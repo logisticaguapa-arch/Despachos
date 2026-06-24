@@ -22,7 +22,7 @@ header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:10px 20px;displ
 .filter-bar label{font-size:0.7rem;color:#64748b;font-weight:600}
 .filter-bar select{padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.75rem;color:#374151;background:white;cursor:pointer}
 .filter-bar select:focus{outline:none;border-color:#2563eb}
-#btnClear{padding:4px 10px;border:1.5px solid #e2e8f0;border-radius:7px;background:white;color:#64748b;cursor:pointer;font-size:0.7rem;font-weight:600}
+#btnClear{padding:4px 12px;border:1.5px solid #e2e8f0;border-radius:7px;background:white;color:#64748b;cursor:pointer;font-size:0.7rem;font-weight:600}
 #btnClear:hover{background:#f1f5f9}
 
 .container{padding:12px 18px;display:grid;gap:12px}
@@ -135,21 +135,21 @@ tbody tr:hover{background:#f8fafc}
     <div class="kpi cyan"><div class="kpi-val" id="kKgMin">—</div><div class="kpi-label">⚡ Kg/Min Prom.</div></div>
   </div>
 
-  <!-- TABLA PRINCIPAL ARRIBA -->
+  <!-- TABLA PRINCIPAL -->
   <div class="table-card">
     <div class="card-title">📋 Detalle de Operación en Tiempo Real</div>
     <div class="tbl-wrap">
       <table>
         <thead>
           <tr>
-            <th>OC</th><th>Cliente</th><th>Placas</th>
+            <th>Fecha</th><th>OC</th><th>Cliente</th><th>Placas</th>
             <th>H.Cita</th><th>H.Llegada</th><th>H.Ini Cargue</th><th>H.Fin Cargue</th>
             <th>Status</th><th>Kg OC</th><th>Cant.Desp</th><th>% Cumpl.</th>
             <th>Kg/Min</th><th>Min Cargue</th><th>Muelle</th><th>Cuadrilla</th><th>Personas</th><th>Observaciones</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="17" style="text-align:center;padding:20px;color:#94a3b8">Cargando datos...</td></tr>
+          <tr><td colspan="18" style="text-align:center;padding:20px;color:#94a3b8">Cargando datos...</td></tr>
         </tbody>
       </table>
     </div>
@@ -228,7 +228,10 @@ Chart.register(ChartDataLabels);
 
 const CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRD2hMylwsNgmCkX708M_Qlk0ufZAR80CUMU0b-7e7pNYdiWxGmageYnHvntzFVF9MOetTe1C0hJiql/pub?output=csv';
 const REFRESH_MS=5*60*1000;
-const C={OC:0,KG_OC:1,CANT:2,PCT:3,CLIENTE:4,PLACAS:5,H_CITA:6,H_LLE:7,H_INI:8,H_FIN:9,STATUS:10,OBS:11,HS:12,MIN:13,KGMIN:14,EMP:15,MUE:16,CUA:17,PER:18,FECHA:19};
+
+// MAPEO CORRECTO DE COLUMNAS
+const C={FECHA:0,OC:1,KG_OC:2,CANT:3,PCT:4,CLIENTE:5,PLACAS:6,H_CITA:7,H_LLE:8,H_INI:9,H_FIN:10,STATUS:11,OBS:12,HS:13,MIN:14,KGMIN:15,EMP:16,MUE:17,CUA:18,PER:19};
+
 let allData=[],filteredData=[],charts={},nextRefresh=0;
 
 function norm(s){return(s||'').toLowerCase().trim()}
@@ -276,7 +279,7 @@ function parseCSV(txt){
     const oc=(r[C.OC]||'').replace(/"/g,'').trim();
     if(!oc)return false;
     const lo=oc.toLowerCase();
-    return lo!=='oc'&&!lo.includes('cargue')&&!lo.includes('minutos')&&!lo.includes('empaque');
+    return lo!=='oc'&&!lo.includes('cargue')&&!lo.includes('minutos')&&!lo.includes('empaque')&&!lo.includes('fecha');
   });
 }
 
@@ -288,8 +291,7 @@ function populateFilters(){
 
   const fF=document.getElementById('fFecha'),curF=fF.value;
   fF.innerHTML='<option value="">Todas las fechas</option>'+fechas.map(f=>`<option value="${f}"${f===curF?' selected':''}>${f}</option>`).join('');
-  // Seleccionar la fecha más reciente por defecto si no hay filtro activo
-  if(!curF && fechas.length) fF.value=fechas[0];
+  if(!curF&&fechas.length)fF.value=fechas[0]; // selecciona la más reciente por defecto
 
   const fC=document.getElementById('fCliente'),curC=fC.value;
   fC.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(c=>`<option value="${c}"${c===curC?' selected':''}>${c}</option>`).join('');
@@ -346,6 +348,7 @@ function renderTable(){
   document.getElementById('tableBody').innerHTML=rows.length?rows.map(r=>{
     const pct=parseFloat(r[C.PCT])||0;
     return`<tr>
+      <td style="color:#64748b;font-size:0.68rem">${r[C.FECHA]||'—'}</td>
       <td><strong style="color:#2563eb">${r[C.OC]||'—'}</strong></td>
       <td class="td-cliente" title="${r[C.CLIENTE]||''}">${r[C.CLIENTE]||'—'}</td>
       <td><strong>${r[C.PLACAS]||'—'}</strong></td>
@@ -356,12 +359,7 @@ function renderTable(){
       <td><span class="badge ${badgeClass(r[C.STATUS])}">${r[C.STATUS]||'—'}</span></td>
       <td>${Number(r[C.KG_OC]||0).toLocaleString()}</td>
       <td>${Number(r[C.CANT]||0).toLocaleString()}</td>
-      <td>
-        <div class="pbar">
-          <div class="pbar-bg"><div class="pbar-fill" style="width:${Math.min(pct,100)}%;background:${pctColor(pct)}"></div></div>
-          <span style="font-size:0.68rem;color:#64748b;width:30px">${pct}%</span>
-        </div>
-      </td>
+      <td><div class="pbar"><div class="pbar-bg"><div class="pbar-fill" style="width:${Math.min(pct,100)}%;background:${pctColor(pct)}"></div></div><span style="font-size:0.68rem;color:#64748b;width:30px">${pct}%</span></div></td>
       <td>${r[C.KGMIN]||'—'}</td>
       <td>${r[C.MIN]||'—'}</td>
       <td>${r[C.MUE]||'—'}</td>
@@ -369,7 +367,7 @@ function renderTable(){
       <td>${r[C.PER]||'—'}</td>
       <td style="color:#94a3b8;max-width:120px;overflow:hidden;text-overflow:ellipsis">${r[C.OBS]||'—'}</td>
     </tr>`;
-  }).join(''):`<tr><td colspan="17" style="text-align:center;padding:20px;color:#94a3b8">Sin datos para los filtros seleccionados</td></tr>`;
+  }).join(''):`<tr><td colspan="18" style="text-align:center;padding:20px;color:#94a3b8">Sin datos para los filtros seleccionados</td></tr>`;
 }
 
 function renderEtapas(){
@@ -420,11 +418,7 @@ function renderCharts(){
   destroyChart('cumpl');
   charts['cumpl']=new Chart(document.getElementById('chartCumplimiento'),{
     type:'bar',
-    data:{labels:cLabels,datasets:[{
-      label:'%',data:cVals,
-      backgroundColor:cVals.map(p=>p>=100?'#16a34a':p>=80?'#d97706':'#dc2626'),
-      borderRadius:4
-    }]},
+    data:{labels:cLabels,datasets:[{label:'%',data:cVals,backgroundColor:cVals.map(p=>p>=100?'#16a34a':p>=80?'#d97706':'#dc2626'),borderRadius:4}]},
     options:{responsive:true,
       plugins:{legend:{display:false},
         datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:v=>v>0?v+'%':''},
@@ -461,13 +455,12 @@ function renderCharts(){
   });
 
   // Kg por cliente
-  const kgLabels=cLabels;
-  const kgOC=kgLabels.map(k=>clienteMap[k].kgOC);
-  const kgDesp=kgLabels.map(k=>clienteMap[k].kgDesp);
+  const kgOC=cLabels.map(k=>clienteMap[k].kgOC);
+  const kgDesp=cLabels.map(k=>clienteMap[k].kgDesp);
   destroyChart('kg');
   charts['kg']=new Chart(document.getElementById('chartKg'),{
     type:'bar',
-    data:{labels:kgLabels,datasets:[
+    data:{labels:cLabels,datasets:[
       {label:'Kg Prog.',data:kgOC,backgroundColor:'#bfdbfe',borderRadius:3},
       {label:'Kg Desp.',data:kgDesp,backgroundColor:'#2563eb',borderRadius:3}
     ]},
@@ -478,7 +471,7 @@ function renderCharts(){
       scales:baseScales}
   });
 
-  // Cuadrillas - toneladas
+  // Cuadrillas
   const cuadMap={};
   r.forEach(x=>{
     const cu=(x[C.CUA]||'').trim();if(!cu)return;
@@ -500,7 +493,7 @@ function renderCharts(){
       }}
   });
 
-  // Dona Kg estados
+  // Dona Kg
   const kgCargado=r.filter(x=>isCargado(x[C.STATUS])).reduce((a,x)=>a+(parseFloat(x[C.CANT])||0),0);
   const kgEnCargue=r.filter(x=>isEnCargue(x[C.STATUS])).reduce((a,x)=>a+(parseFloat(x[C.KG_OC])||0),0);
   const kgEnPatio=r.filter(x=>isEnPatio(x[C.STATUS])).reduce((a,x)=>a+(parseFloat(x[C.KG_OC])||0),0);
@@ -511,8 +504,7 @@ function renderCharts(){
       datasets:[{data:[kgCargado,kgEnCargue,kgEnPatio],backgroundColor:['#16a34a','#d97706','#7c3aed'],borderWidth:0,hoverOffset:4}]},
     options:{responsive:true,cutout:'60%',
       plugins:{legend:{display:false},
-        datalabels:{display:true,color:'white',font:{size:9,weight:'bold'},
-          formatter:(v,ctx)=>v>0?(v/1000).toFixed(1)+'T':''},
+        datalabels:{display:true,color:'white',font:{size:9,weight:'bold'},formatter:(v)=>v>0?(v/1000).toFixed(1)+'T':''},
         tooltip:{callbacks:{label:c=>c.label+': '+(c.raw/1000).toFixed(1)+' Ton'}}}}
   });
   document.getElementById('kgDonaLegend').innerHTML=[
