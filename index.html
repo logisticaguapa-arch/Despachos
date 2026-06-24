@@ -5,68 +5,89 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de Despachos - SYOP</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
 header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.logo{color:white;font-size:1.1rem;font-weight:700;letter-spacing:1px}
-.logo span{color:#60a5fa}
-.header-right{display:flex;align-items:center;gap:12px}
-.update-badge{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#a0c4ff;padding:4px 12px;border-radius:20px;font-size:0.72rem}
-#refreshBtn{background:#2563eb;border:none;color:white;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600}
-#refreshBtn:hover{background:#1d4ed8}
+.logo{color:white;font-size:1.1rem;font-weight:700;letter-spacing:1px}.logo span{color:#60a5fa}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ubadge{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#a0c4ff;padding:4px 10px;border-radius:20px;font-size:0.7rem}
+#refreshBtn{background:#2563eb;border:none;color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:600}
 .progress-wrap{height:3px;background:rgba(0,0,0,0.1)}
 .progress-bar{height:3px;background:#60a5fa;transition:width 1s linear}
-.container{padding:14px 18px;display:grid;gap:14px}
-.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
-.kpi{background:white;border-radius:10px;padding:14px 12px;box-shadow:0 1px 6px rgba(0,0,0,0.07);border-top:3px solid #e2e8f0;display:flex;flex-direction:column;gap:4px}
-.kpi.blue{border-top-color:#2563eb}.kpi.green{border-top-color:#16a34a}
-.kpi.yellow{border-top-color:#d97706}.kpi.red{border-top-color:#dc2626}
-.kpi.purple{border-top-color:#7c3aed}.kpi.cyan{border-top-color:#0891b2}
-.kpi-icon{font-size:1.1rem}
-.kpi-val{font-size:1.7rem;font-weight:800;line-height:1}
-.kpi.blue .kpi-val{color:#2563eb}.kpi.green .kpi-val{color:#16a34a}
-.kpi.yellow .kpi-val{color:#d97706}.kpi.red .kpi-val{color:#dc2626}
-.kpi.purple .kpi-val{color:#7c3aed}.kpi.cyan .kpi-val{color:#0891b2}
-.kpi-label{font-size:0.68rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
-.charts-row{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px}
-.charts-row2{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:14px}
-.card{background:white;border-radius:10px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,0.07)}
-.card-title{font-size:0.78rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;display:flex;align-items:center;gap:6px}
-.card-title::before{content:'';width:3px;height:14px;background:#2563eb;border-radius:2px;display:inline-block}
-.table-card{background:white;border-radius:10px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,0.07)}
-.tbl-wrap{overflow-x:auto;max-height:220px;overflow-y:auto}
-table{width:100%;border-collapse:collapse;font-size:0.75rem}
-th{padding:8px 10px;background:#f8fafc;color:#64748b;font-weight:700;text-transform:uppercase;font-size:0.68rem;letter-spacing:0.5px;position:sticky;top:0;z-index:1;border-bottom:2px solid #e2e8f0;white-space:nowrap}
-td{padding:8px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap}
+
+/* FILTER BAR */
+.filter-bar{background:white;padding:8px 18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+.filter-bar label{font-size:0.7rem;color:#64748b;font-weight:600}
+.filter-bar select{padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.75rem;color:#374151;background:white;cursor:pointer}
+.filter-bar select:focus{outline:none;border-color:#2563eb}
+#btnClear{padding:4px 10px;border:1.5px solid #e2e8f0;border-radius:7px;background:white;color:#64748b;cursor:pointer;font-size:0.7rem;font-weight:600}
+
+.container{padding:12px 18px;display:grid;gap:12px}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.kpi{background:white;border-radius:10px;padding:10px 12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border-top:3px solid #e2e8f0;display:flex;flex-direction:column;gap:2px}
+.kpi.blue{border-top-color:#2563eb}.kpi.green{border-top-color:#16a34a}.kpi.yellow{border-top-color:#d97706}
+.kpi.red{border-top-color:#dc2626}.kpi.purple{border-top-color:#7c3aed}.kpi.cyan{border-top-color:#0891b2}
+.kpi-val{font-size:1.5rem;font-weight:800;line-height:1}
+.kpi.blue .kpi-val{color:#2563eb}.kpi.green .kpi-val{color:#16a34a}.kpi.yellow .kpi-val{color:#d97706}
+.kpi.red .kpi-val{color:#dc2626}.kpi.purple .kpi-val{color:#7c3aed}.kpi.cyan .kpi-val{color:#0891b2}
+.kpi-label{font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;font-weight:600}
+
+/* TABLE PRINCIPAL */
+.table-card{background:white;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.card-title{font-size:0.73rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card-title::before{content:'';width:3px;height:13px;background:#2563eb;border-radius:2px;display:inline-block}
+.tbl-wrap{overflow-x:auto;max-height:260px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:0.73rem}
+th{padding:7px 10px;background:#1e293b;color:#94a3b8;font-weight:700;text-transform:uppercase;font-size:0.63rem;letter-spacing:0.4px;position:sticky;top:0;z-index:1;white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid #f1f5f9;white-space:nowrap}
 tbody tr:hover{background:#f8fafc}
-.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:0.67rem;font-weight:700;text-transform:uppercase}
-.badge-d{background:#dcfce7;color:#15803d}
-.badge-c{background:#fef3c7;color:#b45309}
-.badge-p{background:#ede9fe;color:#6d28d9}
-.pbar{display:flex;align-items:center;gap:6px}
-.pbar-bg{flex:1;height:5px;background:#f1f5f9;border-radius:3px;min-width:50px}
-.pbar-fill{height:100%;border-radius:3px}
-.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-.fbtn{padding:4px 12px;border-radius:16px;border:1.5px solid #e2e8f0;background:white;color:#64748b;cursor:pointer;font-size:0.72rem;font-weight:600;transition:all 0.15s}
-.fbtn.active{background:#2563eb;color:white;border-color:#2563eb}
-.donut-legend{display:flex;flex-direction:column;gap:8px;margin-top:10px}
-.legend-item{display:flex;align-items:center;gap:8px;font-size:0.73rem}
-.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.legend-label{color:#374151;flex:1}
-.legend-val{font-weight:700;color:#1a1a2e}
-.gauge-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1}
-.gauge-val{font-size:2.4rem;font-weight:900;color:#2563eb;line-height:1}
-.gauge-label{font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px}
-.veh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;max-height:180px;overflow-y:auto}
-.veh-card{background:#f8fafc;border-radius:8px;padding:10px;border-left:3px solid #e2e8f0;font-size:0.72rem}
-.veh-card.d{border-left-color:#16a34a}.veh-card.c{border-left-color:#d97706}.veh-card.p{border-left-color:#7c3aed}
-.veh-placa{font-weight:800;font-size:0.85rem;color:#1a1a2e}
-.veh-cliente{color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px}
-.veh-pct{font-weight:800;font-size:1rem}
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:0.63rem;font-weight:700;text-transform:uppercase}
+.badge-d{background:#dcfce7;color:#15803d}.badge-c{background:#fef3c7;color:#b45309}.badge-p{background:#ede9fe;color:#6d28d9}
+.pbar{display:flex;align-items:center;gap:5px}
+.pbar-bg{flex:1;height:4px;background:#f1f5f9;border-radius:2px;min-width:40px}
+.pbar-fill{height:100%;border-radius:2px}
+.td-cliente{min-width:130px;max-width:160px;font-weight:600;color:#1e40af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ETAPAS */
+.etapas-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.etapa-card{background:white;border-radius:10px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.etapa-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f1f5f9}
+.etapa-title{font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px}
+.etapa-count{margin-left:auto;font-size:1.3rem;font-weight:800}
+.etapa-patio .etapa-title{color:#7c3aed}.etapa-patio .etapa-count{color:#7c3aed}
+.etapa-cargue .etapa-title{color:#d97706}.etapa-cargue .etapa-count{color:#d97706}
+.etapa-listo .etapa-title{color:#16a34a}.etapa-listo .etapa-count{color:#16a34a}
+.trucks-grid{display:flex;flex-wrap:wrap;gap:6px;max-height:130px;overflow-y:auto}
+.truck-chip{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;border-radius:8px;font-size:0.62rem;min-width:78px;text-align:center}
+.etapa-patio .truck-chip{background:#f5f3ff;border:1px solid #ddd6fe}
+.etapa-cargue .truck-chip{background:#fffbeb;border:1px solid #fde68a}
+.etapa-listo .truck-chip{background:#f0fdf4;border:1px solid #bbf7d0}
+.truck-svg{width:38px;height:24px}
+.truck-placa{font-weight:700;color:#1a1a2e;font-size:0.68rem}
+.truck-cliente{color:#64748b;font-size:0.6rem;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.truck-hora{font-size:0.58rem;color:#94a3b8}
+.etapa-cargue .truck-svg{animation:bounce 1s infinite alternate}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-3px)}}
+
+/* CHARTS */
+.charts-row{display:grid;grid-template-columns:1.8fr 1fr 1fr;gap:12px}
+.charts-row2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.card{background:white;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.donut-legend{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:0.68rem}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.legend-label{color:#374151;flex:1}.legend-val{font-weight:700;color:#1a1a2e}
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding-top:4px}
+.gauge-val{font-size:1.8rem;font-weight:900;color:#2563eb;line-height:1}
+.gauge-label{font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;margin-top:2px}
+
 @media(max-width:900px){
   .kpi-row{grid-template-columns:repeat(3,1fr)}
-  .charts-row,.charts-row2{grid-template-columns:1fr}
+  .etapas-row,.charts-row,.charts-row2{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -75,67 +96,44 @@ tbody tr:hover{background:#f8fafc}
 <header>
   <div class="logo">📦 Panel de <span>Despachos SYOP</span></div>
   <div class="header-right">
-    <span class="update-badge" id="lastUpdate">Cargando...</span>
-    <span class="update-badge" id="countdown"></span>
+    <span class="ubadge" id="lastUpdate">Cargando...</span>
+    <span class="ubadge" id="countdown"></span>
     <button id="refreshBtn" onclick="fetchData()">↻ Actualizar</button>
   </div>
 </header>
 <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:100%"></div></div>
 
+<!-- FILTROS -->
+<div class="filter-bar">
+  <label>👤 Cliente:</label>
+  <select id="fCliente" onchange="applyFilters()"><option value="">Todos los clientes</option></select>
+  <label>🚛 Placa:</label>
+  <select id="fPlaca" onchange="applyFilters()"><option value="">Todas las placas</option></select>
+  <label>📋 Estado:</label>
+  <select id="fEstado" onchange="applyFilters()">
+    <option value="">Todos</option>
+    <option value="cargado">✅ Cargado</option>
+    <option value="en cargue">🔄 En Cargue</option>
+    <option value="en patio">⏳ En Patio</option>
+  </select>
+  <button id="btnClear" onclick="clearFilters()">✖ Limpiar</button>
+</div>
+
 <div class="container">
 
+  <!-- KPIs -->
   <div class="kpi-row">
-    <div class="kpi blue"><span class="kpi-icon">🚛</span><div class="kpi-val" id="kTotal">—</div><div class="kpi-label">Total Programados</div></div>
-    <div class="kpi green"><span class="kpi-icon">✅</span><div class="kpi-val" id="kDesp">—</div><div class="kpi-label">Cargados</div></div>
-    <div class="kpi yellow"><span class="kpi-icon">🔄</span><div class="kpi-val" id="kCarg">—</div><div class="kpi-label">En Cargue</div></div>
-    <div class="kpi red"><span class="kpi-icon">⏳</span><div class="kpi-val" id="kPend">—</div><div class="kpi-label">En Patio</div></div>
-    <div class="kpi purple"><span class="kpi-icon">📊</span><div class="kpi-val" id="kPct">—</div><div class="kpi-label">% Cumplimiento</div></div>
-    <div class="kpi cyan"><span class="kpi-icon">⚡</span><div class="kpi-val" id="kKgMin">—</div><div class="kpi-label">Kg/Min Prom.</div></div>
+    <div class="kpi blue"><div class="kpi-val" id="kTotal">—</div><div class="kpi-label">🚛 Total</div></div>
+    <div class="kpi green"><div class="kpi-val" id="kDesp">—</div><div class="kpi-label">✅ Cargados</div></div>
+    <div class="kpi yellow"><div class="kpi-val" id="kCarg">—</div><div class="kpi-label">🔄 En Cargue</div></div>
+    <div class="kpi red"><div class="kpi-val" id="kPend">—</div><div class="kpi-label">⏳ En Patio</div></div>
+    <div class="kpi purple"><div class="kpi-val" id="kPct">—</div><div class="kpi-label">📊 % Cumplimiento</div></div>
+    <div class="kpi cyan"><div class="kpi-val" id="kKgMin">—</div><div class="kpi-label">⚡ Kg/Min Prom.</div></div>
   </div>
 
-  <div class="charts-row">
-    <div class="card">
-      <div class="card-title">% Cumplimiento por Vehículo</div>
-      <canvas id="chartCumplimiento" height="130"></canvas>
-    </div>
-    <div class="card">
-      <div class="card-title">Estado de Flota</div>
-      <canvas id="chartEstado" height="120"></canvas>
-      <div class="donut-legend" id="donutLegend"></div>
-    </div>
-    <div class="card" style="display:flex;flex-direction:column">
-      <div class="card-title">Cumplimiento General</div>
-      <div class="gauge-wrap">
-        <canvas id="chartGauge" height="130" width="130"></canvas>
-        <div class="gauge-val" id="gaugeVal">—</div>
-        <div class="gauge-label">% promedio del día</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="charts-row2">
-    <div class="card">
-      <div class="card-title">Kg Programados vs Despachados</div>
-      <canvas id="chartKg" height="130"></canvas>
-    </div>
-    <div class="card">
-      <div class="card-title">Minutos de Cargue por Vehículo</div>
-      <canvas id="chartTiempo" height="130"></canvas>
-    </div>
-    <div class="card">
-      <div class="card-title">Estado de Vehículos</div>
-      <div class="filters">
-        <button class="fbtn active" onclick="setFilter('Todos',this)">Todos</button>
-        <button class="fbtn" onclick="setFilter('Cargado',this)">✅ Cargado</button>
-        <button class="fbtn" onclick="setFilter('En cargue',this)">🔄 En cargue</button>
-        <button class="fbtn" onclick="setFilter('En patio',this)">⏳ En patio</button>
-      </div>
-      <div class="veh-grid" id="vehGrid"></div>
-    </div>
-  </div>
-
+  <!-- ★ TABLA DETALLE - DATO PRINCIPAL ARRIBA -->
   <div class="table-card">
-    <div class="card-title">Detalle de Operación</div>
+    <div class="card-title">📋 Detalle de Operación en Tiempo Real</div>
     <div class="tbl-wrap">
       <table>
         <thead>
@@ -143,7 +141,7 @@ tbody tr:hover{background:#f8fafc}
             <th>OC</th><th>Cliente</th><th>Placas</th>
             <th>H.Cita</th><th>H.Llegada</th><th>H.Ini Cargue</th><th>H.Fin Cargue</th>
             <th>Status</th><th>Kg OC</th><th>Cant.Desp</th><th>% Cumpl.</th>
-            <th>Kg/Min</th><th>Empaque</th><th>Muelle</th><th>Cuadrilla</th><th>Personas</th><th>Observaciones</th>
+            <th>Kg/Min</th><th>Min Cargue</th><th>Muelle</th><th>Cuadrilla</th><th>Personas</th><th>Observaciones</th>
           </tr>
         </thead>
         <tbody id="tableBody"><tr><td colspan="17" style="text-align:center;padding:20px;color:#94a3b8">Cargando datos...</td></tr></tbody>
@@ -151,21 +149,98 @@ tbody tr:hover{background:#f8fafc}
     </div>
   </div>
 
+  <!-- ETAPAS -->
+  <div class="etapas-row">
+    <div class="etapa-card etapa-patio">
+      <div class="etapa-header">
+        <span style="font-size:1.2rem">⏳</span>
+        <span class="etapa-title">En Patio</span>
+        <span class="etapa-count" id="countPatio">0</span>
+      </div>
+      <div class="trucks-grid" id="trucksPatio"></div>
+    </div>
+    <div class="etapa-card etapa-cargue">
+      <div class="etapa-header">
+        <span style="font-size:1.2rem">🔄</span>
+        <span class="etapa-title">En Cargue</span>
+        <span class="etapa-count" id="countCargue">0</span>
+      </div>
+      <div class="trucks-grid" id="trucksCargue"></div>
+    </div>
+    <div class="etapa-card etapa-listo">
+      <div class="etapa-header">
+        <span style="font-size:1.2rem">✅</span>
+        <span class="etapa-title">Cargados</span>
+        <span class="etapa-count" id="countListo">0</span>
+      </div>
+      <div class="trucks-grid" id="trucksListo"></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="charts-row">
+    <div class="card">
+      <div class="card-title">% Cumplimiento por Cliente</div>
+      <canvas id="chartCumplimiento" height="95"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Estado de Flota</div>
+      <canvas id="chartEstado" height="95"></canvas>
+      <div class="donut-legend" id="donutLegend"></div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column">
+      <div class="card-title">Cumplimiento General</div>
+      <div class="gauge-wrap">
+        <canvas id="chartGauge" height="105" width="105"></canvas>
+        <div class="gauge-val" id="gaugeVal">—</div>
+        <div class="gauge-label">% promedio del día</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-row2">
+    <div class="card">
+      <div class="card-title">Kg Programados vs Despachados por Cliente</div>
+      <canvas id="chartKg" height="95"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Toneladas Cargadas por Cuadrilla</div>
+      <canvas id="chartCuadrilla" height="95"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">🍩 Kg: Cargados / En Cargue / Pendientes</div>
+      <canvas id="chartKgDona" height="95"></canvas>
+      <div class="donut-legend" id="kgDonaLegend"></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
-const CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vS-zPLuMqRIx6H5Feg-HKkC8V8dTbkGDKlhoyLDxgc_ChZ8nkueukq388Rh9AQAwUDHs5DPxazXUBaW/pub?output=csv';
+Chart.register(ChartDataLabels);
+const CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRD2hMylwsNgmCkX708M_Qlk0ufZAR80CUMU0b-7e7pNYdiWxGmageYnHvntzFVF9MOetTe1C0hJiql/pub?output=csv';
 const REFRESH_MS=5*60*1000;
 const C={OC:0,KG_OC:1,CANT:2,PCT:3,CLIENTE:4,PLACAS:5,H_CITA:6,H_LLE:7,H_INI:8,H_FIN:9,STATUS:10,OBS:11,HS:12,MIN:13,KGMIN:14,EMP:15,MUE:16,CUA:17,PER:18};
-let allData=[],currentFilter='Todos',charts={},nextRefresh=0;
+let allData=[],filteredData=[],charts={},nextRefresh=0;
 
 function norm(s){return(s||'').toLowerCase().trim()}
 function pctColor(p){return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626'}
 function isCargado(s){return norm(s)==='cargado'}
 function isEnCargue(s){return norm(s)==='en cargue'}
 function isEnPatio(s){return norm(s)==='en patio'}
-function statusClass(s){if(isCargado(s))return 'd';if(isEnCargue(s))return 'c';return 'p'}
 function badgeClass(s){if(isCargado(s))return 'badge-d';if(isEnCargue(s))return 'badge-c';return 'badge-p'}
+
+function truckSVG(color){
+  return`<svg class="truck-svg" viewBox="0 0 60 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="8" width="38" height="20" rx="3" fill="${color}" opacity="0.9"/>
+    <rect x="39" y="14" width="18" height="14" rx="2" fill="${color}"/>
+    <rect x="41" y="16" width="14" height="9" rx="1" fill="white" opacity="0.35"/>
+    <circle cx="10" cy="30" r="4" fill="#374151"/><circle cx="10" cy="30" r="2" fill="#9ca3af"/>
+    <circle cx="46" cy="30" r="4" fill="#374151"/><circle cx="46" cy="30" r="2" fill="#9ca3af"/>
+    <rect x="1" y="25" width="56" height="3" rx="1" fill="${color}" opacity="0.4"/>
+  </svg>`;
+}
 
 async function fetchData(){
   document.getElementById('refreshBtn').textContent='⏳';
@@ -174,7 +249,8 @@ async function fetchData(){
     if(!res.ok)throw new Error('HTTP '+res.status);
     const txt=await res.text();
     allData=parseCSV(txt);
-    renderAll();
+    populateFilters();
+    applyFilters();
     document.getElementById('lastUpdate').textContent='🟢 '+new Date().toLocaleTimeString('es-CO');
   }catch(e){
     document.getElementById('lastUpdate').textContent='🔴 Error: '+e.message;
@@ -197,10 +273,39 @@ function parseCSV(txt){
   });
 }
 
-function renderAll(){renderKPIs();renderCharts();renderVehicles();renderTable()}
+function populateFilters(){
+  const clientes=[...new Set(allData.map(r=>(r[C.CLIENTE]||'').trim()).filter(Boolean))].sort();
+  const placas=[...new Set(allData.map(r=>(r[C.PLACAS]||'').trim()).filter(Boolean))].sort();
+  const fC=document.getElementById('fCliente'),curC=fC.value;
+  fC.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(c=>`<option value="${c}"${c===curC?' selected':''}>${c}</option>`).join('');
+  const fP=document.getElementById('fPlaca'),curP=fP.value;
+  fP.innerHTML='<option value="">Todas las placas</option>'+placas.map(p=>`<option value="${p}"${p===curP?' selected':''}>${p}</option>`).join('');
+}
+
+function applyFilters(){
+  const fC=document.getElementById('fCliente').value;
+  const fP=document.getElementById('fPlaca').value;
+  const fE=document.getElementById('fEstado').value;
+  filteredData=allData.filter(r=>{
+    if(fC&&(r[C.CLIENTE]||'').trim()!==fC)return false;
+    if(fP&&(r[C.PLACAS]||'').trim()!==fP)return false;
+    if(fE&&norm(r[C.STATUS])!==fE)return false;
+    return true;
+  });
+  renderAll();
+}
+
+function clearFilters(){
+  document.getElementById('fCliente').value='';
+  document.getElementById('fPlaca').value='';
+  document.getElementById('fEstado').value='';
+  applyFilters();
+}
+
+function renderAll(){renderKPIs();renderTable();renderEtapas();renderCharts()}
 
 function renderKPIs(){
-  const r=allData,total=r.length;
+  const r=filteredData;
   const desp=r.filter(x=>isCargado(x[C.STATUS])).length;
   const carg=r.filter(x=>isEnCargue(x[C.STATUS])).length;
   const pend=r.filter(x=>isEnPatio(x[C.STATUS])).length;
@@ -208,7 +313,7 @@ function renderKPIs(){
   const avgPct=pcts.length?Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length):0;
   const kgmins=r.map(x=>parseFloat(x[C.KGMIN])||0).filter(v=>v>0);
   const avgKg=kgmins.length?(kgmins.reduce((a,b)=>a+b,0)/kgmins.length).toFixed(1):'—';
-  document.getElementById('kTotal').textContent=total;
+  document.getElementById('kTotal').textContent=r.length;
   document.getElementById('kDesp').textContent=desp;
   document.getElementById('kCarg').textContent=carg;
   document.getElementById('kPend').textContent=pend;
@@ -217,120 +322,150 @@ function renderKPIs(){
   document.getElementById('gaugeVal').textContent=avgPct+'%';
 }
 
+function renderTable(){
+  const rows=filteredData;
+  document.getElementById('tableBody').innerHTML=rows.length?rows.map(r=>{
+    const pct=parseFloat(r[C.PCT])||0;
+    return`<tr>
+      <td><strong style="color:#2563eb">${r[C.OC]||'—'}</strong></td>
+      <td class="td-cliente" title="${r[C.CLIENTE]||''}">${r[C.CLIENTE]||'—'}</td>
+      <td><strong>${r[C.PLACAS]||'—'}</strong></td>
+      <td>${r[C.H_CITA]||'—'}</td><td>${r[C.H_LLE]||'—'}</td>
+      <td>${r[C.H_INI]||'—'}</td><td>${r[C.H_FIN]||'—'}</td>
+      <td><span class="badge ${badgeClass(r[C.STATUS])}">${r[C.STATUS]||'—'}</span></td>
+      <td>${Number(r[C.KG_OC]||0).toLocaleString()}</td>
+      <td>${Number(r[C.CANT]||0).toLocaleString()}</td>
+      <td><div class="pbar"><div class="pbar-bg"><div class="pbar-fill" style="width:${Math.min(pct,100)}%;background:${pctColor(pct)}"></div></div><span style="font-size:0.68rem;color:#64748b;width:28px">${pct}%</span></div></td>
+      <td>${r[C.KGMIN]||'—'}</td>
+      <td>${r[C.MIN]||'—'}</td>
+      <td>${r[C.MUE]||'—'}</td><td>${r[C.CUA]||'—'}</td>
+      <td>${r[C.PER]||'—'}</td>
+      <td style="color:#94a3b8;max-width:120px;overflow:hidden;text-overflow:ellipsis">${r[C.OBS]||'—'}</td>
+    </tr>`;
+  }).join(''):`<tr><td colspan="17" style="text-align:center;padding:20px;color:#94a3b8">Sin datos para los filtros seleccionados</td></tr>`;
+}
+
+function renderEtapas(){
+  const r=filteredData;
+  const patio=r.filter(x=>isEnPatio(x[C.STATUS]));
+  const cargue=r.filter(x=>isEnCargue(x[C.STATUS]));
+  const listo=r.filter(x=>isCargado(x[C.STATUS]));
+  document.getElementById('countPatio').textContent=patio.length;
+  document.getElementById('countCargue').textContent=cargue.length;
+  document.getElementById('countListo').textContent=listo.length;
+  const mk=(r,color)=>`<div class="truck-chip">
+    ${truckSVG(color)}
+    <span class="truck-placa">${r[C.PLACAS]||'?'}</span>
+    <span class="truck-cliente">${r[C.CLIENTE]||'—'}</span>
+    <span class="truck-hora">${r[C.H_LLE]||r[C.H_CITA]||'—'}</span>
+  </div>`;
+  const empty=msg=>`<p style="color:#94a3b8;font-size:0.72rem;padding:6px">${msg}</p>`;
+  document.getElementById('trucksPatio').innerHTML=patio.length?patio.map(r=>mk(r,'#7c3aed')).join(''):empty('Sin vehículos en patio');
+  document.getElementById('trucksCargue').innerHTML=cargue.length?cargue.map(r=>mk(r,'#d97706')).join(''):empty('Sin vehículos en cargue');
+  document.getElementById('trucksListo').innerHTML=listo.length?listo.map(r=>mk(r,'#16a34a')).join(''):empty('Sin vehículos cargados');
+}
+
 function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id]}}
 
 function renderCharts(){
-  const r=allData;
-  const labels=r.map(x=>x[C.PLACAS]||x[C.OC]||'?');
-  const pcts=r.map(x=>parseFloat(x[C.PCT])||0);
-  const kgOC=r.map(x=>parseFloat(x[C.KG_OC])||0);
-  const kgDesp=r.map(x=>parseFloat(x[C.CANT])||0);
-  const mins=r.map(x=>parseFloat(x[C.MIN])||0);
-  const desp=r.filter(x=>isCargado(x[C.STATUS])).length;
-  const carg=r.filter(x=>isEnCargue(x[C.STATUS])).length;
-  const pend=r.filter(x=>isEnPatio(x[C.STATUS])).length;
-  const pvals=pcts.filter(v=>v>0);
-  const avgPct=pvals.length?Math.round(pvals.reduce((a,b)=>a+b,0)/pvals.length):0;
+  const r=filteredData;
+  const datalabelsBar={display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:v=>v>0?v.toLocaleString():''};
+  const datalabelsPct={display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:v=>v>0?v+'%':''};
+  const baseScales={x:{ticks:{font:{size:9},color:'#64748b',maxRotation:25},grid:{display:false}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}};
 
-  const baseOpts={responsive:true,plugins:{legend:{display:false}},scales:{
-    x:{ticks:{font:{size:10},color:'#64748b'},grid:{display:false}},
-    y:{ticks:{font:{size:10},color:'#64748b'},grid:{color:'#f1f5f9'}}
-  }};
-
+  // Cumplimiento por cliente
+  const clienteMap={};
+  r.forEach(x=>{
+    const cl=(x[C.CLIENTE]||'Sin nombre').trim();
+    if(!clienteMap[cl])clienteMap[cl]={sum:0,cnt:0};
+    const p=parseFloat(x[C.PCT])||0;
+    if(p>0){clienteMap[cl].sum+=p;clienteMap[cl].cnt++;}
+  });
+  const cLabels=Object.keys(clienteMap);
+  const cVals=cLabels.map(k=>clienteMap[k].cnt?Math.round(clienteMap[k].sum/clienteMap[k].cnt):0);
   destroyChart('cumpl');
   charts['cumpl']=new Chart(document.getElementById('chartCumplimiento'),{
     type:'bar',
-    data:{labels,datasets:[{label:'% Cumplimiento',data:pcts,backgroundColor:pcts.map(p=>p>=100?'#16a34a':p>=80?'#d97706':'#dc2626'),borderRadius:5}]},
-    options:{...baseOpts,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'%'}}},
-      scales:{...baseOpts.scales,y:{...baseOpts.scales.y,max:100,ticks:{callback:v=>v+'%',font:{size:10},color:'#64748b'},grid:{color:'#f1f5f9'}}}}
+    data:{labels:cLabels,datasets:[{label:'%',data:cVals,backgroundColor:cVals.map(p=>p>=100?'#16a34a':p>=80?'#d97706':'#dc2626'),borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},datalabels:datalabelsPct,tooltip:{callbacks:{label:c=>c.raw+'%'}}},
+      scales:{...baseScales,y:{...baseScales.y,max:110,ticks:{callback:v=>v+'%',font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}
   });
 
+  // Dona estado
+  const desp=r.filter(x=>isCargado(x[C.STATUS])).length;
+  const carg=r.filter(x=>isEnCargue(x[C.STATUS])).length;
+  const pend=r.filter(x=>isEnPatio(x[C.STATUS])).length;
   destroyChart('estado');
   charts['estado']=new Chart(document.getElementById('chartEstado'),{
     type:'doughnut',
     data:{labels:['Cargados','En Cargue','En Patio'],
       datasets:[{data:[desp,carg,pend],backgroundColor:['#16a34a','#d97706','#7c3aed'],borderWidth:0,hoverOffset:4}]},
-    options:{responsive:true,cutout:'70%',plugins:{legend:{display:false}}}
+    options:{responsive:true,cutout:'65%',plugins:{legend:{display:false},
+      datalabels:{display:true,color:'white',font:{size:10,weight:'bold'},formatter:(v,ctx)=>v>0?v:''}}}
   });
   document.getElementById('donutLegend').innerHTML=[
     ['#16a34a','✅ Cargados',desp],['#d97706','🔄 En Cargue',carg],['#7c3aed','⏳ En Patio',pend]
   ].map(([c,l,v])=>`<div class="legend-item"><div class="legend-dot" style="background:${c}"></div><span class="legend-label">${l}</span><span class="legend-val">${v}</span></div>`).join('');
 
+  // Gauge
+  const pvals=r.map(x=>parseFloat(x[C.PCT])||0).filter(v=>v>0);
+  const avgPct=pvals.length?Math.round(pvals.reduce((a,b)=>a+b,0)/pvals.length):0;
   destroyChart('gauge');
   charts['gauge']=new Chart(document.getElementById('chartGauge'),{
     type:'doughnut',
     data:{datasets:[{data:[avgPct,100-avgPct],backgroundColor:['#2563eb','#e2e8f0'],borderWidth:0,circumference:180,rotation:270}]},
-    options:{responsive:false,cutout:'75%',plugins:{legend:{display:false},tooltip:{enabled:false}}}
+    options:{responsive:false,cutout:'72%',plugins:{legend:{display:false},tooltip:{enabled:false},datalabels:{display:false}}}
   });
 
+  // Kg por cliente
+  const kgLabels=Object.keys(clienteMap);
+  const kgOC=kgLabels.map(k=>r.filter(x=>(x[C.CLIENTE]||'Sin nombre').trim()===k).reduce((a,x)=>a+(parseFloat(x[C.KG_OC])||0),0));
+  const kgDesp=kgLabels.map(k=>r.filter(x=>(x[C.CLIENTE]||'Sin nombre').trim()===k).reduce((a,x)=>a+(parseFloat(x[C.CANT])||0),0));
   destroyChart('kg');
   charts['kg']=new Chart(document.getElementById('chartKg'),{
     type:'bar',
-    data:{labels,datasets:[
-      {label:'Kg Programados',data:kgOC,backgroundColor:'#bfdbfe',borderRadius:4},
-      {label:'Kg Despachados',data:kgDesp,backgroundColor:'#2563eb',borderRadius:4}
+    data:{labels:kgLabels,datasets:[
+      {label:'Kg Prog.',data:kgOC,backgroundColor:'#bfdbfe',borderRadius:3},
+      {label:'Kg Desp.',data:kgDesp,backgroundColor:'#2563eb',borderRadius:3}
     ]},
-    options:{...baseOpts,plugins:{legend:{display:true,labels:{font:{size:10},color:'#64748b'}}}}
+    options:{responsive:true,plugins:{legend:{display:true,labels:{font:{size:9},color:'#64748b',boxWidth:10}},
+      datalabels:{...datalabelsBar,formatter:v=>v>0?(v/1000).toFixed(1)+'T':''}},scales:baseScales}
   });
 
-  destroyChart('tiempo');
-  charts['tiempo']=new Chart(document.getElementById('chartTiempo'),{
+  // Cuadrillas
+  const cuadMap={};
+  r.forEach(x=>{
+    const cu=(x[C.CUA]||'').trim();if(!cu)return;
+    if(!cuadMap[cu])cuadMap[cu]=0;
+    cuadMap[cu]+=(parseFloat(x[C.CANT])||0)/1000;
+  });
+  const cuadL=Object.keys(cuadMap);
+  const cuadV=cuadL.map(k=>parseFloat(cuadMap[k].toFixed(2)));
+  destroyChart('cuadrilla');
+  charts['cuadrilla']=new Chart(document.getElementById('chartCuadrilla'),{
     type:'bar',
-    data:{labels,datasets:[{label:'Minutos',data:mins,backgroundColor:'#a78bfa',borderRadius:5}]},
-    options:{...baseOpts,plugins:{legend:{display:false}}}
+    data:{labels:cuadL,datasets:[{label:'Ton',data:cuadV,backgroundColor:'#818cf8',borderRadius:4}]},
+    options:{responsive:true,indexAxis:'y',
+      plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:9,weight:'bold'},formatter:v=>v>0?v+' T':''}},
+      scales:{x:{ticks:{font:{size:9},color:'#64748b',callback:v=>v+' T'},grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}}}}
   });
-}
 
-function setFilter(f,btn){
-  currentFilter=f;
-  document.querySelectorAll('.fbtn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  renderVehicles();
-}
-
-function filtered(){
-  if(currentFilter==='Todos')return allData;
-  return allData.filter(r=>{
-    const n=norm(r[C.STATUS]);
-    if(currentFilter==='Cargado')return n==='cargado';
-    if(currentFilter==='En cargue')return n==='en cargue';
-    return n==='en patio';
+  // Dona Kg
+  const kgCargado=r.filter(x=>isCargado(x[C.STATUS])).reduce((a,x)=>a+(parseFloat(x[C.CANT])||0),0);
+  const kgEnCargue=r.filter(x=>isEnCargue(x[C.STATUS])).reduce((a,x)=>a+(parseFloat(x[C.KG_OC])||0),0);
+  const kgPend=r.filter(x=>isEnPatio(x[C.STATUS])).reduce((a,x)=>a+(parseFloat(x[C.KG_OC])||0),0);
+  destroyChart('kgdona');
+  charts['kgdona']=new Chart(document.getElementById('chartKgDona'),{
+    type:'doughnut',
+    data:{labels:['Cargados','En Cargue','En Patio'],
+      datasets:[{data:[kgCargado,kgEnCargue,kgPend],backgroundColor:['#16a34a','#d97706','#7c3aed'],borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,cutout:'60%',plugins:{legend:{display:false},
+      datalabels:{display:true,color:'white',font:{size:9,weight:'bold'},formatter:(v,ctx)=>v>0?(v/1000).toFixed(1)+'T':''},
+      tooltip:{callbacks:{label:c=>c.label+': '+(c.raw/1000).toFixed(1)+' Ton'}}}}
   });
-}
-
-function renderVehicles(){
-  const rows=filtered();
-  document.getElementById('vehGrid').innerHTML=rows.length?rows.map(r=>{
-    const pct=parseFloat(r[C.PCT])||0;
-    const sc=statusClass(r[C.STATUS]);
-    return`<div class="veh-card ${sc}">
-      <div class="veh-placa">🚛 ${r[C.PLACAS]||'Sin placa'}</div>
-      <div class="veh-cliente">${r[C.CLIENTE]||'—'}</div>
-      <div style="font-size:0.7rem;color:#94a3b8">OC: ${r[C.OC]||'—'}</div>
-      <div style="font-size:0.7rem;color:#94a3b8">Cita: ${r[C.H_CITA]||'—'} | Llegó: ${r[C.H_LLE]||'—'}</div>
-      <div class="veh-pct" style="color:${pctColor(pct)}">${pct}%</div>
-    </div>`;
-  }).join(''):`<p style="color:#94a3b8;font-size:0.8rem;padding:10px">Sin registros</p>`;
-}
-
-function renderTable(){
-  const rows=allData;
-  document.getElementById('tableBody').innerHTML=rows.length?rows.map(r=>{
-    const pct=parseFloat(r[C.PCT])||0;
-    return`<tr>
-      <td><strong style="color:#2563eb">${r[C.OC]||'—'}</strong></td>
-      <td>${r[C.CLIENTE]||'—'}</td><td><strong>${r[C.PLACAS]||'—'}</strong></td>
-      <td>${r[C.H_CITA]||'—'}</td><td>${r[C.H_LLE]||'—'}</td>
-      <td>${r[C.H_INI]||'—'}</td><td>${r[C.H_FIN]||'—'}</td>
-      <td><span class="badge ${badgeClass(r[C.STATUS])}">${r[C.STATUS]||'—'}</span></td>
-      <td>${r[C.KG_OC]||'—'}</td><td>${r[C.CANT]||'—'}</td>
-      <td><div class="pbar"><div class="pbar-bg"><div class="pbar-fill" style="width:${Math.min(pct,100)}%;background:${pctColor(pct)}"></div></div><span style="font-size:0.7rem;color:#64748b;width:30px">${pct}%</span></div></td>
-      <td>${r[C.KGMIN]||'—'}</td><td>${r[C.EMP]||'—'}</td>
-      <td>${r[C.MUE]||'—'}</td><td>${r[C.CUA]||'—'}</td>
-      <td>${r[C.PER]||'—'}</td>
-      <td style="color:#94a3b8;max-width:140px;overflow:hidden;text-overflow:ellipsis">${r[C.OBS]||'—'}</td>
-    </tr>`;
-  }).join(''):`<tr><td colspan="17" style="text-align:center;padding:20px;color:#94a3b8">Sin datos</td></tr>`;
+  document.getElementById('kgDonaLegend').innerHTML=[
+    ['#16a34a','✅ Cargados',kgCargado],['#d97706','🔄 En Cargue',kgEnCargue],['#7c3aed','⏳ En Patio',kgPend]
+  ].map(([c,l,v])=>`<div class="legend-item"><div class="legend-dot" style="background:${c}"></div><span class="legend-label">${l}</span><span class="legend-val">${(v/1000).toFixed(1)} Ton</span></div>`).join('');
 }
 
 function startCountdown(){
