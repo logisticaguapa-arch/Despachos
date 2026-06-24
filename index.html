@@ -86,9 +86,9 @@ tbody tr:hover{background:#f8fafc}
 
   <div class="kpi-row">
     <div class="kpi blue"><span class="kpi-icon">🚛</span><div class="kpi-val" id="kTotal">—</div><div class="kpi-label">Total Programados</div></div>
-    <div class="kpi green"><span class="kpi-icon">✅</span><div class="kpi-val" id="kDesp">—</div><div class="kpi-label">Despachados</div></div>
+    <div class="kpi green"><span class="kpi-icon">✅</span><div class="kpi-val" id="kDesp">—</div><div class="kpi-label">Cargados</div></div>
     <div class="kpi yellow"><span class="kpi-icon">🔄</span><div class="kpi-val" id="kCarg">—</div><div class="kpi-label">En Cargue</div></div>
-    <div class="kpi red"><span class="kpi-icon">⏳</span><div class="kpi-val" id="kPend">—</div><div class="kpi-label">Pendientes</div></div>
+    <div class="kpi red"><span class="kpi-icon">⏳</span><div class="kpi-val" id="kPend">—</div><div class="kpi-label">En Patio</div></div>
     <div class="kpi purple"><span class="kpi-icon">📊</span><div class="kpi-val" id="kPct">—</div><div class="kpi-label">% Cumplimiento</div></div>
     <div class="kpi cyan"><span class="kpi-icon">⚡</span><div class="kpi-val" id="kKgMin">—</div><div class="kpi-label">Kg/Min Prom.</div></div>
   </div>
@@ -126,9 +126,9 @@ tbody tr:hover{background:#f8fafc}
       <div class="card-title">Estado de Vehículos</div>
       <div class="filters">
         <button class="fbtn active" onclick="setFilter('Todos',this)">Todos</button>
-        <button class="fbtn" onclick="setFilter('Despachado',this)">✅ Despachado</button>
+        <button class="fbtn" onclick="setFilter('Cargado',this)">✅ Cargado</button>
         <button class="fbtn" onclick="setFilter('En cargue',this)">🔄 En cargue</button>
-        <button class="fbtn" onclick="setFilter('Pendiente',this)">⏳ Pendiente</button>
+        <button class="fbtn" onclick="setFilter('En patio',this)">⏳ En patio</button>
       </div>
       <div class="veh-grid" id="vehGrid"></div>
     </div>
@@ -161,8 +161,11 @@ let allData=[],currentFilter='Todos',charts={},nextRefresh=0;
 
 function norm(s){return(s||'').toLowerCase().trim()}
 function pctColor(p){return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626'}
-function statusClass(s){const n=norm(s);if(n==='despachado')return 'd';if(n.includes('cargue')||n.includes('cargando'))return 'c';return 'p'}
-function badgeClass(s){const n=norm(s);if(n==='despachado')return 'badge-d';if(n.includes('cargue')||n.includes('cargando'))return 'badge-c';return 'badge-p'}
+function isCargado(s){return norm(s)==='cargado'}
+function isEnCargue(s){return norm(s)==='en cargue'}
+function isEnPatio(s){return norm(s)==='en patio'}
+function statusClass(s){if(isCargado(s))return 'd';if(isEnCargue(s))return 'c';return 'p'}
+function badgeClass(s){if(isCargado(s))return 'badge-d';if(isEnCargue(s))return 'badge-c';return 'badge-p'}
 
 async function fetchData(){
   document.getElementById('refreshBtn').textContent='⏳';
@@ -198,9 +201,9 @@ function renderAll(){renderKPIs();renderCharts();renderVehicles();renderTable()}
 
 function renderKPIs(){
   const r=allData,total=r.length;
-  const desp=r.filter(x=>norm(x[C.STATUS])==='despachado').length;
-  const carg=r.filter(x=>norm(x[C.STATUS]).includes('cargue')||norm(x[C.STATUS]).includes('cargando')).length;
-  const pend=total-desp-carg;
+  const desp=r.filter(x=>isCargado(x[C.STATUS])).length;
+  const carg=r.filter(x=>isEnCargue(x[C.STATUS])).length;
+  const pend=r.filter(x=>isEnPatio(x[C.STATUS])).length;
   const pcts=r.map(x=>parseFloat(x[C.PCT])||0).filter(v=>v>0);
   const avgPct=pcts.length?Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length):0;
   const kgmins=r.map(x=>parseFloat(x[C.KGMIN])||0).filter(v=>v>0);
@@ -223,9 +226,9 @@ function renderCharts(){
   const kgOC=r.map(x=>parseFloat(x[C.KG_OC])||0);
   const kgDesp=r.map(x=>parseFloat(x[C.CANT])||0);
   const mins=r.map(x=>parseFloat(x[C.MIN])||0);
-  const desp=r.filter(x=>norm(x[C.STATUS])==='despachado').length;
-  const carg=r.filter(x=>norm(x[C.STATUS]).includes('cargue')||norm(x[C.STATUS]).includes('cargando')).length;
-  const pend=r.length-desp-carg;
+  const desp=r.filter(x=>isCargado(x[C.STATUS])).length;
+  const carg=r.filter(x=>isEnCargue(x[C.STATUS])).length;
+  const pend=r.filter(x=>isEnPatio(x[C.STATUS])).length;
   const pvals=pcts.filter(v=>v>0);
   const avgPct=pvals.length?Math.round(pvals.reduce((a,b)=>a+b,0)/pvals.length):0;
 
@@ -245,12 +248,12 @@ function renderCharts(){
   destroyChart('estado');
   charts['estado']=new Chart(document.getElementById('chartEstado'),{
     type:'doughnut',
-    data:{labels:['Despachados','En Cargue','Pendientes'],
+    data:{labels:['Cargados','En Cargue','En Patio'],
       datasets:[{data:[desp,carg,pend],backgroundColor:['#16a34a','#d97706','#7c3aed'],borderWidth:0,hoverOffset:4}]},
     options:{responsive:true,cutout:'70%',plugins:{legend:{display:false}}}
   });
   document.getElementById('donutLegend').innerHTML=[
-    ['#16a34a','Despachados',desp],['#d97706','En Cargue',carg],['#7c3aed','Pendientes',pend]
+    ['#16a34a','✅ Cargados',desp],['#d97706','🔄 En Cargue',carg],['#7c3aed','⏳ En Patio',pend]
   ].map(([c,l,v])=>`<div class="legend-item"><div class="legend-dot" style="background:${c}"></div><span class="legend-label">${l}</span><span class="legend-val">${v}</span></div>`).join('');
 
   destroyChart('gauge');
@@ -289,9 +292,9 @@ function filtered(){
   if(currentFilter==='Todos')return allData;
   return allData.filter(r=>{
     const n=norm(r[C.STATUS]);
-    if(currentFilter==='Despachado')return n==='despachado';
-    if(currentFilter==='En cargue')return n.includes('cargue')||n.includes('cargando');
-    return n==='pendiente'||(!n.includes('despachado')&&!n.includes('cargue')&&!n.includes('cargando'));
+    if(currentFilter==='Cargado')return n==='cargado';
+    if(currentFilter==='En cargue')return n==='en cargue';
+    return n==='en patio';
   });
 }
 
