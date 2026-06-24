@@ -187,7 +187,14 @@ function parseCSV(txt){
     }
     cols.push(cur.trim());
     return cols;
-  }).filter(r=>r[C.OC]&&r[C.OC].replace(/"/g,'').trim()!=='');
+  }).filter(r=>{
+    const oc = r[C.OC]?r[C.OC].replace(/"/g,'').trim():'';
+    if(!oc) return false;
+    // Ignorar filas que sean encabezados repetidos
+    const lower = oc.toLowerCase();
+    if(lower==='oc'||lower.includes('cargue')||lower.includes('minutos')||lower.includes('empaque')) return false;
+    return true;
+  });
 }
 
 function renderAll(){ renderKPIs(); renderTimeline(); renderTable(); }
