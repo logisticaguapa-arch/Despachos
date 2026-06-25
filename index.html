@@ -75,16 +75,16 @@ tbody tr:hover{background:#f8fafc}
 .etapa-patio .etapa-title{color:#7c3aed}.etapa-patio .etapa-count{color:#7c3aed}
 .etapa-cargue .etapa-title{color:#d97706}.etapa-cargue .etapa-count{color:#d97706}
 .etapa-listo .etapa-title{color:#16a34a}.etapa-listo .etapa-count{color:#16a34a}
-.trucks-grid{display:flex;flex-wrap:wrap;gap:6px;max-height:140px;overflow-y:auto}
-.truck-chip{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;border-radius:8px;font-size:0.62rem;min-width:82px;text-align:center}
+.trucks-grid{display:flex;flex-direction:row;flex-wrap:wrap;gap:6px;max-height:120px;overflow-y:auto}
+.truck-chip{display:flex;flex-direction:row;align-items:center;gap:8px;padding:6px 12px;border-radius:20px;font-size:0.72rem}
 .etapa-patio .truck-chip{background:#f5f3ff;border:1px solid #ddd6fe}
 .etapa-cargue .truck-chip{background:#fffbeb;border:1px solid #fde68a}
 .etapa-listo .truck-chip{background:#f0fdf4;border:1px solid #bbf7d0}
-.truck-svg{width:40px;height:25px}
-.truck-placa{font-weight:700;color:#1a1a2e;font-size:0.68rem}
-.truck-cliente{color:#64748b;font-size:0.6rem;max-width:82px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.truck-hora{font-size:0.58rem;color:#94a3b8}
-.truck-kg{font-size:0.6rem;font-weight:700;color:#374151}
+.truck-svg{width:28px;height:18px;flex-shrink:0}
+.truck-placa{font-weight:700;color:#1a1a2e;font-size:0.72rem;white-space:nowrap}
+.truck-cliente{color:#64748b;font-size:0.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.truck-hora{display:none}
+.truck-kg{display:none}
 .etapa-cargue .truck-svg{animation:bounce 1s infinite alternate}
 @keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-3px)}}
 
