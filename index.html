@@ -205,19 +205,15 @@ tbody tr:hover{background:#f8fafc}
   </div>
 
   <!-- CHARTS FILA 2 -->
-  <div class="charts-row2">
-    <div class="card">
-      <div class="card-title">Kg Programados vs Despachados por Cliente</div>
-      <canvas id="chartKg" height="95"></canvas>
-    </div>
+  <div class="charts-row" style="grid-template-columns:1.8fr 1fr">
     <div class="card">
       <div class="card-title">Toneladas Cargadas por Cuadrilla</div>
       <canvas id="chartCuadrilla" height="95"></canvas>
     </div>
     <div class="card">
-      <div class="card-title">🍩 Kg: Cargados / En Cargue / En Patio</div>
-      <canvas id="chartKgDona" height="95"></canvas>
-      <div class="donut-legend" id="kgDonaLegend"></div>
+      <div class="card-title">🍩 Kg por Modalidad (Canasta / Granel)</div>
+      <canvas id="chartModalidad" height="95"></canvas>
+      <div class="donut-legend" id="modalidadLegend"></div>
     </div>
   </div>
 
@@ -493,23 +489,31 @@ function renderCharts(){
       }}
   });
 
-  // Dona Kg
-  const kgCargado=r.filter(x=>isCargado(x[C.STATUS])).reduce((a,x)=>a+(parseFloat(x[C.CANT])||0),0);
-  const kgEnCargue=r.filter(x=>isEnCargue(x[C.STATUS])).reduce((a,x)=>a+(parseFloat(x[C.KG_OC])||0),0);
-  const kgEnPatio=r.filter(x=>isEnPatio(x[C.STATUS])).reduce((a,x)=>a+(parseFloat(x[C.KG_OC])||0),0);
-  destroyChart('kgdona');
-  charts['kgdona']=new Chart(document.getElementById('chartKgDona'),{
+  // Modalidad (Empaque: Canasta / Granel)
+  const modalMap={};
+  r.forEach(x=>{
+    const mod=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();
+    if(!modalMap[mod])modalMap[mod]=0;
+    modalMap[mod]+=(parseFloat(x[C.CANT])||0);
+  });
+  const modLabels=Object.keys(modalMap);
+  const modVals=modLabels.map(k=>modalMap[k]);
+  const modColors=['#0ea5e9','#f59e0b','#10b981','#a855f7','#ef4444'];
+
+  destroyChart('modalidad');
+  charts['modalidad']=new Chart(document.getElementById('chartModalidad'),{
     type:'doughnut',
-    data:{labels:['Cargados','En Cargue','En Patio'],
-      datasets:[{data:[kgCargado,kgEnCargue,kgEnPatio],backgroundColor:['#16a34a','#d97706','#7c3aed'],borderWidth:0,hoverOffset:4}]},
+    data:{labels:modLabels,datasets:[{data:modVals,backgroundColor:modColors.slice(0,modLabels.length),borderWidth:0,hoverOffset:4}]},
     options:{responsive:true,cutout:'60%',
       plugins:{legend:{display:false},
         datalabels:{display:true,color:'white',font:{size:9,weight:'bold'},formatter:(v)=>v>0?(v/1000).toFixed(1)+'T':''},
         tooltip:{callbacks:{label:c=>c.label+': '+(c.raw/1000).toFixed(1)+' Ton'}}}}
   });
-  document.getElementById('kgDonaLegend').innerHTML=[
-    ['#16a34a','✅ Cargados',kgCargado],['#d97706','🔄 En Cargue',kgEnCargue],['#7c3aed','⏳ En Patio',kgEnPatio]
-  ].map(([c,l,v])=>`<div class="legend-item"><div class="legend-dot" style="background:${c}"></div><span class="legend-label">${l}</span><span class="legend-val">${(v/1000).toFixed(1)} Ton</span></div>`).join('');
+  document.getElementById('modalidadLegend').innerHTML=modLabels.map((l,i)=>
+    `<div class="legend-item"><div class="legend-dot" style="background:${modColors[i]}"></div><span class="legend-label">${l}</span><span class="legend-val">${(modalMap[l]/1000).toFixed(1)} Ton</span></div>`
+  ).join('');
+
+  // Barras modalidad - ELIMINADO
 }
 
 function startCountdown(){
