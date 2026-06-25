@@ -451,18 +451,16 @@ function renderEtapas(){
   document.getElementById('countPatio').textContent=patio.length;
   document.getElementById('countCargue').textContent=cargue.length;
   document.getElementById('countListo').textContent=listo.length;
-  const mk=(row,color)=>`
+  const mk=(row,emoji)=>`
     <div class="truck-chip">
-      ${truckSVG(color)}
+      <span>${emoji}</span>
       <span class="truck-placa">${row[C.PLACAS]||'?'}</span>
       <span class="truck-cliente">${row[C.CLIENTE]||'—'}</span>
-      <span class="truck-hora">🕐 ${row[C.H_LLE]||row[C.H_CITA]||'—'}</span>
-      <span class="truck-kg">📦 ${Number(row[C.KG_OC]||0).toLocaleString()} Kg</span>
     </div>`;
   const empty=m=>`<p style="color:#94a3b8;font-size:0.72rem;padding:6px">${m}</p>`;
-  document.getElementById('trucksPatio').innerHTML=patio.length?patio.map(r=>mk(r,'#7c3aed')).join(''):empty('Sin vehículos en patio');
-  document.getElementById('trucksCargue').innerHTML=cargue.length?cargue.map(r=>mk(r,'#d97706')).join(''):empty('Sin vehículos en cargue');
-  document.getElementById('trucksListo').innerHTML=listo.length?listo.map(r=>mk(r,'#16a34a')).join(''):empty('Sin vehículos cargados');
+  document.getElementById('trucksPatio').innerHTML=patio.length?patio.map(r=>mk(r,'🟣')).join(''):empty('Sin vehículos en patio');
+  document.getElementById('trucksCargue').innerHTML=cargue.length?cargue.map(r=>mk(r,'🟡')).join(''):empty('Sin vehículos en cargue');
+  document.getElementById('trucksListo').innerHTML=listo.length?listo.map(r=>mk(r,'🟢')).join(''):empty('Sin vehículos cargados');
 }
 
 function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id]}}
