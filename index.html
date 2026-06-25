@@ -107,8 +107,8 @@ tbody tr:hover{background:#f8fafc}
     <div class="kpi green"><div class="kpi-val" id="kDesp">—</div><div class="kpi-label">✅ Cargados</div></div>
     <div class="kpi yellow"><div class="kpi-val" id="kCarg">—</div><div class="kpi-label">🔄 En Cargue</div></div>
     <div class="kpi red"><div class="kpi-val" id="kPend">—</div><div class="kpi-label">⏳ En Patio</div></div>
+    <div class="kpi orange" style="border-top-color:#ea580c"><div class="kpi-val" style="color:#ea580c" id="kSinLlegar">—</div><div class="kpi-label">🕐 Sin Presentarse</div></div>
     <div class="kpi purple"><div class="kpi-val" id="kPct">—</div><div class="kpi-label">📊 % Cumplimiento</div></div>
-    <div class="kpi cyan"><div class="kpi-val" id="kKgMin">—</div><div class="kpi-label">⚡ Kg/Min Prom.</div></div>
   </div>
 
   <!-- TABLA PRINCIPAL -->
@@ -308,16 +308,15 @@ function renderKPIs(){
   const desp=r.filter(x=>isCargado(x[C.STATUS])).length;
   const carg=r.filter(x=>isEnCargue(x[C.STATUS])).length;
   const pend=r.filter(x=>isEnPatio(x[C.STATUS])).length;
+  const sinLlegar=r.filter(x=>!isCargado(x[C.STATUS])&&!isEnCargue(x[C.STATUS])&&!isEnPatio(x[C.STATUS])).length;
   const pcts=r.map(x=>parseFloat(x[C.PCT])||0).filter(v=>v>0);
   const avgPct=pcts.length?Math.round(pcts.reduce((a,b)=>a+b,0)/pcts.length):0;
-  const kgmins=r.map(x=>parseFloat(x[C.KGMIN])||0).filter(v=>v>0);
-  const avgKg=kgmins.length?(kgmins.reduce((a,b)=>a+b,0)/kgmins.length).toFixed(1):'—';
   document.getElementById('kTotal').textContent=r.length;
   document.getElementById('kDesp').textContent=desp;
   document.getElementById('kCarg').textContent=carg;
   document.getElementById('kPend').textContent=pend;
+  document.getElementById('kSinLlegar').textContent=sinLlegar;
   document.getElementById('kPct').textContent=avgPct+'%';
-  document.getElementById('kKgMin').textContent=avgKg;
   document.getElementById('gaugeVal').textContent=avgPct+'%';
 }
 
@@ -364,20 +363,26 @@ function renderAlertas(){
     container.innerHTML=`<div class="alerta-empty">✅ Sin alertas activas — La operación está bajo control</div>`;
     return;
   }
-  const makeAlerta=(icon,titulo,items,campoExtra)=>{
+  const makeAlerta=(icon,titulo,items,detalle)=>{
     if(!items.length)return'';
-    const chips=items.map(r=>`<span class="alerta-chip">🚛 ${r[C.PLACAS]||'?'} — ${r[C.CLIENTE]||'?'}${campoExtra?' | Cita: '+r[campoExtra]:''}</span>`).join('');
+    const filas=items.map(r=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:#fee2e2;border-radius:8px;margin-top:5px">
+        <span style="font-size:1rem">🚛</span>
+        <span style="font-weight:800;color:#dc2626;font-size:0.8rem;min-width:70px">${r[C.PLACAS]||'Sin placa'}</span>
+        <span style="color:#374151;font-size:0.78rem;flex:1">${r[C.CLIENTE]||'Sin cliente'}</span>
+        <span style="color:#64748b;font-size:0.72rem">${detalle(r)}</span>
+      </div>`).join('');
     return`<div class="alerta alerta-roja">
       <span class="alerta-icon">${icon}</span>
-      <div class="alerta-body">
-        <div class="alerta-titulo">${titulo} (${items.length} vehículo${items.length>1?'s':''})</div>
-        <div class="alerta-items">${chips}</div>
+      <div class="alerta-body" style="width:100%">
+        <div class="alerta-titulo">${titulo} — ${items.length} vehículo${items.length>1?'s':''}</div>
+        ${filas}
       </div>
     </div>`;
   };
   container.innerHTML=`<div class="alertas-wrap">
-    ${makeAlerta('🚨','Carros con cita VENCIDA que no han llegado',citaVencida,C.H_CITA)}
-    ${makeAlerta('⏰','Carros en patio hace +30 min sin iniciar cargue',patioMucho,C.H_LLE)}
+    ${makeAlerta('🚨','Cita VENCIDA — No han llegado',citaVencida,r=>'Cita: '+(r[C.H_CITA]||'—'))}
+    ${makeAlerta('⏰','En patio +30 min sin iniciar cargue',patioMucho,r=>'Llegó: '+(r[C.H_LLE]||'—'))}
   </div>`;
 }
 
