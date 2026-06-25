@@ -54,7 +54,20 @@ tbody tr:hover{background:#f8fafc}
 .td-cliente{min-width:140px;max-width:170px;font-weight:600;color:#1e40af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ETAPAS */
-.etapas-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.alertas-wrap{display:grid;gap:8px}
+.alerta{border-radius:10px;padding:12px 16px;display:flex;align-items:flex-start;gap:12px;border-left:4px solid}
+.alerta-roja{background:#fff1f2;border-left-color:#ef4444}
+.alerta-amarilla{background:#fffbeb;border-left-color:#f59e0b}
+.alerta-icon{font-size:1.3rem;flex-shrink:0;margin-top:1px}
+.alerta-body{flex:1}
+.alerta-titulo{font-size:0.78rem;font-weight:700;margin-bottom:4px}
+.alerta-roja .alerta-titulo{color:#dc2626}
+.alerta-amarilla .alerta-titulo{color:#b45309}
+.alerta-items{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.alerta-chip{font-size:0.68rem;padding:3px 10px;border-radius:12px;font-weight:600}
+.alerta-roja .alerta-chip{background:#fee2e2;color:#dc2626}
+.alerta-amarilla .alerta-chip{background:#fef3c7;color:#b45309}
+.alerta-empty{background:#f0fdf4;border-radius:10px;padding:10px 16px;font-size:0.78rem;color:#16a34a;font-weight:600;border-left:4px solid #16a34a}
 .etapa-card{background:white;border-radius:10px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
 .etapa-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #f1f5f9}
 .etapa-title{font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px}
@@ -154,6 +167,9 @@ tbody tr:hover{background:#f8fafc}
       </table>
     </div>
   </div>
+
+  <!-- ALERTAS AUTOMÁTICAS -->
+  <div id="alertasContainer"></div>
 
   <!-- ETAPAS CARROS -->
   <div class="etapas-row">
@@ -319,7 +335,75 @@ function clearFilters(){
   applyFilters();
 }
 
-function renderAll(){renderKPIs();renderTable();renderEtapas();renderCharts()}
+function renderAll(){renderKPIs();renderAlertas();renderTable();renderEtapas();renderCharts()}
+
+function timeToMin(t){
+  if(!t)return null;
+  const p=(t+'').trim().split(':');
+  if(p.length<2)return null;
+  return parseInt(p[0])*60+parseInt(p[1]);
+}
+
+function renderAlertas(){
+  const r=filteredData;
+  const ahora=new Date();
+  const ahoraMin=ahora.getHours()*60+ahora.getMinutes();
+
+  // 🔴 ALERTA 1: Carros con cita vencida que NO han llegado
+  const citaVencida=r.filter(x=>{
+    const cita=timeToMin(x[C.H_CITA]);
+    const llegada=(x[C.H_LLE]||'').trim();
+    if(!cita||llegada)return false; // si no tiene cita o ya llegó, no aplica
+    return ahoraMin > cita+10; // 10 min de gracia
+  });
+
+  // 🔴 ALERTA 2: Carros en patio hace más de 30 min sin iniciar cargue
+  const patioMucho=r.filter(x=>{
+    const llegada=timeToMin(x[C.H_LLE]);
+    const inicio=(x[C.H_INI]||'').trim();
+    if(!llegada||inicio)return false; // si no llegó o ya inició, no aplica
+    return ahoraMin - llegada > 30;
+  });
+
+  // 🟡 ALERTA 3: Carros en cargue hace más de 2 horas
+  const cargueExcesivo=r.filter(x=>{
+    const ini=timeToMin(x[C.H_INI]);
+    const fin=(x[C.H_FIN]||'').trim();
+    if(!ini||fin)return false;
+    return ahoraMin - ini > 120;
+  });
+
+  // 🟡 ALERTA 4: Carros con % cumplimiento < 80% ya despachados
+  const bajoCumplimiento=r.filter(x=>{
+    const pct=parseFloat(x[C.PCT])||0;
+    return isCargado(x[C.STATUS]) && pct>0 && pct<80;
+  });
+
+  const hayAlertas=citaVencida.length||patioMucho.length||cargueExcesivo.length||bajoCumplimiento.length;
+  const container=document.getElementById('alertasContainer');
+
+  if(!hayAlertas){
+    container.innerHTML=`<div class="alerta-empty">✅ Sin alertas activas — La operación está bajo control</div>`;
+    return;
+  }
+
+  const makeAlerta=(tipo,icon,titulo,items,campo1,campo2)=>{
+    if(!items.length)return'';
+    const chips=items.map(r=>`<span class="alerta-chip">🚛 ${r[C.PLACAS]||'?'} — ${r[C.CLIENTE]||'?'}${campo1?' | '+r[campo1]:''}${campo2?' → '+r[campo2]:''}</span>`).join('');
+    return`<div class="alerta alerta-${tipo}">
+      <span class="alerta-icon">${icon}</span>
+      <div class="alerta-body">
+        <div class="alerta-titulo">${titulo} (${items.length} vehículo${items.length>1?'s':''})</div>
+        <div class="alerta-items">${chips}</div>
+      </div>
+    </div>`;
+  };
+
+  container.innerHTML=`<div class="alertas-wrap">
+    ${makeAlerta('roja','🚨','Carros con cita VENCIDA que no han llegado',citaVencida,C.H_CITA,null)}
+    ${makeAlerta('roja','⏰','Carros en patio hace +30 min sin iniciar cargue',patioMucho,C.H_LLE,null)}
+  </div>`;
+}
 
 function renderKPIs(){
   const r=filteredData;
