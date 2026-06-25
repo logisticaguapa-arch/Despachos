@@ -80,7 +80,7 @@ tbody tr:hover{background:#f8fafc}
 .etapa-patio .truck-chip{background:#f5f3ff;border:1px solid #ddd6fe}
 .etapa-cargue .truck-chip{background:#fffbeb;border:1px solid #fde68a}
 .etapa-listo .truck-chip{background:#f0fdf4;border:1px solid #bbf7d0}
-.truck-svg{width:28px;height:18px;flex-shrink:0}
+.truck-svg{width:28px;height:18px;flex-shrink:0;vertical-align:middle}
 .truck-placa{font-weight:700;color:#1a1a2e;font-size:0.72rem;white-space:nowrap}
 .truck-cliente{color:#64748b;font-size:0.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
 .truck-hora{display:none}
@@ -253,7 +253,7 @@ function isEnPatio(s){return norm(s)==='en patio'}
 function badgeClass(s){if(isCargado(s))return 'badge-d';if(isEnCargue(s))return 'badge-c';return 'badge-p'}
 
 function truckSVG(color){
-  return`<svg class="truck-svg" viewBox="0 0 60 35" fill="none" xmlns="http://www.w3.org/2000/svg">
+  return`<svg class="truck-svg" viewBox="0 0 60 35" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block">
     <rect x="1" y="8" width="38" height="20" rx="3" fill="${color}" opacity="0.9"/>
     <rect x="39" y="14" width="18" height="14" rx="2" fill="${color}"/>
     <rect x="41" y="16" width="14" height="9" rx="1" fill="white" opacity="0.35"/>
