@@ -158,11 +158,10 @@ tbody tr:hover{background:#f8fafc}
             <th>Fecha</th><th>OC</th><th>Cliente</th><th>Placas</th>
             <th>H.Cita</th><th>H.Llegada</th><th>H.Ini Cargue</th><th>H.Fin Cargue</th>
             <th>Status</th><th>Kg OC</th><th>Cant.Desp</th><th>% Cumpl.</th>
-            <th>Kg/Min</th><th>Min Cargue</th><th>Muelle</th><th>Cuadrilla</th><th>Personas</th><th>Observaciones</th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="18" style="text-align:center;padding:20px;color:#94a3b8">Cargando datos...</td></tr>
+          <tr><td colspan="12" style="text-align:center;padding:20px;color:#94a3b8">Cargando datos...</td></tr>
         </tbody>
       </table>
     </div>
@@ -440,14 +439,8 @@ function renderTable(){
       <td>${Number(r[C.KG_OC]||0).toLocaleString()}</td>
       <td>${Number(r[C.CANT]||0).toLocaleString()}</td>
       <td><div class="pbar"><div class="pbar-bg"><div class="pbar-fill" style="width:${Math.min(pct,100)}%;background:${pctColor(pct)}"></div></div><span style="font-size:0.68rem;color:#64748b;width:30px">${pct}%</span></div></td>
-      <td>${r[C.KGMIN]||'—'}</td>
-      <td>${r[C.MIN]||'—'}</td>
-      <td>${r[C.MUE]||'—'}</td>
-      <td>${r[C.CUA]||'—'}</td>
-      <td>${r[C.PER]||'—'}</td>
-      <td style="color:#94a3b8;max-width:120px;overflow:hidden;text-overflow:ellipsis">${r[C.OBS]||'—'}</td>
     </tr>`;
-  }).join(''):`<tr><td colspan="18" style="text-align:center;padding:20px;color:#94a3b8">Sin datos para los filtros seleccionados</td></tr>`;
+  }).join(''):`<tr><td colspan="12" style="text-align:center;padding:20px;color:#94a3b8">Sin datos para los filtros seleccionados</td></tr>`;
 }
 
 function renderEtapas(){
