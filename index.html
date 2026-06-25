@@ -355,7 +355,7 @@ function renderAlertas(){
     const llegada=timeToMin(x[C.H_LLE]);
     const inicio=(x[C.H_INI]||'').trim();
     if(!llegada||inicio)return false;
-    return ahoraMin-llegada>30;
+    return ahoraMin-llegada>60;
   });
   const hayAlertas=citaVencida.length||patioMucho.length;
   const container=document.getElementById('alertasContainer');
@@ -365,12 +365,12 @@ function renderAlertas(){
   }
   const makeAlerta=(icon,titulo,items,detalle)=>{
     if(!items.length)return'';
-    const filas=items.map(r=>`
+    const filas=items.map(row=>`
       <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:#fee2e2;border-radius:8px;margin-top:5px">
         <span style="font-size:1rem">🚛</span>
-        <span style="font-weight:800;color:#dc2626;font-size:0.8rem;min-width:70px">${r[C.PLACAS]||'Sin placa'}</span>
-        <span style="color:#374151;font-size:0.78rem;flex:1">${r[C.CLIENTE]||'Sin cliente'}</span>
-        <span style="color:#64748b;font-size:0.72rem">${detalle(r)}</span>
+        <span style="font-weight:800;color:#dc2626;font-size:0.8rem;min-width:70px">${row[C.PLACAS]||'Sin placa'}</span>
+        <span style="color:#374151;font-size:0.78rem;flex:1">${row[C.CLIENTE]||'Sin cliente'}</span>
+        <span style="color:#64748b;font-size:0.72rem">${detalle(row)}</span>
       </div>`).join('');
     return`<div class="alerta alerta-roja">
       <span class="alerta-icon">${icon}</span>
@@ -381,8 +381,8 @@ function renderAlertas(){
     </div>`;
   };
   container.innerHTML=`<div class="alertas-wrap">
-    ${makeAlerta('🚨','Cita VENCIDA — No han llegado',citaVencida,r=>'Cita: '+(r[C.H_CITA]||'—'))}
-    ${makeAlerta('⏰','En patio +30 min sin iniciar cargue',patioMucho,r=>'Llegó: '+(r[C.H_LLE]||'—'))}
+    ${makeAlerta('🚨','Cita VENCIDA — No han llegado',citaVencida,row=>'Cita: '+(row[C.H_CITA]||'—'))}
+    ${makeAlerta('⏰','En patio +1 hora sin iniciar cargue',patioMucho,row=>'Llegó: '+(row[C.H_LLE]||'—'))}
   </div>`;
 }
 
