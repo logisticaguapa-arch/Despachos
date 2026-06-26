@@ -362,10 +362,10 @@ function renderTable() {
   }).join('') : '<tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Sin datos para los filtros seleccionados</td></tr>';
   document.getElementById('tableBody').innerHTML = html;
   document.getElementById('tableFoot').innerHTML = rows.length ? 
-    '<tr style="background:#1e293b">'
-    + '<td colspan="10" style="padding:8px 10px;font-weight:700;color:#60a5fa;font-size:0.72rem;text-align:right">TOTAL</td>'
-    + '<td style="padding:8px 10px;font-weight:800;color:#38bdf8;font-size:0.75rem">' + totalKgOC.toLocaleString('es-CO') + '</td>'
-    + '<td style="padding:8px 10px;font-weight:800;color:#34d399;font-size:0.75rem">' + totalCant.toLocaleString('es-CO') + '</td>'
+    '<tr style="background:#f8fafc;border-top:2px solid #1e293b">'
+    + '<td colspan="10" style="padding:8px 10px;font-weight:700;color:#374151;font-size:0.72rem;text-align:right">TOTAL</td>'
+    + '<td style="padding:8px 10px;font-weight:800;color:#2563eb;font-size:0.75rem">' + totalKgOC.toLocaleString('es-CO') + '</td>'
+    + '<td style="padding:8px 10px;font-weight:800;color:#16a34a;font-size:0.75rem">' + totalCant.toLocaleString('es-CO') + '</td>'
     + '<td></td></tr>' : '';
 }
 
