@@ -51,8 +51,6 @@ tbody tr:hover{background:#f8fafc}
 .alerta-icon{font-size:1.3rem;flex-shrink:0;margin-top:1px}
 .alerta-body{flex:1}
 .alerta-titulo{font-size:0.78rem;font-weight:700;margin-bottom:4px;color:#dc2626}
-.alerta-items{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.alerta-chip{font-size:0.68rem;padding:3px 10px;border-radius:12px;font-weight:600;background:#fee2e2;color:#dc2626}
 .alerta-empty{background:#f0fdf4;border-radius:10px;padding:10px 16px;font-size:0.78rem;color:#16a34a;font-weight:600;border-left:4px solid #16a34a}
 .charts-row{display:grid;grid-template-columns:1.8fr 1fr 1fr;gap:12px}
 .card{background:white;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
@@ -64,11 +62,7 @@ tbody tr:hover{background:#f8fafc}
 .gauge-val{font-size:1.8rem;font-weight:900;color:#2563eb;line-height:1}
 .gauge-label{font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;margin-top:2px}
 @keyframes truckMove{from{transform:translateX(0)}to{transform:translateX(5px)}}
-.truck-svg{width:28px;height:18px;flex-shrink:0;display:block}
-@media(max-width:900px){
-  .kpi-row{grid-template-columns:repeat(3,1fr)}
-  .charts-row{grid-template-columns:1fr}
-}
+@media(max-width:900px){.kpi-row{grid-template-columns:repeat(3,1fr)}.charts-row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -107,7 +101,7 @@ tbody tr:hover{background:#f8fafc}
     <div class="kpi green"><div class="kpi-val" id="kDesp">—</div><div class="kpi-label">✅ Cargados</div></div>
     <div class="kpi yellow"><div class="kpi-val" id="kCarg">—</div><div class="kpi-label">🔄 En Cargue</div></div>
     <div class="kpi red"><div class="kpi-val" id="kPend">—</div><div class="kpi-label">⏳ En Patio</div></div>
-    <div class="kpi orange" style="border-top-color:#ea580c"><div class="kpi-val" style="color:#ea580c" id="kSinLlegar">—</div><div class="kpi-label">🕐 Sin Presentarse</div></div>
+    <div class="kpi" style="border-top-color:#ea580c"><div class="kpi-val" style="color:#ea580c" id="kSinLlegar">—</div><div class="kpi-label">🕐 Sin Presentarse</div></div>
     <div class="kpi purple"><div class="kpi-val" id="kPct">—</div><div class="kpi-label">📊 % Cumplimiento</div></div>
   </div>
 
@@ -133,9 +127,8 @@ tbody tr:hover{background:#f8fafc}
   <!-- ALERTAS -->
   <div id="alertasContainer"></div>
 
-  <!-- ETAPAS - 3 COLUMNAS HORIZONTALES -->
+  <!-- ETAPAS -->
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
-
     <div style="background:white;border-radius:10px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f1f5f9">
         <span style="font-size:1.2rem">⏳</span>
@@ -144,7 +137,6 @@ tbody tr:hover{background:#f8fafc}
       </div>
       <div id="trucksPatio" style="display:flex;flex-direction:row;flex-wrap:wrap;gap:6px"></div>
     </div>
-
     <div style="background:white;border-radius:10px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f1f5f9">
         <span style="font-size:1.2rem">🔄</span>
@@ -153,7 +145,6 @@ tbody tr:hover{background:#f8fafc}
       </div>
       <div id="trucksCargue" style="display:flex;flex-direction:row;flex-wrap:wrap;gap:6px"></div>
     </div>
-
     <div style="background:white;border-radius:10px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f1f5f9">
         <span style="font-size:1.2rem">✅</span>
@@ -162,7 +153,6 @@ tbody tr:hover{background:#f8fafc}
       </div>
       <div id="trucksListo" style="display:flex;flex-direction:row;flex-wrap:wrap;gap:6px"></div>
     </div>
-
   </div>
 
   <!-- CHARTS FILA 1 -->
@@ -207,25 +197,20 @@ Chart.register(ChartDataLabels);
 const CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
 const REFRESH_MS=1*60*1000;
 const C={FECHA:0,OC:1,KG_OC:2,CANT:3,PCT:4,CLIENTE:5,PLACAS:6,H_OC:7,H_CITA:8,H_LLE:9,H_INI:10,H_FIN:11,STATUS:12,OBS:13,HS:14,MIN:15,KGMIN:16,EMP:17,MUE:18,CUA:19,PER:20};
+
 let allData=[],filteredData=[],charts={},nextRefresh=0;
 
 function toNum(v){return parseFloat((v||'0').toString().replace(/\./g,'').replace(',','.'))||0}
 function fmtKg(v){return toNum(v).toLocaleString('es-CO')}
 function norm(s){return(s||'').toLowerCase().trim()}
 function pctColor(p){return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626'}
+function isCargado(s){return norm(s)==='cargado'}
 function isEnCargue(s){return norm(s)==='en cargue'}
 function isEnPatio(s){return norm(s)==='en patio'}
 function badgeClass(s){if(isCargado(s))return 'badge-d';if(isEnCargue(s))return 'badge-c';return 'badge-p'}
 
 function truckSVG(color){
-  return`<svg class="truck-svg" viewBox="0 0 60 35" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;width:28px;height:18px;flex-shrink:0">
-    <rect x="1" y="8" width="38" height="20" rx="3" fill="${color}" opacity="0.9"/>
-    <rect x="39" y="14" width="18" height="14" rx="2" fill="${color}"/>
-    <rect x="41" y="16" width="14" height="9" rx="1" fill="white" opacity="0.35"/>
-    <circle cx="10" cy="30" r="4" fill="#374151"/><circle cx="10" cy="30" r="2" fill="#9ca3af"/>
-    <circle cx="46" cy="30" r="4" fill="#374151"/><circle cx="46" cy="30" r="2" fill="#9ca3af"/>
-    <rect x="1" y="25" width="56" height="3" rx="1" fill="${color}" opacity="0.4"/>
-  </svg>`;
+  return'<svg viewBox="0 0 60 35" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;width:28px;height:18px;flex-shrink:0"><rect x="1" y="8" width="38" height="20" rx="3" fill="'+color+'" opacity="0.9"/><rect x="39" y="14" width="18" height="14" rx="2" fill="'+color+'"/><rect x="41" y="16" width="14" height="9" rx="1" fill="white" opacity="0.35"/><circle cx="10" cy="30" r="4" fill="#374151"/><circle cx="10" cy="30" r="2" fill="#9ca3af"/><circle cx="46" cy="30" r="4" fill="#374151"/><circle cx="46" cy="30" r="2" fill="#9ca3af"/><rect x="1" y="25" width="56" height="3" rx="1" fill="'+color+'" opacity="0.4"/></svg>';
 }
 
 async function fetchData(){
@@ -417,8 +402,6 @@ function renderCharts(){
     x:{ticks:{font:{size:9},color:'#64748b',maxRotation:25},grid:{display:false}},
     y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}
   };
-
-  // Agrupación por cliente
   const clienteMap={};
   r.forEach(x=>{
     const cl=(x[C.CLIENTE]||'Sin nombre').trim();
@@ -433,10 +416,9 @@ function renderCharts(){
   charts['cumpl']=new Chart(document.getElementById('chartCumplimiento'),{
     type:'bar',
     data:{labels:cLabels,datasets:[{label:'%',data:cVals,backgroundColor:cVals.map(p=>p>=100?'#16a34a':p>=80?'#d97706':'#dc2626'),borderRadius:4}]},
-    options:{responsive:true,
-      plugins:{legend:{display:false},
-        datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:v=>v>0?v+'%':''},
-        tooltip:{callbacks:{label:c=>c.raw+'%'}}},
+    options:{responsive:true,plugins:{legend:{display:false},
+      datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:v=>v>0?v+'%':''},
+      tooltip:{callbacks:{label:c=>c.raw+'%'}}},
       scales:{...baseScales,y:{...baseScales.y,max:110,ticks:{callback:v=>v+'%',font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}
   });
 
@@ -448,10 +430,9 @@ function renderCharts(){
     type:'doughnut',
     data:{labels:['Cargados','En Cargue','En Patio'],
       datasets:[{data:[desp,carg,pend],backgroundColor:['#16a34a','#d97706','#7c3aed'],borderWidth:0,hoverOffset:4}]},
-    options:{responsive:true,cutout:'65%',
-      plugins:{legend:{display:false},
-        datalabels:{display:true,color:'white',font:{size:10,weight:'bold'},formatter:v=>v>0?v:''},
-        tooltip:{callbacks:{label:c=>c.label+': '+c.raw}}}}
+    options:{responsive:true,cutout:'65%',plugins:{legend:{display:false},
+      datalabels:{display:true,color:'white',font:{size:10,weight:'bold'},formatter:v=>v>0?v:''},
+      tooltip:{callbacks:{label:c=>c.label+': '+c.raw}}}}
   });
   document.getElementById('donutLegend').innerHTML=[
     ['#16a34a','✅ Cargados',desp],['#d97706','🔄 En Cargue',carg],['#7c3aed','⏳ En Patio',pend]
@@ -470,7 +451,7 @@ function renderCharts(){
   r.forEach(x=>{
     const cu=(x[C.CUA]||'').trim();if(!cu)return;
     if(!cuadMap[cu])cuadMap[cu]=0;
-    cuadMap[cu]+=(parseFloat(x[C.CANT])||0)/1000;
+    cuadMap[cu]+=toNum(x[C.CANT])/1000;
   });
   const cuadL=Object.keys(cuadMap);
   const cuadV=cuadL.map(k=>parseFloat(cuadMap[k].toFixed(2)));
@@ -478,20 +459,17 @@ function renderCharts(){
   charts['cuadrilla']=new Chart(document.getElementById('chartCuadrilla'),{
     type:'bar',
     data:{labels:cuadL,datasets:[{label:'Ton',data:cuadV,backgroundColor:'#818cf8',borderRadius:4}]},
-    options:{responsive:true,indexAxis:'y',
-      plugins:{legend:{display:false},
-        datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:9,weight:'bold'},formatter:v=>v>0?v+' T':''}},
-      scales:{
-        x:{ticks:{font:{size:9},color:'#64748b',callback:v=>v+' T'},grid:{color:'#f1f5f9'}},
-        y:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}}
-      }}
+    options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false},
+      datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:9,weight:'bold'},formatter:v=>v>0?v+' T':''}},
+      scales:{x:{ticks:{font:{size:9},color:'#64748b',callback:v=>v+' T'},grid:{color:'#f1f5f9'}},
+        y:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}}}}
   });
 
   const modalMap={};
   r.forEach(x=>{
     const mod=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();
     if(!modalMap[mod])modalMap[mod]=0;
-    modalMap[mod]+=(parseFloat(x[C.CANT])||0);
+    modalMap[mod]+=toNum(x[C.CANT]);
   });
   const modLabels=Object.keys(modalMap);
   const modVals=modLabels.map(k=>modalMap[k]);
@@ -500,10 +478,9 @@ function renderCharts(){
   charts['modalidad']=new Chart(document.getElementById('chartModalidad'),{
     type:'doughnut',
     data:{labels:modLabels,datasets:[{data:modVals,backgroundColor:modColors.slice(0,modLabels.length),borderWidth:0,hoverOffset:4}]},
-    options:{responsive:true,cutout:'60%',
-      plugins:{legend:{display:false},
-        datalabels:{display:true,color:'white',font:{size:9,weight:'bold'},formatter:v=>v>0?(v/1000).toFixed(1)+'T':''},
-        tooltip:{callbacks:{label:c=>c.label+': '+(c.raw/1000).toFixed(1)+' Ton'}}}}
+    options:{responsive:true,cutout:'60%',plugins:{legend:{display:false},
+      datalabels:{display:true,color:'white',font:{size:9,weight:'bold'},formatter:v=>v>0?(v/1000).toFixed(1)+'T':''},
+      tooltip:{callbacks:{label:c=>c.label+': '+(c.raw/1000).toFixed(1)+' Ton'}}}}
   });
   document.getElementById('modalidadLegend').innerHTML=modLabels.map((l,i)=>
     `<div class="legend-item"><div class="legend-dot" style="background:${modColors[i]}"></div><span class="legend-label">${l}</span><span class="legend-val">${(modalMap[l]/1000).toFixed(1)} Ton</span></div>`
