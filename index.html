@@ -209,9 +209,10 @@ const REFRESH_MS=1*60*1000;
 const C={FECHA:0,OC:1,KG_OC:2,CANT:3,PCT:4,CLIENTE:5,PLACAS:6,H_OC:7,H_CITA:8,H_LLE:9,H_INI:10,H_FIN:11,STATUS:12,OBS:13,HS:14,MIN:15,KGMIN:16,EMP:17,MUE:18,CUA:19,PER:20};
 let allData=[],filteredData=[],charts={},nextRefresh=0;
 
+function toNum(v){return parseFloat((v||'0').toString().replace(/\./g,'').replace(',','.'))||0}
+function fmtKg(v){return toNum(v).toLocaleString('es-CO')}
 function norm(s){return(s||'').toLowerCase().trim()}
 function pctColor(p){return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626'}
-function isCargado(s){return norm(s)==='cargado'}
 function isEnCargue(s){return norm(s)==='en cargue'}
 function isEnPatio(s){return norm(s)==='en patio'}
 function badgeClass(s){if(isCargado(s))return 'badge-d';if(isEnCargue(s))return 'badge-c';return 'badge-p'}
@@ -334,8 +335,8 @@ function renderTable(){
       <td style="font-weight:600;color:#0ea5e9">${r[C.H_INI]||'—'}</td>
       <td style="font-weight:600;color:#16a34a">${r[C.H_FIN]||'—'}</td>
       <td><span class="badge ${badgeClass(r[C.STATUS])}">${r[C.STATUS]||'—'}</span></td>
-      <td>${Number(r[C.KG_OC]||0).toLocaleString()}</td>
-      <td>${Number(r[C.CANT]||0).toLocaleString()}</td>
+      <td>${fmtKg(r[C.KG_OC])}</td>
+      <td>${fmtKg(r[C.CANT])}</td>
       <td><div class="pbar"><div class="pbar-bg"><div class="pbar-fill" style="width:${Math.min(pct,100)}%;background:${pctColor(pct)}"></div></div><span style="font-size:0.68rem;color:#64748b;width:30px">${pct}%</span></div></td>
     </tr>`;
   }).join(''):`<tr><td colspan="12" style="text-align:center;padding:20px;color:#94a3b8">Sin datos para los filtros seleccionados</td></tr>`;
