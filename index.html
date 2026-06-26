@@ -119,6 +119,7 @@ tbody tr:hover{background:#f8fafc}
         <tbody id="tableBody">
           <tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Cargando datos...</td></tr>
         </tbody>
+        <tfoot id="tableFoot" style="position:sticky;bottom:0;z-index:1"></tfoot>
       </table>
     </div>
   </div>
@@ -337,9 +338,12 @@ function renderKPIs() {
 
 function renderTable() {
   var rows = filteredData;
+  var totalKgOC = 0, totalCant = 0;
   var html = rows.length ? rows.map(function(r) {
     var pct = parseFloat(r[C.PCT]) || 0;
     var dur = calcDuracion(r[C.H_INI], r[C.H_FIN]);
+    totalKgOC += toNum(r[C.KG_OC]);
+    totalCant += toNum(r[C.CANT]);
     return '<tr>'
       + '<td style="color:#64748b;font-size:0.65rem">' + (r[C.FECHA]||'—') + '</td>'
       + '<td><strong style="color:#2563eb">' + (r[C.OC]||'—') + '</strong></td>'
@@ -357,6 +361,12 @@ function renderTable() {
       + '</tr>';
   }).join('') : '<tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Sin datos para los filtros seleccionados</td></tr>';
   document.getElementById('tableBody').innerHTML = html;
+  document.getElementById('tableFoot').innerHTML = rows.length ? 
+    '<tr style="background:#1e293b">'
+    + '<td colspan="10" style="padding:8px 10px;font-weight:700;color:#60a5fa;font-size:0.72rem;text-align:right">TOTAL</td>'
+    + '<td style="padding:8px 10px;font-weight:800;color:#38bdf8;font-size:0.75rem">' + totalKgOC.toLocaleString('es-CO') + '</td>'
+    + '<td style="padding:8px 10px;font-weight:800;color:#34d399;font-size:0.75rem">' + totalCant.toLocaleString('es-CO') + '</td>'
+    + '<td></td></tr>' : '';
 }
 
 function renderAlertas() {
