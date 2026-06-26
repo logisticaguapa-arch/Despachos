@@ -206,7 +206,7 @@ Chart.register(ChartDataLabels);
 
 const CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
 const REFRESH_MS=1*60*1000;
-const C={FECHA:0,OC:1,KG_OC:2,CANT:3,PCT:4,CLIENTE:5,PLACAS:6,H_CITA:7,H_LLE:8,H_INI:9,H_FIN:10,STATUS:11,OBS:12,HS:13,MIN:14,KGMIN:15,EMP:16,MUE:17,CUA:18,PER:19};
+const C={FECHA:0,OC:1,KG_OC:2,CANT:3,PCT:4,CLIENTE:5,PLACAS:6,H_OC:7,H_CITA:8,H_LLE:9,H_INI:10,H_FIN:11,STATUS:12,OBS:13,HS:14,MIN:15,KGMIN:16,EMP:17,MUE:18,CUA:19,PER:20};
 let allData=[],filteredData=[],charts={},nextRefresh=0;
 
 function norm(s){return(s||'').toLowerCase().trim()}
@@ -329,10 +329,10 @@ function renderTable(){
       <td><strong style="color:#2563eb">${r[C.OC]||'—'}</strong></td>
       <td class="td-cliente" title="${r[C.CLIENTE]||''}">${r[C.CLIENTE]||'—'}</td>
       <td><strong>${r[C.PLACAS]||'—'}</strong></td>
-      <td>${r[C.H_CITA]||'—'}</td>
-      <td>${r[C.H_LLE]||'—'}</td>
-      <td>${r[C.H_INI]||'—'}</td>
-      <td>${r[C.H_FIN]||'—'}</td>
+      <td style="font-weight:600;color:#374151">${r[C.H_CITA]||'—'}</td>
+      <td style="font-weight:600;color:#374151">${r[C.H_LLE]||'—'}</td>
+      <td style="font-weight:600;color:#0ea5e9">${r[C.H_INI]||'—'}</td>
+      <td style="font-weight:600;color:#16a34a">${r[C.H_FIN]||'—'}</td>
       <td><span class="badge ${badgeClass(r[C.STATUS])}">${r[C.STATUS]||'—'}</span></td>
       <td>${Number(r[C.KG_OC]||0).toLocaleString()}</td>
       <td>${Number(r[C.CANT]||0).toLocaleString()}</td>
