@@ -14,7 +14,8 @@ header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:10px 20px;displ
 .logo span{color:#60a5fa}
 .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ubadge{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#a0c4ff;padding:4px 10px;border-radius:20px;font-size:0.7rem}
-#refreshBtn{background:#2563eb;border:none;color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:600}
+  #refreshBtn{background:#2563eb;border:none;color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:600}
+  #pdfBtn{background:#16a34a;border:none;color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:600}
 .progress-wrap{height:3px;background:rgba(0,0,0,0.1)}
 .progress-bar{height:3px;background:#60a5fa;transition:width 1s linear}
 .filter-bar{background:white;padding:8px 18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #e2e8f0;box-shadow:0 1px 4px rgba(0,0,0,0.05)}
@@ -73,6 +74,7 @@ tbody tr:hover{background:#f8fafc}
     <span class="ubadge" id="lastUpdate">Cargando...</span>
     <span class="ubadge" id="countdown"></span>
     <button id="refreshBtn" onclick="fetchData()">↻ Actualizar</button>
+    <button id="pdfBtn" onclick="downloadPDF()">⬇ Descargar PDF</button>
   </div>
 </header>
 <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:100%"></div></div>
@@ -540,6 +542,93 @@ function startCountdown() {
 
 fetchData();
 startCountdown();
+  var btn = document.getElementById('pdfBtn');
+  btn.textContent = '⏳ Generando...';
+  btn.disabled = true;
+
+  var fecha = document.getElementById('fFecha').value || new Date().toLocaleDateString('es-CO');
+  var style = '<style>'
+    + 'body{font-family:Segoe UI,sans-serif;color:#1a1a2e;padding:20px;font-size:11px}'
+    + 'h1{font-size:16px;color:#1B2A4A;margin-bottom:4px}'
+    + '.sub{color:#64748b;font-size:10px;margin-bottom:16px}'
+    + '.kpi-row{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}'
+    + '.kpi{background:#f8fafc;border-radius:8px;padding:10px 14px;border-left:3px solid #2563eb;min-width:100px}'
+    + '.kpi-val{font-size:20px;font-weight:800;color:#2563eb}'
+    + '.kpi-label{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.4px}'
+    + '.kpi:nth-child(2){border-left-color:#16a34a}.kpi:nth-child(2) .kpi-val{color:#16a34a}'
+    + '.kpi:nth-child(3){border-left-color:#d97706}.kpi:nth-child(3) .kpi-val{color:#d97706}'
+    + '.kpi:nth-child(4){border-left-color:#dc2626}.kpi:nth-child(4) .kpi-val{color:#dc2626}'
+    + '.kpi:nth-child(5){border-left-color:#ea580c}.kpi:nth-child(5) .kpi-val{color:#ea580c}'
+    + '.kpi:nth-child(6){border-left-color:#7c3aed}.kpi:nth-child(6) .kpi-val{color:#7c3aed}'
+    + 'table{width:100%;border-collapse:collapse;margin-bottom:16px}'
+    + 'th{background:#1e293b;color:#94a3b8;padding:6px 8px;font-size:9px;text-transform:uppercase;text-align:left}'
+    + 'td{padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:10px}'
+    + 'tr:nth-child(even) td{background:#f8fafc}'
+    + '.badge{padding:2px 6px;border-radius:8px;font-size:9px;font-weight:700}'
+    + '.badge-d{background:#dcfce7;color:#15803d}.badge-c{background:#fef3c7;color:#b45309}.badge-p{background:#ede9fe;color:#6d28d9}'
+    + '.total-row td{font-weight:800;border-top:2px solid #1e293b;background:#f1f5f9}'
+    + '.footer{color:#94a3b8;font-size:9px;text-align:center;margin-top:20px;border-top:1px solid #e2e8f0;padding-top:8px}'
+    + '</style>';
+
+  var kpiHtml = '<div class="kpi-row">'
+    + '<div class="kpi"><div class="kpi-val">' + document.getElementById('kTotal').textContent + '</div><div class="kpi-label">Total Vehículos</div></div>'
+    + '<div class="kpi"><div class="kpi-val">' + document.getElementById('kDesp').textContent + '</div><div class="kpi-label">Cargados</div></div>'
+    + '<div class="kpi"><div class="kpi-val">' + document.getElementById('kCarg').textContent + '</div><div class="kpi-label">En Cargue</div></div>'
+    + '<div class="kpi"><div class="kpi-val">' + document.getElementById('kPend').textContent + '</div><div class="kpi-label">En Patio</div></div>'
+    + '<div class="kpi"><div class="kpi-val">' + document.getElementById('kSinLlegar').textContent + '</div><div class="kpi-label">Sin Presentarse</div></div>'
+    + '<div class="kpi"><div class="kpi-val">' + document.getElementById('kPct').textContent + '</div><div class="kpi-label">% Cumplimiento</div></div>'
+    + '</div>';
+
+  var totalKgOC = 0, totalCant = 0;
+  var filas = filteredData.map(function(r) {
+    var pct = parseFloat(r[C.PCT]) || 0;
+    var dur = calcDuracion(r[C.H_INI], r[C.H_FIN]);
+    var kgoc = toNum(r[C.KG_OC]), cant = toNum(r[C.CANT]);
+    totalKgOC += kgoc; totalCant += cant;
+    return '<tr>'
+      + '<td>' + (r[C.FECHA]||'—') + '</td>'
+      + '<td><strong>' + (r[C.OC]||'—') + '</strong></td>'
+      + '<td>' + (r[C.CLIENTE]||'—') + '</td>'
+      + '<td>' + (r[C.PLACAS]||'—') + '</td>'
+      + '<td>' + (r[C.H_CITA]||'—') + '</td>'
+      + '<td>' + (r[C.H_LLE]||'—') + '</td>'
+      + '<td>' + (r[C.H_INI]||'—') + '</td>'
+      + '<td>' + (r[C.H_FIN]||'—') + '</td>'
+      + '<td>' + dur + '</td>'
+      + '<td><span class="badge ' + badgeClass(r[C.STATUS]) + '">' + (r[C.STATUS]||'—') + '</span></td>'
+      + '<td>' + kgoc.toLocaleString('es-CO') + '</td>'
+      + '<td>' + cant.toLocaleString('es-CO') + '</td>'
+      + '<td>' + pct + '%</td>'
+      + '</tr>';
+  }).join('');
+
+  var tablaHtml = '<table>'
+    + '<thead><tr><th>Fecha</th><th>OC</th><th>Cliente</th><th>Placas</th><th>H.Cita</th><th>H.Llega</th><th>H.Ini</th><th>H.Fin</th><th>Duración</th><th>Status</th><th>Kg OC</th><th>Cant.Desp</th><th>% Cumpl.</th></tr></thead>'
+    + '<tbody>' + filas + '</tbody>'
+    + '<tfoot><tr class="total-row"><td colspan="10" style="text-align:right;padding:6px 8px">TOTAL</td>'
+    + '<td style="color:#2563eb">' + totalKgOC.toLocaleString('es-CO') + '</td>'
+    + '<td style="color:#16a34a">' + totalCant.toLocaleString('es-CO') + '</td>'
+    + '<td></td></tr></tfoot>'
+    + '</table>';
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' + style + '</head><body>'
+    + '<h1>📦 Panel de Despachos SYOP</h1>'
+    + '<div class="sub">Fecha: ' + fecha + ' &nbsp;|&nbsp; Generado: ' + new Date().toLocaleString('es-CO') + '</div>'
+    + kpiHtml + tablaHtml
+    + '<div class="footer">AGRÍCOLA GUAPA S.A.S — Dashboard de Despachos SYOP</div>'
+    + '</body></html>';
+
+  var win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(function() {
+    win.print();
+    btn.textContent = '⬇ Descargar PDF';
+    btn.disabled = false;
+  }, 800);
+}
+
 </script>
 </body>
 </html>
