@@ -176,38 +176,38 @@ tbody tr:hover{background:#f8fafc}
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px" id="panelOps">
 
     <!-- Estado por toneladas -->
-    <div class="card">
-      <div class="card-title">📦 Despachos por Estado (Ton)</div>
-      <table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:4px">
+    <div class="card" style="padding:10px">
+      <div class="card-title" style="margin-bottom:6px;font-size:0.68rem">📦 Despachos por Estado (Ton)</div>
+      <table style="width:100%;font-size:0.72rem;border-collapse:collapse">
         <thead><tr>
-          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:left;font-size:0.68rem;text-transform:uppercase">Estado</th>
-          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase">Ton</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:left;font-size:0.62rem;text-transform:uppercase">Estado</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:right;font-size:0.62rem;text-transform:uppercase">Ton</th>
         </tr></thead>
         <tbody id="opsEstadoBody"></tbody>
       </table>
     </div>
 
     <!-- Empaque -->
-    <div class="card">
-      <div class="card-title">🎁 Rendimiento por Empaque</div>
-      <table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:4px">
+    <div class="card" style="padding:10px">
+      <div class="card-title" style="margin-bottom:6px;font-size:0.68rem">🎁 Rendimiento por Empaque</div>
+      <table style="width:100%;font-size:0.72rem;border-collapse:collapse">
         <thead><tr>
-          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:left;font-size:0.68rem;text-transform:uppercase">Empaque</th>
-          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase">Participación</th>
-          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase">Kg</th>
-          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase">Kg/Min</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:left;font-size:0.62rem;text-transform:uppercase">Empaque</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:right;font-size:0.62rem;text-transform:uppercase">Part.</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:right;font-size:0.62rem;text-transform:uppercase">Kg</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:right;font-size:0.62rem;text-transform:uppercase">Kg/Min</th>
         </tr></thead>
         <tbody id="opsEmpaqueBody"></tbody>
       </table>
     </div>
 
     <!-- Tiempos operación -->
-    <div class="card">
-      <div class="card-title">⏱️ Tiempos de Operación</div>
-      <table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:4px">
+    <div class="card" style="padding:10px">
+      <div class="card-title" style="margin-bottom:6px;font-size:0.68rem">⏱️ Tiempos de Operación</div>
+      <table style="width:100%;font-size:0.72rem;border-collapse:collapse">
         <thead><tr>
-          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:left;font-size:0.68rem;text-transform:uppercase">Indicador</th>
-          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase">Valor</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:left;font-size:0.62rem;text-transform:uppercase">Indicador</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:right;font-size:0.62rem;text-transform:uppercase">Valor</th>
         </tr></thead>
         <tbody id="opsTiemposBody"></tbody>
       </table>
@@ -400,8 +400,8 @@ function renderOps(){
   ];
   document.getElementById('opsEstadoBody').innerHTML=estadoRows.map(function(e){
     return'<tr style="border-bottom:1px solid #f1f5f9">'
-      +'<td style="padding:6px 10px;font-weight:'+(e.bold?'800':'600')+';color:'+e.color+'">'+e.label+'</td>'
-      +'<td style="padding:6px 10px;text-align:right;font-weight:'+(e.bold?'800':'600')+';color:'+e.color+'">'+(e.kg/1000).toFixed(3)+'</td>'
+      +'<td style="padding:4px 8px;font-weight:'+(e.bold?'800':'600')+';color:'+e.color+'">'+e.label+'</td>'
+      +'<td style="padding:4px 8px;text-align:right;font-weight:'+(e.bold?'800':'600')+';color:'+e.color+'">'+(e.kg/1000).toFixed(3)+'</td>'
       +'</tr>';
   }).join('');
 
@@ -420,10 +420,10 @@ function renderOps(){
     var pct=totalEmpKg>0?Math.round(e.kg/totalEmpKg*100):0;
     var kgMin=e.minSum>0?(e.kg/e.minSum).toFixed(1):'—';
     return'<tr style="border-bottom:1px solid #f1f5f9">'
-      +'<td style="padding:6px 10px;font-weight:600;color:#374151">'+k+'</td>'
-      +'<td style="padding:6px 10px;text-align:right;color:#64748b">'+pct+'%</td>'
-      +'<td style="padding:6px 10px;text-align:right;color:#2563eb;font-weight:700">'+(e.kg/1000).toFixed(1)+' T</td>'
-      +'<td style="padding:6px 10px;text-align:right;color:#d97706;font-weight:700">'+kgMin+'</td>'
+      +'<td style="padding:4px 8px;font-weight:600;color:#374151">'+k+'</td>'
+      +'<td style="padding:4px 8px;text-align:right;color:#64748b">'+pct+'%</td>'
+      +'<td style="padding:4px 8px;text-align:right;color:#2563eb;font-weight:700">'+(e.kg/1000).toFixed(1)+' T</td>'
+      +'<td style="padding:4px 8px;text-align:right;color:#d97706;font-weight:700">'+kgMin+'</td>'
       +'</tr>';
   }).join('');
 
@@ -463,8 +463,8 @@ function renderOps(){
   ];
   document.getElementById('opsTiemposBody').innerHTML=tiempos.map(function(t){
     return'<tr style="border-bottom:1px solid #f1f5f9">'
-      +'<td style="padding:6px 10px;color:#374151;font-weight:600">'+t.label+'</td>'
-      +'<td style="padding:6px 10px;text-align:right;font-weight:'+(t.bold?'800':'600')+';color:'+(t.color||'#1a1a2e')+'">'+t.val+'</td>'
+      +'<td style="padding:4px 8px;color:#374151;font-weight:600">'+t.label+'</td>'
+      +'<td style="padding:4px 8px;text-align:right;font-weight:'+(t.bold?'800':'600')+';color:'+(t.color||'#1a1a2e')+'">'+t.val+'</td>'
       +'</tr>';
   }).join('');
 }
