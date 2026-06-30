@@ -189,9 +189,28 @@ function badgeClass(s){ return isCargado(s)?'badge-d':isEnCargue(s)?'badge-c':'b
 
 function timeToMin(t){
   if(!t) return null;
-  var p=(t+'').trim().split(':');
-  if(p.length<2) return null;
-  return parseInt(p[0])*60+parseInt(p[1]);
+  var s=(t+'').trim();
+  // Formato 12h: "2:11:16 p. m." o "2:11 p.m."
+  var match12=s.match(/(\d+):(\d+)(?::\d+)?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);
+  if(match12){
+    var h=parseInt(match12[1]),m=parseInt(match12[2]);
+    var isPM=/p/i.test(match12[3]);
+    if(isPM&&h!==12) h+=12;
+    if(!isPM&&h===12) h=0;
+    return h*60+m;
+  }
+  // Formato 24h: "14:50"
+  var p=s.split(':');
+  if(p.length>=2) return parseInt(p[0])*60+parseInt(p[1]);
+  return null;
+}
+
+function fmtHora(t){
+  if(!t||t==='—') return '—';
+  var m=timeToMin(t);
+  if(!m&&m!==0) return t;
+  var h=Math.floor(m/60),min=m%60;
+  return (h<10?'0'+h:h)+':'+(min<10?'0'+min:min);
 }
 
 function calcDuracion(ini,fin){
@@ -317,10 +336,10 @@ function renderTable(){
       +'<td><strong style="color:#2563eb">'+(r[C.OC]||'—')+'</strong></td>'
       +'<td class="td-cliente" title="'+(r[C.CLIENTE]||'')+'">'+(r[C.CLIENTE]||'—')+'</td>'
       +'<td><strong>'+(r[C.PLACAS]||'—')+'</strong></td>'
-      +'<td style="font-weight:600;color:#374151;font-size:0.68rem">'+(r[C.H_CITA]||'—')+'</td>'
-      +'<td style="font-weight:600;color:#374151;font-size:0.68rem">'+(r[C.H_LLE]||'—')+'</td>'
-      +'<td style="font-weight:600;color:#0ea5e9;font-size:0.68rem">'+(r[C.H_INI]||'—')+'</td>'
-      +'<td style="font-weight:600;color:#16a34a;font-size:0.68rem">'+(r[C.H_FIN]||'—')+'</td>'
+      +'<td style="font-weight:600;color:#374151;font-size:0.68rem">'+fmtHora(r[C.H_CITA])+'</td>'
+      +'<td style="font-weight:600;color:#374151;font-size:0.68rem">'+fmtHora(r[C.H_LLE])+'</td>'
+      +'<td style="font-weight:600;color:#0ea5e9;font-size:0.68rem">'+fmtHora(r[C.H_INI])+'</td>'
+      +'<td style="font-weight:600;color:#16a34a;font-size:0.68rem">'+fmtHora(r[C.H_FIN])+'</td>'
       +'<td style="font-weight:700;color:#7c3aed;font-size:0.68rem">'+dur+'</td>'
       +'<td><span class="badge '+badgeClass(r[C.STATUS])+'">'+(r[C.STATUS]||'—')+'</span></td>'
       +'<td>'+fmtKg(r[C.KG_OC])+'</td>'
@@ -493,7 +512,7 @@ function downloadPDF(){
     var kgoc=toNum(r[C.KG_OC]),cant=toNum(r[C.CANT]);
     totalKgOC+=kgoc;totalCant+=cant;
     return '<tr><td>'+(r[C.FECHA]||'—')+'</td><td><b>'+(r[C.OC]||'—')+'</b></td><td>'+(r[C.CLIENTE]||'—')+'</td><td>'+(r[C.PLACAS]||'—')+'</td>'
-      +'<td>'+(r[C.H_CITA]||'—')+'</td><td>'+(r[C.H_LLE]||'—')+'</td><td>'+(r[C.H_INI]||'—')+'</td><td>'+(r[C.H_FIN]||'—')+'</td>'
+      +'<td>'+fmtHora(r[C.H_CITA])+'</td><td>'+fmtHora(r[C.H_LLE])+'</td><td>'+fmtHora(r[C.H_INI])+'</td><td>'+fmtHora(r[C.H_FIN])+'</td>'
       +'<td>'+dur+'</td><td>'+(r[C.STATUS]||'—')+'</td>'
       +'<td>'+kgoc.toLocaleString('es-CO')+'</td><td>'+cant.toLocaleString('es-CO')+'</td><td>'+pct+'%</td></tr>';
   }).join('');
