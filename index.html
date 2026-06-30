@@ -190,9 +190,25 @@ var REFRESH_MS=60000;
 var C={FECHA:0,OC:1,KG_OC:2,CANT:3,PCT:4,CLIENTE:5,PLACAS:6,H_OC:7,H_CITA:8,H_LLE:9,H_INI:10,H_FIN:11,STATUS:12,OBS:13,HS:14,MIN:15,KGMIN:16,EMP:17,MUE:18,CUA:19,PER:20};
 var allData=[],filteredData=[],charts={},nextRefresh=0;
 
-function toNum(v){return parseFloat((v||'0').toString().replace(/\./g,'').replace(',','.'))||0;}
+function toNum(v){
+  if(!v) return 0;
+  var s=v.toString().replace('%','').trim();
+  // formato colombiano: 1.234,56 -> quitar puntos de miles, cambiar coma por punto
+  s=s.replace(/\./g,'').replace(',','.');
+  return parseFloat(s)||0;
+}
+function parsePct(v){
+  if(!v||v==='—') return 0;
+  var s=v.toString().trim();
+  // viene como "100%" o "95%"
+  if(s.includes('%')) return parseFloat(s.replace('%','').replace(',','.'))||0;
+  // viene como decimal Google Sheets: 1.0 = 100%, 0.95 = 95%
+  var n=parseFloat(s.replace(',','.'))||0;
+  if(n>0&&n<=1.5) return Math.round(n*100);
+  // viene como número directo: 100, 95
+  return n;
+}
 function fmtKg(v){return toNum(v).toLocaleString('es-CO');}
-function norm(s){return(s||'').toLowerCase().trim();}
 function pctColor(p){return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626';}
 function isCargado(s){return norm(s)==='cargado';}
 function isEnCargue(s){return norm(s)==='en cargue';}
@@ -318,7 +334,7 @@ function renderKPIs(){
   var carg=r.filter(function(x){return isEnCargue(x[C.STATUS]);}).length;
   var pend=r.filter(function(x){return isEnPatio(x[C.STATUS]);}).length;
   var sinL=r.filter(function(x){return!isCargado(x[C.STATUS])&&!isEnCargue(x[C.STATUS])&&!isEnPatio(x[C.STATUS]);}).length;
-  var pcts=r.map(function(x){return parseFloat(x[C.PCT])||0;}).filter(function(v){return v>0;});
+  var pcts=r.map(function(x){return parsePct(x[C.PCT]);}).filter(function(v){return v>0;});
   var avgPct=pcts.length?Math.round(pcts.reduce(function(a,b){return a+b;},0)/pcts.length):0;
   document.getElementById('kTotal').textContent=r.length;
   document.getElementById('kDesp').textContent=desp;
@@ -332,7 +348,7 @@ function renderKPIs(){
 function renderTable(){
   var rows=filteredData,totalKgOC=0,totalCant=0;
   var html=rows.length?rows.map(function(r){
-    var pct=parseFloat(r[C.PCT])||0;
+    var pct=parsePct(r[C.PCT]);
     var dur=calcDuracion(r[C.H_INI],r[C.H_FIN]);
     totalKgOC+=toNum(r[C.KG_OC]);totalCant+=toNum(r[C.CANT]);
     return'<tr>'
@@ -421,7 +437,7 @@ function renderCharts(){
   r.forEach(function(x){
     var cl=(x[C.CLIENTE]||'Sin nombre').trim();
     if(!clienteMap[cl])clienteMap[cl]={ps:0,pc:0};
-    var p=parseFloat(x[C.PCT])||0;
+    var p=parsePct(x[C.PCT]);
     if(p>0){clienteMap[cl].ps+=p;clienteMap[cl].pc++;}
   });
   var cL=Object.keys(clienteMap);
@@ -448,7 +464,7 @@ function renderCharts(){
   });
   document.getElementById('donutLegend').innerHTML=[['#16a34a','✅ Cargados',desp],['#d97706','🔄 En Cargue',carg],['#7c3aed','⏳ En Patio',pend]]
     .map(function(x){return'<div class="legend-item"><div class="legend-dot" style="background:'+x[0]+'"></div><span class="legend-label">'+x[1]+'</span><span class="legend-val">'+x[2]+'</span></div>';}).join('');
-  var pvals=r.map(function(x){return parseFloat(x[C.PCT])||0;}).filter(function(v){return v>0;});
+  var pvals=r.map(function(x){return parsePct(x[C.PCT]);}).filter(function(v){return v>0;});
   var avgPct=pvals.length?Math.round(pvals.reduce(function(a,b){return a+b;},0)/pvals.length):0;
   destroyChart('gauge');
   charts['gauge']=new Chart(document.getElementById('chartGauge'),{
