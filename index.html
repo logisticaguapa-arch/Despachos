@@ -519,63 +519,7 @@ function renderCharts(){
 }
 
 function downloadPDF(){
-  var btn=document.getElementById('pdfBtn');
-  btn.textContent='⏳ Capturando...';
-  btn.disabled=true;
-
-  var container=document.querySelector('.container');
-  html2canvas(container,{
-    scale:1.5,
-    useCORS:true,
-    backgroundColor:'#f0f2f5',
-    scrollY:0,
-    windowWidth:container.scrollWidth,
-    height:container.scrollHeight
-  }).then(function(canvas){
-    var imgData=canvas.toDataURL('image/png');
-    var imgW=canvas.width, imgH=canvas.height;
-
-    // A4 en px a 96dpi: 794 x 1123
-    var pageW=794, pageH=Math.round(imgH*(pageW/imgW));
-
-    var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Despachos SYOP</title>'
-      +'<style>'
-      +'*{margin:0;padding:0;box-sizing:border-box}'
-      +'body{background:white;font-family:Arial,sans-serif}'
-      +'.header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:12px 20px;display:flex;align-items:center;justify-content:space-between}'
-      +'.header h1{color:white;font-size:14px;font-weight:700}'
-      +'.header p{color:#a0c4ff;font-size:10px}'
-      +'.content{width:100%}'
-      +'@media print{body{margin:0}}'
-      +'</style></head><body>'
-      +'<div class="header">'
-      +'<div><h1>📦 Panel de Despachos SYOP</h1>'
-      +'<p>Fecha: '+(document.getElementById('fFecha').value||new Date().toLocaleDateString('es-CO'))
-      +' | Generado: '+new Date().toLocaleString('es-CO')+'</p></div>'
-      +'</div>'
-      +'<img class="content" src="'+imgData+'" style="width:100%;display:block"/>'
-      +'</body></html>';
-
-    var win=window.open('','_blank');
-    if(!win){
-      alert('Permite las ventanas emergentes para este sitio y vuelve a intentarlo.');
-      btn.textContent='⬇ Descargar PDF';
-      btn.disabled=false;
-      return;
-    }
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(function(){
-      win.print();
-      btn.textContent='⬇ Descargar PDF';
-      btn.disabled=false;
-    },800);
-  }).catch(function(err){
-    alert('Error al generar PDF: '+err.message);
-    btn.textContent='⬇ Descargar PDF';
-    btn.disabled=false;
-  });
+  window.print();
 }
 
 function startCountdown(){
