@@ -6,7 +6,6 @@
 <title>Panel de Despachos - SYOP</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
@@ -63,25 +62,23 @@ tbody tr:hover{background:#f8fafc}
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding-top:4px}
 .gauge-val{font-size:1.8rem;font-weight:900;color:#2563eb;line-height:1}
 .gauge-label{font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;margin-top:2px}
-@media(max-width:900px){.kpi-row{grid-template-columns:repeat(3,1fr)}.charts-row{grid-template-columns:1fr}}
-  header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a) !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .filter-bar{display:none !important}
-  #refreshBtn,#pdfBtn{display:none !important}
-  .ubadge{display:none !important}
-  body{background:white !important}
-  .container{padding:8px !important;gap:8px !important}
-  .kpi-row{grid-template-columns:repeat(6,1fr) !important}
-  .kpi{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .charts-row{grid-template-columns:1.8fr 1fr 1fr !important}
-  canvas{max-width:100% !important}
-  .card,.table-card,.table-card{box-shadow:none !important;border:1px solid #e2e8f0 !important}
-  .alerta-roja{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .badge{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  th{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#1e293b !important;color:#94a3b8 !important}
-  tr:nth-child(even) td{background:#f8fafc !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  #tableFoot tr td{background:#f1f5f9 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-}
 @keyframes truckMove{from{transform:translateX(0)}to{transform:translateX(5px)}}
+@media(max-width:900px){.kpi-row{grid-template-columns:repeat(3,1fr)}.charts-row{grid-template-columns:1fr}}
+@media print{
+  *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  .filter-bar,.progress-wrap,#refreshBtn,#pdfBtn,.ubadge,.header-right{display:none !important}
+  header{padding:8px 16px !important}
+  body{background:white !important}
+  .container{padding:6px 10px !important;gap:8px !important}
+  .kpi-row{grid-template-columns:repeat(6,1fr) !important}
+  .charts-row{grid-template-columns:1.8fr 1fr 1fr !important}
+  .card,.table-card{box-shadow:none !important;border:1px solid #e2e8f0 !important}
+  th{background:#1e293b !important;color:#94a3b8 !important}
+  .badge-d{background:#dcfce7 !important;color:#15803d !important}
+  .badge-c{background:#fef3c7 !important;color:#b45309 !important}
+  .badge-p{background:#ede9fe !important;color:#6d28d9 !important}
+  @page{margin:8mm;size:A4 landscape}
+}
 </style>
 </head>
 <body>
@@ -92,7 +89,7 @@ tbody tr:hover{background:#f8fafc}
     <span class="ubadge" id="lastUpdate">Cargando...</span>
     <span class="ubadge" id="countdown"></span>
     <button id="refreshBtn" onclick="fetchData()">↻ Actualizar</button>
-    <button id="pdfBtn" onclick="downloadPDF()">⬇ Descargar PDF</button>
+    <button id="pdfBtn" onclick="window.print()">⬇ Descargar PDF</button>
   </div>
 </header>
 <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:100%"></div></div>
@@ -115,7 +112,6 @@ tbody tr:hover{background:#f8fafc}
 </div>
 
 <div class="container">
-
   <div class="kpi-row">
     <div class="kpi blue"><div class="kpi-val" id="kTotal">—</div><div class="kpi-label">🚛 Total Vehículos</div></div>
     <div class="kpi green"><div class="kpi-val" id="kDesp">—</div><div class="kpi-label">✅ Cargados</div></div>
@@ -185,62 +181,57 @@ tbody tr:hover{background:#f8fafc}
     <div class="card"><div class="card-title">Toneladas Cargadas por Cuadrilla</div><canvas id="chartCuadrilla" height="95"></canvas></div>
     <div class="card"><div class="card-title">🍩 Kg por Modalidad</div><canvas id="chartModalidad" height="95"></canvas><div class="donut-legend" id="modalidadLegend"></div></div>
   </div>
-
 </div>
 
 <script>
 Chart.register(ChartDataLabels);
+var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
+var REFRESH_MS=60000;
+var C={FECHA:0,OC:1,KG_OC:2,CANT:3,PCT:4,CLIENTE:5,PLACAS:6,H_OC:7,H_CITA:8,H_LLE:9,H_INI:10,H_FIN:11,STATUS:12,OBS:13,HS:14,MIN:15,KGMIN:16,EMP:17,MUE:18,CUA:19,PER:20};
+var allData=[],filteredData=[],charts={},nextRefresh=0;
 
-var CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
-var REFRESH_MS = 60000;
-var C = {FECHA:0,OC:1,KG_OC:2,CANT:3,PCT:4,CLIENTE:5,PLACAS:6,H_OC:7,H_CITA:8,H_LLE:9,H_INI:10,H_FIN:11,STATUS:12,OBS:13,HS:14,MIN:15,KGMIN:16,EMP:17,MUE:18,CUA:19,PER:20};
-var allData = [], filteredData = [], charts = {}, nextRefresh = 0;
-
-function toNum(v){ return parseFloat((v||'0').toString().replace(/\./g,'').replace(',','.'))||0; }
-function fmtKg(v){ return toNum(v).toLocaleString('es-CO'); }
-function norm(s){ return (s||'').toLowerCase().trim(); }
-function pctColor(p){ return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626'; }
-function isCargado(s){ return norm(s)==='cargado'; }
-function isEnCargue(s){ return norm(s)==='en cargue'; }
-function isEnPatio(s){ return norm(s)==='en patio'; }
-function badgeClass(s){ return isCargado(s)?'badge-d':isEnCargue(s)?'badge-c':'badge-p'; }
+function toNum(v){return parseFloat((v||'0').toString().replace(/\./g,'').replace(',','.'))||0;}
+function fmtKg(v){return toNum(v).toLocaleString('es-CO');}
+function norm(s){return(s||'').toLowerCase().trim();}
+function pctColor(p){return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626';}
+function isCargado(s){return norm(s)==='cargado';}
+function isEnCargue(s){return norm(s)==='en cargue';}
+function isEnPatio(s){return norm(s)==='en patio';}
+function badgeClass(s){return isCargado(s)?'badge-d':isEnCargue(s)?'badge-c':'badge-p';}
 
 function timeToMin(t){
   if(!t) return null;
   var s=(t+'').trim();
-  // Formato 12h: "2:11:16 p. m." o "2:11 p.m."
-  var match12=s.match(/(\d+):(\d+)(?::\d+)?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);
-  if(match12){
-    var h=parseInt(match12[1]),m=parseInt(match12[2]);
-    var isPM=/p/i.test(match12[3]);
-    if(isPM&&h!==12) h+=12;
-    if(!isPM&&h===12) h=0;
+  var m12=s.match(/(\d+):(\d+)(?::\d+)?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);
+  if(m12){
+    var h=parseInt(m12[1]),m=parseInt(m12[2]),pm=/p/i.test(m12[3]);
+    if(pm&&h!==12)h+=12;
+    if(!pm&&h===12)h=0;
     return h*60+m;
   }
-  // Formato 24h: "14:50"
   var p=s.split(':');
-  if(p.length>=2) return parseInt(p[0])*60+parseInt(p[1]);
+  if(p.length>=2)return parseInt(p[0])*60+parseInt(p[1]);
   return null;
 }
 
 function fmtHora(t){
-  if(!t||t==='—') return '—';
+  if(!t||t==='—')return'—';
   var m=timeToMin(t);
-  if(!m&&m!==0) return t;
+  if(m===null)return t;
   var h=Math.floor(m/60),min=m%60;
-  return (h<10?'0'+h:h)+':'+(min<10?'0'+min:min);
+  return(h<10?'0'+h:h)+':'+(min<10?'0'+min:min);
 }
 
 function calcDuracion(ini,fin){
-  var a=timeToMin(ini), b=timeToMin(fin);
-  if(!a||!b||b<=a) return '—';
-  var diff=b-a, h=Math.floor(diff/60), m=diff%60;
+  var a=timeToMin(ini),b=timeToMin(fin);
+  if(!a||!b||b<=a)return'—';
+  var d=b-a,h=Math.floor(d/60),m=d%60;
   return h>0?(h+'h '+m+'m'):(m+'m');
 }
 
 function truckSVG(color,anim){
   var s='display:inline-block;vertical-align:middle;width:28px;height:18px;flex-shrink:0'+(anim?';animation:truckMove 0.6s infinite alternate':'');
-  return '<svg viewBox="0 0 60 35" fill="none" style="'+s+'">'
+  return'<svg viewBox="0 0 60 35" fill="none" style="'+s+'">'
     +'<rect x="1" y="8" width="38" height="20" rx="3" fill="'+color+'" opacity="0.9"/>'
     +'<rect x="39" y="14" width="18" height="14" rx="2" fill="'+color+'"/>'
     +'<rect x="41" y="16" width="14" height="9" rx="1" fill="white" opacity="0.35"/>'
@@ -253,7 +244,7 @@ async function fetchData(){
   document.getElementById('refreshBtn').textContent='⏳';
   try{
     var res=await fetch(CSV_URL+'&t='+Date.now());
-    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(!res.ok)throw new Error('HTTP '+res.status);
     var txt=await res.text();
     allData=parseCSV(txt);
     populateFilters();
@@ -267,36 +258,33 @@ async function fetchData(){
 
 function parseCSV(txt){
   var lines=txt.trim().split('\n');
-  if(lines.length<2) return [];
+  if(lines.length<2)return[];
   return lines.slice(1).map(function(line){
     var cols=[],cur='',inQ=false;
     for(var i=0;i<line.length;i++){
       var c=line[i];
-      if(c==='"'){inQ=!inQ;}
-      else if(c===','&&!inQ){cols.push(cur.trim());cur='';}
-      else{cur+=c;}
+      if(c==='"'){inQ=!inQ;}else if(c===','&&!inQ){cols.push(cur.trim());cur='';}else{cur+=c;}
     }
-    cols.push(cur.trim());
-    return cols;
+    cols.push(cur.trim());return cols;
   }).filter(function(r){
     var oc=(r[C.OC]||'').replace(/"/g,'').trim();
-    if(!oc) return false;
+    if(!oc)return false;
     var lo=oc.toLowerCase();
     return lo!=='oc'&&!lo.includes('cargue')&&!lo.includes('minutos')&&!lo.includes('empaque')&&!lo.includes('fecha');
   });
 }
 
 function populateFilters(){
-  var fechas=[...new Set(allData.map(function(r){return (r[C.FECHA]||'').trim();}).filter(Boolean))].sort().reverse();
-  var clientes=[...new Set(allData.map(function(r){return (r[C.CLIENTE]||'').trim();}).filter(Boolean))].sort();
-  var placas=[...new Set(allData.map(function(r){return (r[C.PLACAS]||'').trim();}).filter(Boolean))].sort();
+  var fechas=[...new Set(allData.map(function(r){return(r[C.FECHA]||'').trim();}).filter(Boolean))].sort().reverse();
+  var clientes=[...new Set(allData.map(function(r){return(r[C.CLIENTE]||'').trim();}).filter(Boolean))].sort();
+  var placas=[...new Set(allData.map(function(r){return(r[C.PLACAS]||'').trim();}).filter(Boolean))].sort();
   var fF=document.getElementById('fFecha'),curF=fF.value;
-  fF.innerHTML='<option value="">Todas las fechas</option>'+fechas.map(function(f){return '<option value="'+f+'"'+(f===curF?' selected':'')+'>'+f+'</option>';}).join('');
-  if(!curF&&fechas.length) fF.value=fechas[0];
+  fF.innerHTML='<option value="">Todas las fechas</option>'+fechas.map(function(f){return'<option value="'+f+'"'+(f===curF?' selected':'')+'>'+f+'</option>';}).join('');
+  if(!curF&&fechas.length)fF.value=fechas[0];
   var fC=document.getElementById('fCliente'),curC=fC.value;
-  fC.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(function(c){return '<option value="'+c+'"'+(c===curC?' selected':'')+'>'+c+'</option>';}).join('');
+  fC.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(function(c){return'<option value="'+c+'"'+(c===curC?' selected':'')+'>'+c+'</option>';}).join('');
   var fP=document.getElementById('fPlaca'),curP=fP.value;
-  fP.innerHTML='<option value="">Todas las placas</option>'+placas.map(function(p){return '<option value="'+p+'"'+(p===curP?' selected':'')+'>'+p+'</option>';}).join('');
+  fP.innerHTML='<option value="">Todas las placas</option>'+placas.map(function(p){return'<option value="'+p+'"'+(p===curP?' selected':'')+'>'+p+'</option>';}).join('');
 }
 
 function applyFilters(){
@@ -305,10 +293,10 @@ function applyFilters(){
   var fP=document.getElementById('fPlaca').value;
   var fE=document.getElementById('fEstado').value;
   filteredData=allData.filter(function(r){
-    if(fF&&(r[C.FECHA]||'').trim()!==fF) return false;
-    if(fC&&(r[C.CLIENTE]||'').trim()!==fC) return false;
-    if(fP&&(r[C.PLACAS]||'').trim()!==fP) return false;
-    if(fE&&norm(r[C.STATUS])!==fE) return false;
+    if(fF&&(r[C.FECHA]||'').trim()!==fF)return false;
+    if(fC&&(r[C.CLIENTE]||'').trim()!==fC)return false;
+    if(fP&&(r[C.PLACAS]||'').trim()!==fP)return false;
+    if(fE&&norm(r[C.STATUS])!==fE)return false;
     return true;
   });
   renderAll();
@@ -322,14 +310,14 @@ function clearFilters(){
   applyFilters();
 }
 
-function renderAll(){ renderKPIs(); renderTable(); renderAlertas(); renderEtapas(); renderCharts(); }
+function renderAll(){renderKPIs();renderTable();renderAlertas();renderEtapas();renderCharts();}
 
 function renderKPIs(){
   var r=filteredData;
   var desp=r.filter(function(x){return isCargado(x[C.STATUS]);}).length;
   var carg=r.filter(function(x){return isEnCargue(x[C.STATUS]);}).length;
   var pend=r.filter(function(x){return isEnPatio(x[C.STATUS]);}).length;
-  var sinL=r.filter(function(x){return !isCargado(x[C.STATUS])&&!isEnCargue(x[C.STATUS])&&!isEnPatio(x[C.STATUS]);}).length;
+  var sinL=r.filter(function(x){return!isCargado(x[C.STATUS])&&!isEnCargue(x[C.STATUS])&&!isEnPatio(x[C.STATUS]);}).length;
   var pcts=r.map(function(x){return parseFloat(x[C.PCT])||0;}).filter(function(v){return v>0;});
   var avgPct=pcts.length?Math.round(pcts.reduce(function(a,b){return a+b;},0)/pcts.length):0;
   document.getElementById('kTotal').textContent=r.length;
@@ -342,14 +330,12 @@ function renderKPIs(){
 }
 
 function renderTable(){
-  var rows=filteredData;
-  var totalKgOC=0, totalCant=0;
+  var rows=filteredData,totalKgOC=0,totalCant=0;
   var html=rows.length?rows.map(function(r){
     var pct=parseFloat(r[C.PCT])||0;
     var dur=calcDuracion(r[C.H_INI],r[C.H_FIN]);
-    totalKgOC+=toNum(r[C.KG_OC]);
-    totalCant+=toNum(r[C.CANT]);
-    return '<tr>'
+    totalKgOC+=toNum(r[C.KG_OC]);totalCant+=toNum(r[C.CANT]);
+    return'<tr>'
       +'<td style="color:#64748b;font-size:0.65rem">'+(r[C.FECHA]||'—')+'</td>'
       +'<td><strong style="color:#2563eb">'+(r[C.OC]||'—')+'</strong></td>'
       +'<td class="td-cliente" title="'+(r[C.CLIENTE]||'')+'">'+(r[C.CLIENTE]||'—')+'</td>'
@@ -364,54 +350,44 @@ function renderTable(){
       +'<td>'+fmtKg(r[C.CANT])+'</td>'
       +'<td><div class="pbar"><div class="pbar-bg"><div class="pbar-fill" style="width:'+Math.min(pct,100)+'%;background:'+pctColor(pct)+'"></div></div><span style="font-size:0.65rem;color:#64748b;width:28px">'+pct+'%</span></div></td>'
       +'</tr>';
-  }).join(''):'<tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Sin datos para los filtros seleccionados</td></tr>';
-
+  }).join(''):'<tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Sin datos</td></tr>';
   document.getElementById('tableBody').innerHTML=html;
   document.getElementById('tableFoot').innerHTML=rows.length
     ?'<tr style="background:#f8fafc;border-top:2px solid #1e293b">'
-      +'<td colspan="10" style="padding:8px 10px;font-weight:700;color:#374151;font-size:0.72rem;text-align:right">TOTAL</td>'
-      +'<td style="padding:8px 10px;font-weight:800;color:#2563eb;font-size:0.75rem">'+totalKgOC.toLocaleString('es-CO')+'</td>'
-      +'<td style="padding:8px 10px;font-weight:800;color:#16a34a;font-size:0.75rem">'+totalCant.toLocaleString('es-CO')+'</td>'
+      +'<td colspan="10" style="padding:8px;font-weight:700;color:#374151;font-size:0.72rem;text-align:right">TOTAL</td>'
+      +'<td style="padding:8px;font-weight:800;color:#2563eb">'+totalKgOC.toLocaleString('es-CO')+'</td>'
+      +'<td style="padding:8px;font-weight:800;color:#16a34a">'+totalCant.toLocaleString('es-CO')+'</td>'
       +'<td></td></tr>':'';
 }
 
 function renderAlertas(){
-  var r=filteredData;
-  var ahora=new Date();
-  var ahoraMin=ahora.getHours()*60+ahora.getMinutes();
+  var r=filteredData,ahora=new Date(),ahoraMin=ahora.getHours()*60+ahora.getMinutes();
   var citaVencida=r.filter(function(x){
-    var cita=timeToMin(x[C.H_CITA]);
-    var llegada=(x[C.H_LLE]||'').trim();
-    if(!cita||llegada) return false;
-    return ahoraMin>cita+10;
+    var cita=timeToMin(x[C.H_CITA]),llegada=(x[C.H_LLE]||'').trim();
+    if(!cita||llegada)return false;return ahoraMin>cita+10;
   });
   var patioMucho=r.filter(function(x){
-    var llegada=timeToMin(x[C.H_LLE]);
-    var inicio=(x[C.H_INI]||'').trim();
-    if(!llegada||inicio) return false;
-    return ahoraMin-llegada>60;
+    var llegada=timeToMin(x[C.H_LLE]),inicio=(x[C.H_INI]||'').trim();
+    if(!llegada||inicio)return false;return ahoraMin-llegada>60;
   });
   var container=document.getElementById('alertasContainer');
   if(!citaVencida.length&&!patioMucho.length){
-    container.innerHTML='<div class="alerta-empty">✅ Sin alertas activas — La operación está bajo control</div>';
-    return;
+    container.innerHTML='<div class="alerta-empty">✅ Sin alertas activas — La operación está bajo control</div>';return;
   }
   function makeAlerta(icon,titulo,items,detalleFn){
-    if(!items.length) return '';
+    if(!items.length)return'';
     var filas=items.map(function(row){
-      return '<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:#fee2e2;border-radius:8px;margin-top:5px">'
-        +'<span>🚛</span>'
-        +'<span style="font-weight:800;color:#dc2626;font-size:0.8rem;min-width:70px">'+(row[C.PLACAS]||'Sin placa')+'</span>'
+      return'<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:#fee2e2;border-radius:8px;margin-top:5px">'
+        +'<span>🚛</span><span style="font-weight:800;color:#dc2626;font-size:0.8rem;min-width:70px">'+(row[C.PLACAS]||'Sin placa')+'</span>'
         +'<span style="color:#374151;font-size:0.78rem;flex:1">'+(row[C.CLIENTE]||'Sin cliente')+'</span>'
-        +'<span style="color:#64748b;font-size:0.72rem">'+detalleFn(row)+'</span>'
-        +'</div>';
+        +'<span style="color:#64748b;font-size:0.72rem">'+detalleFn(row)+'</span></div>';
     }).join('');
-    return '<div class="alerta alerta-roja"><span class="alerta-icon">'+icon+'</span>'
+    return'<div class="alerta alerta-roja"><span class="alerta-icon">'+icon+'</span>'
       +'<div class="alerta-body" style="width:100%"><div class="alerta-titulo">'+titulo+' — '+items.length+' vehículo'+(items.length>1?'s':'')+'</div>'+filas+'</div></div>';
   }
   container.innerHTML='<div class="alertas-wrap">'
-    +makeAlerta('🚨','Cita VENCIDA — No han llegado',citaVencida,function(row){return 'Cita: '+(row[C.H_CITA]||'—');})
-    +makeAlerta('⏰','En patio +1 hora sin iniciar cargue',patioMucho,function(row){return 'Llegó: '+(row[C.H_LLE]||'—');})
+    +makeAlerta('🚨','Cita VENCIDA — No han llegado',citaVencida,function(row){return'Cita: '+(row[C.H_CITA]||'—');})
+    +makeAlerta('⏰','En patio +1 hora sin iniciar cargue',patioMucho,function(row){return'Llegó: '+fmtHora(row[C.H_LLE]);})
     +'</div>';
 }
 
@@ -424,11 +400,10 @@ function renderEtapas(){
   document.getElementById('countCargue').textContent=cargue.length;
   document.getElementById('countListo').textContent=listo.length;
   function mkChip(row,bg,border,color,anim){
-    return '<div style="display:inline-flex;flex-direction:row;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;background:'+bg+';border:1px solid '+border+';white-space:nowrap">'
+    return'<div style="display:inline-flex;flex-direction:row;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;background:'+bg+';border:1px solid '+border+';white-space:nowrap">'
       +truckSVG(color,anim)
       +'<span style="font-weight:700;color:#1a1a2e;font-size:0.72rem">'+(row[C.PLACAS]||'?')+'</span>'
-      +'<span style="color:#64748b;font-size:0.68rem;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(row[C.CLIENTE]||'—')+'</span>'
-      +'</div>';
+      +'<span style="color:#64748b;font-size:0.68rem;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(row[C.CLIENTE]||'—')+'</span></div>';
   }
   var empty='<p style="color:#94a3b8;font-size:0.72rem;padding:6px">Sin vehículos</p>';
   document.getElementById('trucksPatio').innerHTML=patio.length?patio.map(function(r){return mkChip(r,'#f5f3ff','#ddd6fe','#7c3aed',false);}).join(''):empty;
@@ -436,7 +411,7 @@ function renderEtapas(){
   document.getElementById('trucksListo').innerHTML=listo.length?listo.map(function(r){return mkChip(r,'#f0fdf4','#bbf7d0','#16a34a',false);}).join(''):empty;
 }
 
-function destroyChart(id){ if(charts[id]){charts[id].destroy();delete charts[id];} }
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 
 function renderCharts(){
   var r=filteredData;
@@ -445,7 +420,7 @@ function renderCharts(){
   var clienteMap={};
   r.forEach(function(x){
     var cl=(x[C.CLIENTE]||'Sin nombre').trim();
-    if(!clienteMap[cl]) clienteMap[cl]={ps:0,pc:0};
+    if(!clienteMap[cl])clienteMap[cl]={ps:0,pc:0};
     var p=parseFloat(x[C.PCT])||0;
     if(p>0){clienteMap[cl].ps+=p;clienteMap[cl].pc++;}
   });
@@ -472,7 +447,7 @@ function renderCharts(){
       tooltip:{callbacks:{label:function(c){return c.label+': '+c.raw;}}}}}
   });
   document.getElementById('donutLegend').innerHTML=[['#16a34a','✅ Cargados',desp],['#d97706','🔄 En Cargue',carg],['#7c3aed','⏳ En Patio',pend]]
-    .map(function(x){return '<div class="legend-item"><div class="legend-dot" style="background:'+x[0]+'"></div><span class="legend-label">'+x[1]+'</span><span class="legend-val">'+x[2]+'</span></div>';}).join('');
+    .map(function(x){return'<div class="legend-item"><div class="legend-dot" style="background:'+x[0]+'"></div><span class="legend-label">'+x[1]+'</span><span class="legend-val">'+x[2]+'</span></div>';}).join('');
   var pvals=r.map(function(x){return parseFloat(x[C.PCT])||0;}).filter(function(v){return v>0;});
   var avgPct=pvals.length?Math.round(pvals.reduce(function(a,b){return a+b;},0)/pvals.length):0;
   destroyChart('gauge');
@@ -482,13 +457,8 @@ function renderCharts(){
     options:{responsive:false,cutout:'72%',plugins:{legend:{display:false},tooltip:{enabled:false},datalabels:{display:false}}}
   });
   var cuadMap={};
-  r.forEach(function(x){
-    var cu=(x[C.CUA]||'').trim();if(!cu)return;
-    if(!cuadMap[cu])cuadMap[cu]=0;
-    cuadMap[cu]+=toNum(x[C.CANT])/1000;
-  });
-  var cuadL=Object.keys(cuadMap);
-  var cuadV=cuadL.map(function(k){return parseFloat(cuadMap[k].toFixed(2));});
+  r.forEach(function(x){var cu=(x[C.CUA]||'').trim();if(!cu)return;if(!cuadMap[cu])cuadMap[cu]=0;cuadMap[cu]+=toNum(x[C.CANT])/1000;});
+  var cuadL=Object.keys(cuadMap),cuadV=cuadL.map(function(k){return parseFloat(cuadMap[k].toFixed(2));});
   destroyChart('cuadrilla');
   charts['cuadrilla']=new Chart(document.getElementById('chartCuadrilla'),{
     type:'bar',data:{labels:cuadL,datasets:[{label:'Ton',data:cuadV,backgroundColor:'#818cf8',borderRadius:4}]},
@@ -497,14 +467,8 @@ function renderCharts(){
       scales:{x:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return v+' T';}},grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}}}}
   });
   var modalMap={};
-  r.forEach(function(x){
-    var mod=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();
-    if(!modalMap[mod])modalMap[mod]=0;
-    modalMap[mod]+=toNum(x[C.CANT]);
-  });
-  var modL=Object.keys(modalMap);
-  var modV=modL.map(function(k){return modalMap[k];});
-  var modC=['#0ea5e9','#f59e0b','#10b981','#a855f7','#ef4444'];
+  r.forEach(function(x){var mod=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();if(!modalMap[mod])modalMap[mod]=0;modalMap[mod]+=toNum(x[C.CANT]);});
+  var modL=Object.keys(modalMap),modV=modL.map(function(k){return modalMap[k];}),modC=['#0ea5e9','#f59e0b','#10b981','#a855f7','#ef4444'];
   destroyChart('modalidad');
   charts['modalidad']=new Chart(document.getElementById('chartModalidad'),{
     type:'doughnut',
@@ -514,12 +478,8 @@ function renderCharts(){
       tooltip:{callbacks:{label:function(c){return c.label+': '+(c.raw/1000).toFixed(1)+' Ton';}}}}}
   });
   document.getElementById('modalidadLegend').innerHTML=modL.map(function(l,i){
-    return '<div class="legend-item"><div class="legend-dot" style="background:'+modC[i]+'"></div><span class="legend-label">'+l+'</span><span class="legend-val">'+(modalMap[l]/1000).toFixed(1)+' Ton</span></div>';
+    return'<div class="legend-item"><div class="legend-dot" style="background:'+modC[i]+'"></div><span class="legend-label">'+l+'</span><span class="legend-val">'+(modalMap[l]/1000).toFixed(1)+' Ton</span></div>';
   }).join('');
-}
-
-function downloadPDF(){
-  window.print();
 }
 
 function startCountdown(){
