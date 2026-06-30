@@ -6,6 +6,7 @@
 <title>Panel de Despachos - SYOP</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
@@ -502,60 +503,62 @@ function renderCharts(){
 
 function downloadPDF(){
   var btn=document.getElementById('pdfBtn');
-  btn.textContent='⏳ Generando...';
+  btn.textContent='⏳ Capturando...';
   btn.disabled=true;
-  var fecha=document.getElementById('fFecha').value||new Date().toLocaleDateString('es-CO');
-  var totalKgOC=0,totalCant=0;
-  var filas=filteredData.map(function(r){
-    var pct=parseFloat(r[C.PCT])||0;
-    var dur=calcDuracion(r[C.H_INI],r[C.H_FIN]);
-    var kgoc=toNum(r[C.KG_OC]),cant=toNum(r[C.CANT]);
-    totalKgOC+=kgoc;totalCant+=cant;
-    return '<tr><td>'+(r[C.FECHA]||'—')+'</td><td><b>'+(r[C.OC]||'—')+'</b></td><td>'+(r[C.CLIENTE]||'—')+'</td><td>'+(r[C.PLACAS]||'—')+'</td>'
-      +'<td>'+fmtHora(r[C.H_CITA])+'</td><td>'+fmtHora(r[C.H_LLE])+'</td><td>'+fmtHora(r[C.H_INI])+'</td><td>'+fmtHora(r[C.H_FIN])+'</td>'
-      +'<td>'+dur+'</td><td>'+(r[C.STATUS]||'—')+'</td>'
-      +'<td>'+kgoc.toLocaleString('es-CO')+'</td><td>'+cant.toLocaleString('es-CO')+'</td><td>'+pct+'%</td></tr>';
-  }).join('');
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Despachos SYOP</title>'
-    +'<style>body{font-family:Arial,sans-serif;padding:20px;font-size:11px;color:#1a1a2e}'
-    +'h1{font-size:15px;color:#1B2A4A;margin:0 0 2px}p{color:#64748b;font-size:10px;margin:0 0 14px}'
-    +'.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}'
-    +'.k{background:#f8fafc;border-radius:6px;padding:8px 12px;border-left:3px solid #2563eb;min-width:90px}'
-    +'.kv{font-size:18px;font-weight:800;color:#2563eb}.kl{font-size:9px;color:#64748b;text-transform:uppercase}'
-    +'.k2{border-left-color:#16a34a}.k2 .kv{color:#16a34a}.k3{border-left-color:#d97706}.k3 .kv{color:#d97706}'
-    +'.k4{border-left-color:#dc2626}.k4 .kv{color:#dc2626}.k5{border-left-color:#ea580c}.k5 .kv{color:#ea580c}'
-    +'.k6{border-left-color:#7c3aed}.k6 .kv{color:#7c3aed}'
-    +'table{width:100%;border-collapse:collapse}th{background:#1e293b;color:#ccc;padding:5px 7px;font-size:9px;text-transform:uppercase;text-align:left}'
-    +'td{padding:5px 7px;border-bottom:1px solid #f1f5f9;font-size:10px}tr:nth-child(even) td{background:#f8fafc}'
-    +'.tf td{font-weight:800;border-top:2px solid #1e293b;background:#f1f5f9}'
-    +'.footer{color:#94a3b8;font-size:9px;text-align:center;margin-top:16px;border-top:1px solid #e2e8f0;padding-top:6px}'
-    +'@media print{body{padding:10px}}</style></head><body>'
-    +'<h1>Panel de Despachos SYOP</h1>'
-    +'<p>Fecha: '+fecha+' &nbsp;|&nbsp; Generado: '+new Date().toLocaleString('es-CO')+'</p>'
-    +'<div class="kpis">'
-    +'<div class="k"><div class="kv">'+document.getElementById('kTotal').textContent+'</div><div class="kl">Total</div></div>'
-    +'<div class="k k2"><div class="kv">'+document.getElementById('kDesp').textContent+'</div><div class="kl">Cargados</div></div>'
-    +'<div class="k k3"><div class="kv">'+document.getElementById('kCarg').textContent+'</div><div class="kl">En Cargue</div></div>'
-    +'<div class="k k4"><div class="kv">'+document.getElementById('kPend').textContent+'</div><div class="kl">En Patio</div></div>'
-    +'<div class="k k5"><div class="kv">'+document.getElementById('kSinLlegar').textContent+'</div><div class="kl">Sin Presentarse</div></div>'
-    +'<div class="k k6"><div class="kv">'+document.getElementById('kPct').textContent+'</div><div class="kl">% Cumplimiento</div></div>'
-    +'</div>'
-    +'<table><thead><tr><th>Fecha</th><th>OC</th><th>Cliente</th><th>Placas</th>'
-    +'<th>H.Cita</th><th>H.Llega</th><th>H.Ini</th><th>H.Fin</th><th>Duración</th>'
-    +'<th>Status</th><th>Kg OC</th><th>Cant.Desp</th><th>% Cumpl.</th></tr></thead>'
-    +'<tbody>'+(filas||'<tr><td colspan="13" style="text-align:center;color:#94a3b8">Sin datos</td></tr>')+'</tbody>'
-    +'<tfoot><tr class="tf"><td colspan="10" style="text-align:right">TOTAL</td>'
-    +'<td style="color:#2563eb">'+totalKgOC.toLocaleString('es-CO')+'</td>'
-    +'<td style="color:#16a34a">'+totalCant.toLocaleString('es-CO')+'</td>'
-    +'<td></td></tr></tfoot></table>'
-    +'<div class="footer">AGRÍCOLA GUAPA S.A.S — Dashboard de Despachos SYOP</div>'
-    +'</body></html>';
-  var win=window.open('','_blank');
-  if(!win){alert('Permite las ventanas emergentes para este sitio');btn.textContent='⬇ Descargar PDF';btn.disabled=false;return;}
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  setTimeout(function(){win.print();btn.textContent='⬇ Descargar PDF';btn.disabled=false;},600);
+
+  var container=document.querySelector('.container');
+  html2canvas(container,{
+    scale:1.5,
+    useCORS:true,
+    backgroundColor:'#f0f2f5',
+    scrollY:0,
+    windowWidth:container.scrollWidth,
+    height:container.scrollHeight
+  }).then(function(canvas){
+    var imgData=canvas.toDataURL('image/png');
+    var imgW=canvas.width, imgH=canvas.height;
+
+    // A4 en px a 96dpi: 794 x 1123
+    var pageW=794, pageH=Math.round(imgH*(pageW/imgW));
+
+    var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Despachos SYOP</title>'
+      +'<style>'
+      +'*{margin:0;padding:0;box-sizing:border-box}'
+      +'body{background:white;font-family:Arial,sans-serif}'
+      +'.header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:12px 20px;display:flex;align-items:center;justify-content:space-between}'
+      +'.header h1{color:white;font-size:14px;font-weight:700}'
+      +'.header p{color:#a0c4ff;font-size:10px}'
+      +'.content{width:100%}'
+      +'@media print{body{margin:0}}'
+      +'</style></head><body>'
+      +'<div class="header">'
+      +'<div><h1>📦 Panel de Despachos SYOP</h1>'
+      +'<p>Fecha: '+(document.getElementById('fFecha').value||new Date().toLocaleDateString('es-CO'))
+      +' | Generado: '+new Date().toLocaleString('es-CO')+'</p></div>'
+      +'</div>'
+      +'<img class="content" src="'+imgData+'" style="width:100%;display:block"/>'
+      +'</body></html>';
+
+    var win=window.open('','_blank');
+    if(!win){
+      alert('Permite las ventanas emergentes para este sitio y vuelve a intentarlo.');
+      btn.textContent='⬇ Descargar PDF';
+      btn.disabled=false;
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(function(){
+      win.print();
+      btn.textContent='⬇ Descargar PDF';
+      btn.disabled=false;
+    },800);
+  }).catch(function(err){
+    alert('Error al generar PDF: '+err.message);
+    btn.textContent='⬇ Descargar PDF';
+    btn.disabled=false;
+  });
 }
 
 function startCountdown(){
