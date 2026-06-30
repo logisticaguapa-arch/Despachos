@@ -63,8 +63,25 @@ tbody tr:hover{background:#f8fafc}
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding-top:4px}
 .gauge-val{font-size:1.8rem;font-weight:900;color:#2563eb;line-height:1}
 .gauge-label{font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;margin-top:2px}
-@keyframes truckMove{from{transform:translateX(0)}to{transform:translateX(5px)}}
 @media(max-width:900px){.kpi-row{grid-template-columns:repeat(3,1fr)}.charts-row{grid-template-columns:1fr}}
+  header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a) !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .filter-bar{display:none !important}
+  #refreshBtn,#pdfBtn{display:none !important}
+  .ubadge{display:none !important}
+  body{background:white !important}
+  .container{padding:8px !important;gap:8px !important}
+  .kpi-row{grid-template-columns:repeat(6,1fr) !important}
+  .kpi{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .charts-row{grid-template-columns:1.8fr 1fr 1fr !important}
+  canvas{max-width:100% !important}
+  .card,.table-card,.table-card{box-shadow:none !important;border:1px solid #e2e8f0 !important}
+  .alerta-roja{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .badge{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  th{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#1e293b !important;color:#94a3b8 !important}
+  tr:nth-child(even) td{background:#f8fafc !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #tableFoot tr td{background:#f1f5f9 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+@keyframes truckMove{from{transform:translateX(0)}to{transform:translateX(5px)}}
 </style>
 </head>
 <body>
