@@ -171,6 +171,49 @@ tbody tr:hover{background:#f8fafc}
     <div class="card"><div class="card-title">Toneladas Cargadas por Cuadrilla</div><canvas id="chartCuadrilla" height="95"></canvas></div>
     <div class="card"><div class="card-title">🍩 Kg por Modalidad</div><canvas id="chartModalidad" height="95"></canvas><div class="donut-legend" id="modalidadLegend"></div></div>
   </div>
+
+  <!-- PANEL OPERACIONES -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px" id="panelOps">
+
+    <!-- Estado por toneladas -->
+    <div class="card">
+      <div class="card-title">📦 Despachos por Estado (Ton)</div>
+      <table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:4px">
+        <thead><tr>
+          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:left;font-size:0.68rem;text-transform:uppercase">Estado</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase">Ton</th>
+        </tr></thead>
+        <tbody id="opsEstadoBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Empaque -->
+    <div class="card">
+      <div class="card-title">🎁 Rendimiento por Empaque</div>
+      <table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:4px">
+        <thead><tr>
+          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:left;font-size:0.68rem;text-transform:uppercase">Empaque</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase">Participación</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase">Kg</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase">Kg/Min</th>
+        </tr></thead>
+        <tbody id="opsEmpaqueBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Tiempos operación -->
+    <div class="card">
+      <div class="card-title">⏱️ Tiempos de Operación</div>
+      <table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:4px">
+        <thead><tr>
+          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:left;font-size:0.68rem;text-transform:uppercase">Indicador</th>
+          <th style="background:#1e293b;color:#94a3b8;padding:6px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase">Valor</th>
+        </tr></thead>
+        <tbody id="opsTiemposBody"></tbody>
+      </table>
+    </div>
+
+  </div>
 </div>
 
 <script>
@@ -333,7 +376,98 @@ function clearFilters(){
 }
 
 // ─── Render ───────────────────────────────────────────────────
-function renderAll(){renderKPIs();renderTable();renderAlertas();renderEtapas();renderCharts();}
+function renderAll(){renderKPIs();renderTable();renderAlertas();renderEtapas();renderCharts();renderOps();}
+
+function renderOps(){
+  var r=filteredData;
+  if(!r.length){document.getElementById('panelOps').style.display='none';return;}
+  document.getElementById('panelOps').style.display='grid';
+
+  // 1. Estado por toneladas (usa KG_OC)
+  var kgCargado=0,kgEnCargue=0,kgEnPatio=0;
+  r.forEach(function(x){
+    var kg=toNum(x[C.KG_OC]);
+    if(isCargado(x[C.STATUS]))kgCargado+=kg;
+    else if(isEnCargue(x[C.STATUS]))kgEnCargue+=kg;
+    else if(isEnPatio(x[C.STATUS]))kgEnPatio+=kg;
+  });
+  var totalKg=kgCargado+kgEnCargue+kgEnPatio;
+  var estadoRows=[
+    {label:'Cargado',kg:kgCargado,color:'#16a34a'},
+    {label:'En Cargue',kg:kgEnCargue,color:'#d97706'},
+    {label:'En Patio',kg:kgEnPatio,color:'#7c3aed'},
+    {label:'Total',kg:totalKg,color:'#1e293b',bold:true}
+  ];
+  document.getElementById('opsEstadoBody').innerHTML=estadoRows.map(function(e){
+    return'<tr style="border-bottom:1px solid #f1f5f9">'
+      +'<td style="padding:6px 10px;font-weight:'+(e.bold?'800':'600')+';color:'+e.color+'">'+e.label+'</td>'
+      +'<td style="padding:6px 10px;text-align:right;font-weight:'+(e.bold?'800':'600')+';color:'+e.color+'">'+(e.kg/1000).toFixed(3)+'</td>'
+      +'</tr>';
+  }).join('');
+
+  // 2. Empaque con Kg/Min (usa KG_OC y MIN)
+  var empMap={};
+  r.forEach(function(x){
+    var emp=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();
+    if(!empMap[emp])empMap[emp]={kg:0,minSum:0,cnt:0};
+    empMap[emp].kg+=toNum(x[C.KG_OC]);
+    var min=toNum(x[C.MIN]);
+    if(min>0){empMap[emp].minSum+=min;empMap[emp].cnt++;}
+  });
+  var totalEmpKg=Object.keys(empMap).reduce(function(a,k){return a+empMap[k].kg;},0);
+  document.getElementById('opsEmpaqueBody').innerHTML=Object.keys(empMap).map(function(k){
+    var e=empMap[k];
+    var pct=totalEmpKg>0?Math.round(e.kg/totalEmpKg*100):0;
+    var kgMin=e.minSum>0?(e.kg/e.minSum).toFixed(1):'—';
+    return'<tr style="border-bottom:1px solid #f1f5f9">'
+      +'<td style="padding:6px 10px;font-weight:600;color:#374151">'+k+'</td>'
+      +'<td style="padding:6px 10px;text-align:right;color:#64748b">'+pct+'%</td>'
+      +'<td style="padding:6px 10px;text-align:right;color:#2563eb;font-weight:700">'+(e.kg/1000).toFixed(1)+' T</td>'
+      +'<td style="padding:6px 10px;text-align:right;color:#d97706;font-weight:700">'+kgMin+'</td>'
+      +'</tr>';
+  }).join('');
+
+  // 3. Tiempos de operación
+  // Hora inicio = min de todas las H_INI, Hora fin = max de todas las H_FIN
+  var hInis=r.map(function(x){return timeToMin(x[C.H_INI]);}).filter(function(v){return v!==null;});
+  var hFins=r.map(function(x){return timeToMin(x[C.H_FIN]);}).filter(function(v){return v!==null;});
+  var hIni=hInis.length?Math.min.apply(null,hInis):null;
+  var hFin=hFins.length?Math.max.apply(null,hFins):null;
+
+  function minToStr(m){if(m===null)return'—';var h=Math.floor(m/60),min=m%60;return(h<10?'0'+h:h)+':'+(min<10?'0'+min:min);}
+  function minToHM(m){if(!m||m<=0)return'0:00';var h=Math.floor(m/60),min=m%60;return h+':'+(min<10?'0'+min:min);}
+
+  var totalMin=hIni!==null&&hFin!==null?(hFin-hIni):0;
+
+  // Calcular tiempo no efectivo según reglas
+  var noEfectivo=0;
+  if(hIni!==null&&hFin!==null){
+    // Desayuno 8:00-8:30 (480-510)
+    if(hIni<=510&&hFin>=480)noEfectivo+=Math.min(hFin,510)-Math.max(hIni,480);
+    // Almuerzo 12:00-13:00 (720-780)
+    if(hIni<=780&&hFin>=720)noEfectivo+=Math.min(hFin,780)-Math.max(hIni,720);
+    // Media tarde 17:00-17:30 (1020-1050) si fin > 17:00
+    if(hFin>=1020)noEfectivo+=Math.min(hFin,1050)-Math.max(hIni,1020);
+  }
+  var efectivo=Math.max(0,totalMin-noEfectivo);
+  // Ton/Hora = kg total / horas efectivas
+  var tonHora=efectivo>0?((totalKg/1000)/(efectivo/60)).toFixed(1):'—';
+
+  var tiempos=[
+    {label:'Hora Inicio',val:minToStr(hIni)},
+    {label:'Hora Fin',val:minToStr(hFin)},
+    {label:'Total Horas',val:minToHM(totalMin)},
+    {label:'Tiempo no efectivo',val:minToHM(noEfectivo)},
+    {label:'Tiempo efectivo',val:minToHM(efectivo)},
+    {label:'Ton / Hora',val:tonHora,bold:true,color:'#2563eb'}
+  ];
+  document.getElementById('opsTiemposBody').innerHTML=tiempos.map(function(t){
+    return'<tr style="border-bottom:1px solid #f1f5f9">'
+      +'<td style="padding:6px 10px;color:#374151;font-weight:600">'+t.label+'</td>'
+      +'<td style="padding:6px 10px;text-align:right;font-weight:'+(t.bold?'800':'600')+';color:'+(t.color||'#1a1a2e')+'">'+t.val+'</td>'
+      +'</tr>';
+  }).join('');
+}
 
 function renderKPIs(){
   var r=filteredData;
@@ -490,7 +624,7 @@ function renderCharts(){
   });
 
   var cuadMap={};
-  r.forEach(function(x){var cu=(x[C.CUA]||'').trim();if(!cu)return;if(!cuadMap[cu])cuadMap[cu]=0;cuadMap[cu]+=toNum(x[C.CANT])/1000;});
+  r.forEach(function(x){var cu=(x[C.CUA]||'').trim();if(!cu)return;if(!cuadMap[cu])cuadMap[cu]=0;cuadMap[cu]+=toNum(x[C.KG_OC])/1000;});
   var cuadL=Object.keys(cuadMap),cuadV=cuadL.map(function(k){return parseFloat(cuadMap[k].toFixed(2));});
   dc('cuadrilla');
   charts['cuadrilla']=new Chart(document.getElementById('chartCuadrilla'),{
@@ -501,7 +635,7 @@ function renderCharts(){
   });
 
   var modMap={};
-  r.forEach(function(x){var m=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();if(!modMap[m])modMap[m]=0;modMap[m]+=toNum(x[C.CANT]);});
+  r.forEach(function(x){var m=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();if(!modMap[m])modMap[m]=0;modMap[m]+=toNum(x[C.KG_OC]);});
   var modL=Object.keys(modMap),modV=modL.map(function(k){return modMap[k];}),modC=['#0ea5e9','#f59e0b','#10b981','#a855f7','#ef4444'];
   dc('modalidad');
   charts['modalidad']=new Chart(document.getElementById('chartModalidad'),{
