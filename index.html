@@ -196,7 +196,6 @@ tbody tr:hover{background:#f8fafc}
           <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:right;font-size:0.62rem;text-transform:uppercase">Part.</th>
           <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:right;font-size:0.62rem;text-transform:uppercase">Kg</th>
           <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:right;font-size:0.62rem;text-transform:uppercase">Kg/Min</th>
-          <th style="background:#1e293b;color:#94a3b8;padding:4px 8px;text-align:right;font-size:0.62rem;text-transform:uppercase">Ton/Hr</th>
         </tr></thead>
         <tbody id="opsEmpaqueBody"></tbody>
       </table>
@@ -434,19 +433,18 @@ function renderOps(){
     var e=empMap[k];
     var pct=totalEmpKg>0?Math.round(e.kg/totalEmpKg*100):0;
     var kgMin=e.minSum>0?(e.kg/e.minSum).toFixed(1):'—';
-    var tonHr=efectivo>0?((e.kg/1000)/(efectivo/60)).toFixed(1):'—';
     return'<tr style="border-bottom:1px solid #f1f5f9">'
       +'<td style="padding:4px 8px;font-weight:600;color:#374151">'+k+'</td>'
       +'<td style="padding:4px 8px;text-align:right;color:#64748b">'+pct+'%</td>'
       +'<td style="padding:4px 8px;text-align:right;color:#2563eb;font-weight:700">'+(e.kg/1000).toFixed(1)+' T</td>'
       +'<td style="padding:4px 8px;text-align:right;color:#d97706;font-weight:700">'+kgMin+'</td>'
-      +'<td style="padding:4px 8px;text-align:right;color:#16a34a;font-weight:700">'+tonHr+'</td>'
       +'</tr>';
   }).join('');
 
   // 3. Tiempos de operación (ya calculados arriba)
   // Ton/Hora = kg total / horas efectivas
   var tonHora=efectivo>0?((totalKg/1000)/(efectivo/60)).toFixed(1):'—';
+  var kgHora=efectivo>0?(totalKg/(efectivo/60)).toFixed(0):'—';
 
   var tiempos=[
     {label:'Hora Inicio',val:minToStr(hIni)},
@@ -454,7 +452,8 @@ function renderOps(){
     {label:'Total Horas',val:minToHM(totalMin)},
     {label:'Tiempo no efectivo',val:minToHM(noEfectivo)},
     {label:'Tiempo efectivo',val:minToHM(efectivo)},
-    {label:'Ton / Hora',val:tonHora,bold:true,color:'#2563eb'}
+    {label:'Ton / Hora',val:tonHora,bold:true,color:'#2563eb'},
+    {label:'Kg / Hora',val:kgHora,bold:true,color:'#16a34a'}
   ];
   document.getElementById('opsTiemposBody').innerHTML=tiempos.map(function(t){
     return'<tr style="border-bottom:1px solid #f1f5f9">'
