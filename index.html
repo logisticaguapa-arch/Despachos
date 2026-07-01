@@ -549,7 +549,7 @@ function renderOps(){
       +'<td style="padding:4px 8px;text-align:right;color:#d97706;font-weight:700">'+kgMin+'</td>'
       +'</tr>';
   }).join('');
-  var tonHora=efectivo>0?((totalKg/1000)/(efectivo/60)).toFixed(1):'—';
+  var tonHora=efectivo>0?((kgCargado/1000)/(efectivo/60)).toFixed(1):'—';
   document.getElementById('opsTiemposBody').innerHTML=[
     {label:'Hora Inicio',val:minToStr(hIni)},
     {label:'Hora Fin',val:minToStr(hFin)},
