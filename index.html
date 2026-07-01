@@ -384,6 +384,8 @@ function renderOps(){
   document.getElementById('panelOps').style.display='grid';
 
   // Calcular tiempos PRIMERO para usar efectivo en empaque
+  function minToStr(m){if(m===null)return'—';var h=Math.floor(m/60),min=m%60;return(h<10?'0'+h:h)+':'+(min<10?'0'+min:min);}
+  function minToHM(m){if(!m||m<=0)return'0:00';var h=Math.floor(m/60),min=m%60;return h+':'+(min<10?'0'+min:min);}
   var hInis=r.map(function(x){return timeToMin(x[C.H_INI]);}).filter(function(v){return v!==null;});
   var hFins=r.map(function(x){return timeToMin(x[C.H_FIN]);}).filter(function(v){return v!==null;});
   var hIni=hInis.length?Math.min.apply(null,hInis):null;
