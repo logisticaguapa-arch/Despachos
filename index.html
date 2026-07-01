@@ -67,10 +67,12 @@ tbody tr:hover{background:#f8fafc}
   .filter-bar,.progress-wrap,#refreshBtn,#pdfBtn,.ubadge,.header-right{display:none !important}
   body{background:white !important}
   .container{padding:6px 10px !important;gap:8px !important}
-  .card,.table-card{box-shadow:none !important;border:1px solid #e2e8f0 !important}
-  th{background:#1e293b !important;color:#94a3b8 !important}
-  .print-img{max-width:100% !important;page-break-inside:avoid !important}
+  .card,.table-card{box-shadow:none !important;border:1px solid #e2e8f0 !important;page-break-inside:avoid !important}
+  .kpi-row{grid-template-columns:repeat(6,1fr) !important}
+  .charts-row{grid-template-columns:1.8fr 1fr 1fr !important}
   canvas{display:none !important}
+  .print-img{max-width:100% !important;display:block !important}
+  th{background:#1e293b !important;color:#94a3b8 !important}
   @page{margin:8mm;size:A4 landscape}
 }
 </style>
@@ -106,6 +108,8 @@ tbody tr:hover{background:#f8fafc}
 </div>
 
 <div class="container">
+
+  <!-- KPIs -->
   <div class="kpi-row">
     <div class="kpi blue"><div class="kpi-val" id="kTotal">—</div><div class="kpi-label">🚛 Total Vehículos</div></div>
     <div class="kpi green"><div class="kpi-val" id="kDesp">—</div><div class="kpi-label">✅ Cargados</div></div>
@@ -115,6 +119,7 @@ tbody tr:hover{background:#f8fafc}
     <div class="kpi purple"><div class="kpi-val" id="kPct">—</div><div class="kpi-label">📊 % Cumplimiento</div></div>
   </div>
 
+  <!-- TABLA -->
   <div class="table-card">
     <div class="card-title">📋 Detalle de Operación en Tiempo Real</div>
     <div class="tbl-wrap">
@@ -132,8 +137,10 @@ tbody tr:hover{background:#f8fafc}
     </div>
   </div>
 
+  <!-- ALERTAS -->
   <div id="alertasContainer"></div>
 
+  <!-- ETAPAS -->
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
     <div style="background:white;border-radius:10px;padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f1f5f9">
@@ -163,8 +170,6 @@ tbody tr:hover{background:#f8fafc}
 
   <!-- PANEL OPERACIONES -->
   <div style="display:grid;grid-template-columns:repeat(3,280px);gap:12px;justify-content:start" id="panelOps">
-
-    <!-- Estado por toneladas -->
     <div class="card" style="padding:10px">
       <div class="card-title" style="margin-bottom:6px;font-size:0.68rem">📦 Despachos por Estado (Ton)</div>
       <table style="width:100%;font-size:0.72rem;border-collapse:collapse">
@@ -175,8 +180,6 @@ tbody tr:hover{background:#f8fafc}
         <tbody id="opsEstadoBody"></tbody>
       </table>
     </div>
-
-    <!-- Empaque -->
     <div class="card" style="padding:10px">
       <div class="card-title" style="margin-bottom:6px;font-size:0.68rem">🎁 Rendimiento por Empaque</div>
       <table style="width:100%;font-size:0.72rem;border-collapse:collapse">
@@ -189,8 +192,6 @@ tbody tr:hover{background:#f8fafc}
         <tbody id="opsEmpaqueBody"></tbody>
       </table>
     </div>
-
-    <!-- Tiempos operación -->
     <div class="card" style="padding:10px">
       <div class="card-title" style="margin-bottom:6px;font-size:0.68rem">⏱️ Tiempos de Operación</div>
       <table style="width:100%;font-size:0.72rem;border-collapse:collapse">
@@ -201,7 +202,6 @@ tbody tr:hover{background:#f8fafc}
         <tbody id="opsTiemposBody"></tbody>
       </table>
     </div>
-
   </div>
 
   <!-- GRÁFICAS -->
@@ -217,17 +217,16 @@ tbody tr:hover{background:#f8fafc}
     <div class="card"><div class="card-title">Toneladas Cargadas por Cuadrilla</div><canvas id="chartCuadrilla" height="95"></canvas></div>
     <div class="card"><div class="card-title">🍩 Kg por Modalidad</div><canvas id="chartModalidad" height="95"></canvas><div class="donut-legend" id="modalidadLegend"></div></div>
   </div>
+
 </div>
 
 <script>
 Chart.register(ChartDataLabels);
-
 var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
 var REFRESH_MS=60000;
 var C={FECHA:0,OC:1,KG_OC:2,CANT:3,PCT:4,CLIENTE:5,PLACAS:6,H_OC:7,H_CITA:8,H_LLE:9,H_INI:10,H_FIN:11,STATUS:12,OBS:13,HS:14,MIN:15,KGMIN:16,EMP:17,MUE:18,CUA:19,PER:20};
 var allData=[],filteredData=[],charts={},nextRefresh=0;
 
-// ─── Utilidades ───────────────────────────────────────────────
 function normStr(s){return(s||'').toLowerCase().trim();}
 function pctColor(p){return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626';}
 function isCargado(s){return normStr(s)==='cargado';}
@@ -236,25 +235,25 @@ function isEnPatio(s){return normStr(s)==='en patio';}
 function badgeClass(s){return isCargado(s)?'badge-d':isEnCargue(s)?'badge-c':'badge-p';}
 
 function toNum(v){
-  if(!v) return 0;
+  if(!v)return 0;
   var s=v.toString().replace(/"/g,'').replace('%','').trim();
   s=s.replace(/\./g,'').replace(',','.');
   return parseFloat(s)||0;
 }
 
 function parsePct(v){
-  if(!v) return 0;
+  if(!v)return 0;
   var s=v.toString().replace(/"/g,'').trim();
-  if(s.indexOf('%')>=0) return parseFloat(s.replace('%','').replace(',','.'))||0;
+  if(s.indexOf('%')>=0)return parseFloat(s.replace('%','').replace(',','.'))||0;
   var n=parseFloat(s.replace(',','.'))||0;
-  if(n>0&&n<=1.5) return Math.round(n*100);
+  if(n>0&&n<=1.5)return Math.round(n*100);
   return n;
 }
 
 function fmtKg(v){return toNum(v).toLocaleString('es-CO');}
 
 function timeToMin(t){
-  if(!t) return null;
+  if(!t)return null;
   var s=(t+'').trim();
   var m12=s.match(/(\d+):(\d+)(?::\d+)?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);
   if(m12){
@@ -294,7 +293,29 @@ function truckSVG(color,anim){
     +'<rect x="1" y="25" width="56" height="3" rx="1" fill="'+color+'" opacity="0.4"/></svg>';
 }
 
-// ─── Fetch ────────────────────────────────────────────────────
+function downloadPDF(){
+  var canvases=document.querySelectorAll('canvas');
+  var imgs=[];
+  canvases.forEach(function(canvas){
+    var img=document.createElement('img');
+    img.src=canvas.toDataURL('image/png');
+    img.style.width=canvas.offsetWidth+'px';
+    img.style.height=canvas.offsetHeight+'px';
+    img.style.display='block';
+    img.className='print-img';
+    canvas.parentNode.insertBefore(img,canvas);
+    canvas.style.display='none';
+    imgs.push({canvas:canvas,img:img});
+  });
+  window.print();
+  setTimeout(function(){
+    imgs.forEach(function(pair){
+      pair.canvas.style.display='';
+      if(pair.img.parentNode)pair.img.parentNode.removeChild(pair.img);
+    });
+  },2000);
+}
+
 async function fetchData(){
   document.getElementById('refreshBtn').textContent='⏳';
   try{
@@ -332,10 +353,8 @@ function parseCSV(txt){
   });
 }
 
-// ─── Filtros ──────────────────────────────────────────────────
 function populateFilters(){
-  var fechas=[],clientes=[],placas=[];
-  var fSet={},cSet={},pSet={};
+  var fSet={},cSet={},pSet={},fechas=[],clientes=[],placas=[];
   allData.forEach(function(r){
     var f=(r[C.FECHA]||'').trim(),c=(r[C.CLIENTE]||'').trim(),p=(r[C.PLACAS]||'').trim();
     if(f&&!fSet[f]){fSet[f]=1;fechas.push(f);}
@@ -343,14 +362,11 @@ function populateFilters(){
     if(p&&!pSet[p]){pSet[p]=1;placas.push(p);}
   });
   fechas.sort().reverse();clientes.sort();placas.sort();
-
   var fF=document.getElementById('fFecha'),curF=fF.value;
   fF.innerHTML='<option value="">Todas las fechas</option>'+fechas.map(function(f){return'<option value="'+f+'"'+(f===curF?' selected':'')+'>'+f+'</option>';}).join('');
   if(!curF&&fechas.length)fF.value=fechas[0];
-
   var fC=document.getElementById('fCliente'),curC=fC.value;
   fC.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(function(c){return'<option value="'+c+'"'+(c===curC?' selected':'')+'>'+c+'</option>';}).join('');
-
   var fP=document.getElementById('fPlaca'),curP=fP.value;
   fP.innerHTML='<option value="">Todas las placas</option>'+placas.map(function(p){return'<option value="'+p+'"'+(p===curP?' selected':'')+'>'+p+'</option>';}).join('');
 }
@@ -378,97 +394,10 @@ function clearFilters(){
   applyFilters();
 }
 
-// ─── Render ───────────────────────────────────────────────────
-function renderAll(){renderKPIs();renderTable();renderAlertas();renderEtapas();renderCharts();renderOps();}
-
-function renderOps(){
-  var r=filteredData;
-  if(!r.length){document.getElementById('panelOps').style.display='none';return;}
-  document.getElementById('panelOps').style.display='grid';
-
-  // Calcular tiempos PRIMERO para usar efectivo en empaque
-  function minToStr(m){if(m===null)return'—';var h=Math.floor(m/60),min=m%60;return(h<10?'0'+h:h)+':'+(min<10?'0'+min:min);}
-  function minToHM(m){if(!m||m<=0)return'0:00';var h=Math.floor(m/60),min=m%60;return h+':'+(min<10?'0'+min:min);}
-  var hInis=r.map(function(x){return timeToMin(x[C.H_INI]);}).filter(function(v){return v!==null;});
-  var hFins=r.map(function(x){return timeToMin(x[C.H_FIN]);}).filter(function(v){return v!==null;});
-  var hIni=hInis.length?Math.min.apply(null,hInis):null;
-  var hFin=hFins.length?Math.max.apply(null,hFins):null;
-  var totalMin=hIni!==null&&hFin!==null?(hFin-hIni):0;
-  var noEfectivo=0;
-  if(hIni!==null&&hFin!==null){
-    if(hIni<=510&&hFin>=480)noEfectivo+=Math.min(hFin,510)-Math.max(hIni,480);
-    if(hIni<=780&&hFin>=720)noEfectivo+=Math.min(hFin,780)-Math.max(hIni,720);
-    if(hFin>=1020)noEfectivo+=Math.min(hFin,1050)-Math.max(hIni,1020);
-  }
-  var efectivo=Math.max(0,totalMin-noEfectivo);
-
-  // 1. Estado por toneladas (usa KG_OC)
-  var kgCargado=0,kgEnCargue=0,kgEnPatio=0;
-  r.forEach(function(x){
-    var kg=toNum(x[C.KG_OC]);
-    if(isCargado(x[C.STATUS]))kgCargado+=kg;
-    else if(isEnCargue(x[C.STATUS]))kgEnCargue+=kg;
-    else if(isEnPatio(x[C.STATUS]))kgEnPatio+=kg;
-  });
-  var totalKg=kgCargado+kgEnCargue+kgEnPatio;
-  var estadoRows=[
-    {label:'Cargado',kg:kgCargado,color:'#16a34a'},
-    {label:'En Cargue',kg:kgEnCargue,color:'#d97706'},
-    {label:'En Patio',kg:kgEnPatio,color:'#7c3aed'},
-    {label:'Total',kg:totalKg,color:'#1e293b',bold:true}
-  ];
-  document.getElementById('opsEstadoBody').innerHTML=estadoRows.map(function(e){
-    return'<tr style="border-bottom:1px solid #f1f5f9">'
-      +'<td style="padding:4px 8px;font-weight:'+(e.bold?'800':'600')+';color:'+e.color+'">'+e.label+'</td>'
-      +'<td style="padding:4px 8px;text-align:right;font-weight:'+(e.bold?'800':'600')+';color:'+e.color+'">'+(e.kg/1000).toFixed(3)+'</td>'
-      +'</tr>';
-  }).join('');
-
-  // 2. Empaque con Kg/Min (usa KG_OC y MIN)
-  var empMap={};
-  r.forEach(function(x){
-    var emp=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();
-    if(!empMap[emp])empMap[emp]={kg:0,minSum:0,cnt:0};
-    empMap[emp].kg+=toNum(x[C.KG_OC]);
-    var min=toNum(x[C.MIN]);
-    if(min>0){empMap[emp].minSum+=min;empMap[emp].cnt++;}
-  });
-  var totalEmpKg=Object.keys(empMap).reduce(function(a,k){return a+empMap[k].kg;},0);
-  document.getElementById('opsEmpaqueBody').innerHTML=Object.keys(empMap).map(function(k){
-    var e=empMap[k];
-    var pct=totalEmpKg>0?Math.round(e.kg/totalEmpKg*100):0;
-    var kgMin=e.minSum>0?(e.kg/e.minSum).toFixed(1):'—';
-    return'<tr style="border-bottom:1px solid #f1f5f9">'
-      +'<td style="padding:4px 8px;font-weight:600;color:#374151">'+k+'</td>'
-      +'<td style="padding:4px 8px;text-align:right;color:#64748b">'+pct+'%</td>'
-      +'<td style="padding:4px 8px;text-align:right;color:#2563eb;font-weight:700">'+(e.kg/1000).toFixed(1)+' T</td>'
-      +'<td style="padding:4px 8px;text-align:right;color:#d97706;font-weight:700">'+kgMin+'</td>'
-      +'</tr>';
-  }).join('');
-
-  // 3. Tiempos de operación (ya calculados arriba)
-  // Ton/Hora = kg total / horas efectivas
-  var tonHora=efectivo>0?((totalKg/1000)/(efectivo/60)).toFixed(1):'—';
-
-  var tiempos=[
-    {label:'Hora Inicio',val:minToStr(hIni)},
-    {label:'Hora Fin',val:minToStr(hFin)},
-    {label:'Total Horas',val:minToHM(totalMin)},
-    {label:'Tiempo no efectivo',val:minToHM(noEfectivo)},
-    {label:'Tiempo efectivo',val:minToHM(efectivo)},
-    {label:'Ton / Hora',val:tonHora,bold:true,color:'#2563eb'}
-  ];
-  document.getElementById('opsTiemposBody').innerHTML=tiempos.map(function(t){
-    return'<tr style="border-bottom:1px solid #f1f5f9">'
-      +'<td style="padding:4px 8px;color:#374151;font-weight:600">'+t.label+'</td>'
-      +'<td style="padding:4px 8px;text-align:right;font-weight:'+(t.bold?'800':'600')+';color:'+(t.color||'#1a1a2e')+'">'+t.val+'</td>'
-      +'</tr>';
-  }).join('');
-}
+function renderAll(){renderKPIs();renderTable();renderAlertas();renderEtapas();renderOps();renderCharts();}
 
 function renderKPIs(){
-  var r=filteredData;
-  var desp=0,carg=0,pend=0,sinL=0,psum=0,pcnt=0;
+  var r=filteredData,desp=0,carg=0,pend=0,sinL=0,psum=0,pcnt=0;
   r.forEach(function(x){
     if(isCargado(x[C.STATUS]))desp++;
     else if(isEnCargue(x[C.STATUS]))carg++;
@@ -519,14 +448,8 @@ function renderTable(){
 
 function renderAlertas(){
   var r=filteredData,ahora=new Date(),aMin=ahora.getHours()*60+ahora.getMinutes();
-  var cv=r.filter(function(x){
-    var c=timeToMin(x[C.H_CITA]),l=(x[C.H_LLE]||'').trim();
-    return c&&!l&&aMin>c+10;
-  });
-  var pm=r.filter(function(x){
-    var l=timeToMin(x[C.H_LLE]),i=(x[C.H_INI]||'').trim();
-    return l&&!i&&aMin-l>60;
-  });
+  var cv=r.filter(function(x){var c=timeToMin(x[C.H_CITA]),l=(x[C.H_LLE]||'').trim();return c&&!l&&aMin>c+10;});
+  var pm=r.filter(function(x){var l=timeToMin(x[C.H_LLE]),i=(x[C.H_INI]||'').trim();return l&&!i&&aMin-l>60;});
   var el=document.getElementById('alertasContainer');
   if(!cv.length&&!pm.length){el.innerHTML='<div class="alerta-empty">✅ Sin alertas activas — La operación está bajo control</div>';return;}
   function mk(icon,titulo,items,fn){
@@ -566,26 +489,102 @@ function renderEtapas(){
   document.getElementById('trucksListo').innerHTML=listo.length?listo.map(function(r){return chip(r,'#f0fdf4','#bbf7d0','#16a34a',false);}).join(''):empty;
 }
 
+function renderOps(){
+  var r=filteredData;
+  if(!r.length){document.getElementById('panelOps').style.display='none';return;}
+  document.getElementById('panelOps').style.display='grid';
+
+  function minToStr(m){if(m===null)return'—';var h=Math.floor(m/60),min=m%60;return(h<10?'0'+h:h)+':'+(min<10?'0'+min:min);}
+  function minToHM(m){if(!m||m<=0)return'0:00';var h=Math.floor(m/60),min=m%60;return h+':'+(min<10?'0'+min:min);}
+
+  var hInis=r.map(function(x){return timeToMin(x[C.H_INI]);}).filter(function(v){return v!==null;});
+  var hFins=r.map(function(x){return timeToMin(x[C.H_FIN]);}).filter(function(v){return v!==null;});
+  var hIni=hInis.length?Math.min.apply(null,hInis):null;
+  var hFin=hFins.length?Math.max.apply(null,hFins):null;
+  var totalMin=hIni!==null&&hFin!==null?(hFin-hIni):0;
+  var noEfectivo=0;
+  if(hIni!==null&&hFin!==null){
+    if(hIni<=510&&hFin>=480)noEfectivo+=Math.min(hFin,510)-Math.max(hIni,480);
+    if(hIni<=780&&hFin>=720)noEfectivo+=Math.min(hFin,780)-Math.max(hIni,720);
+    if(hFin>=1020)noEfectivo+=Math.min(hFin,1050)-Math.max(hIni,1020);
+  }
+  var efectivo=Math.max(0,totalMin-noEfectivo);
+
+  // Estado
+  var kgCargado=0,kgEnCargue=0,kgEnPatio=0,totalKg=0;
+  r.forEach(function(x){
+    var kg=toNum(x[C.KG_OC]);
+    totalKg+=kg;
+    if(isCargado(x[C.STATUS]))kgCargado+=kg;
+    else if(isEnCargue(x[C.STATUS]))kgEnCargue+=kg;
+    else if(isEnPatio(x[C.STATUS]))kgEnPatio+=kg;
+  });
+  document.getElementById('opsEstadoBody').innerHTML=[
+    {label:'Cargado',kg:kgCargado,color:'#16a34a'},
+    {label:'En Cargue',kg:kgEnCargue,color:'#d97706'},
+    {label:'En Patio',kg:kgEnPatio,color:'#7c3aed'},
+    {label:'Total',kg:totalKg,color:'#1e293b',bold:true}
+  ].map(function(e){
+    return'<tr style="border-bottom:1px solid #f1f5f9">'
+      +'<td style="padding:4px 8px;font-weight:'+(e.bold?'800':'600')+';color:'+e.color+'">'+e.label+'</td>'
+      +'<td style="padding:4px 8px;text-align:right;font-weight:'+(e.bold?'800':'600')+';color:'+e.color+'">'+(e.kg/1000).toFixed(3)+'</td>'
+      +'</tr>';
+  }).join('');
+
+  // Empaque
+  var empMap={};
+  r.forEach(function(x){
+    var emp=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();
+    if(!empMap[emp])empMap[emp]={kg:0,minSum:0,cnt:0};
+    empMap[emp].kg+=toNum(x[C.KG_OC]);
+    var min=toNum(x[C.MIN]);
+    if(min>0){empMap[emp].minSum+=min;empMap[emp].cnt++;}
+  });
+  var totalEmpKg=Object.keys(empMap).reduce(function(a,k){return a+empMap[k].kg;},0);
+  document.getElementById('opsEmpaqueBody').innerHTML=Object.keys(empMap).map(function(k){
+    var e=empMap[k];
+    var pct=totalEmpKg>0?Math.round(e.kg/totalEmpKg*100):0;
+    var kgMin=e.minSum>0?(e.kg/e.minSum).toFixed(1):'—';
+    return'<tr style="border-bottom:1px solid #f1f5f9">'
+      +'<td style="padding:4px 8px;font-weight:600;color:#374151">'+k+'</td>'
+      +'<td style="padding:4px 8px;text-align:right;color:#64748b">'+pct+'%</td>'
+      +'<td style="padding:4px 8px;text-align:right;color:#2563eb;font-weight:700">'+(e.kg/1000).toFixed(1)+' T</td>'
+      +'<td style="padding:4px 8px;text-align:right;color:#d97706;font-weight:700">'+kgMin+'</td>'
+      +'</tr>';
+  }).join('');
+
+  // Tiempos
+  var tonHora=efectivo>0?((totalKg/1000)/(efectivo/60)).toFixed(1):'—';
+  document.getElementById('opsTiemposBody').innerHTML=[
+    {label:'Hora Inicio',val:minToStr(hIni)},
+    {label:'Hora Fin',val:minToStr(hFin)},
+    {label:'Total Horas',val:minToHM(totalMin)},
+    {label:'Tiempo no efectivo',val:minToHM(noEfectivo)},
+    {label:'Tiempo efectivo',val:minToHM(efectivo)},
+    {label:'Ton / Hora',val:tonHora,bold:true,color:'#2563eb'}
+  ].map(function(t){
+    return'<tr style="border-bottom:1px solid #f1f5f9">'
+      +'<td style="padding:4px 8px;color:#374151;font-weight:600">'+t.label+'</td>'
+      +'<td style="padding:4px 8px;text-align:right;font-weight:'+(t.bold?'800':'600')+';color:'+(t.color||'#1a1a2e')+'">'+t.val+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 
 function renderCharts(){
   var r=filteredData;
   var bx={ticks:{font:{size:9},color:'#64748b',maxRotation:25},grid:{display:false}};
   var by={ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}};
-
-  // Agrupar por cliente
   var cMap={};
   r.forEach(function(x){
     var cl=(x[C.CLIENTE]||'Sin nombre').trim();
-    if(!cMap[cl])cMap[cl]={ps:0,pc:0,kg:0,cant:0};
+    if(!cMap[cl])cMap[cl]={ps:0,pc:0};
     var p=parsePct(x[C.PCT]);
     if(p>0){cMap[cl].ps+=p;cMap[cl].pc++;}
-    cMap[cl].kg+=toNum(x[C.KG_OC]);
-    cMap[cl].cant+=toNum(x[C.CANT]);
   });
   var cL=Object.keys(cMap);
   var cV=cL.map(function(k){return cMap[k].pc?Math.round(cMap[k].ps/cMap[k].pc):0;});
-
   dc('cumpl');
   charts['cumpl']=new Chart(document.getElementById('chartCumplimiento'),{
     type:'bar',
@@ -595,7 +594,6 @@ function renderCharts(){
       tooltip:{callbacks:{label:function(c){return c.raw+'%';}}}},
       scales:{x:bx,y:{ticks:{callback:function(v){return v+'%';},font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'},max:115}}}
   });
-
   var desp=r.filter(function(x){return isCargado(x[C.STATUS]);}).length;
   var carg=r.filter(function(x){return isEnCargue(x[C.STATUS]);}).length;
   var pend=r.filter(function(x){return isEnPatio(x[C.STATUS]);}).length;
@@ -609,7 +607,6 @@ function renderCharts(){
   });
   document.getElementById('donutLegend').innerHTML=[['#16a34a','✅ Cargados',desp],['#d97706','🔄 En Cargue',carg],['#7c3aed','⏳ En Patio',pend]]
     .map(function(x){return'<div class="legend-item"><div class="legend-dot" style="background:'+x[0]+'"></div><span class="legend-label">'+x[1]+'</span><span class="legend-val">'+x[2]+'</span></div>';}).join('');
-
   var psum=0,pcnt=0;
   r.forEach(function(x){var p=parsePct(x[C.PCT]);if(p>0){psum+=p;pcnt++;}});
   var avg=pcnt?Math.round(psum/pcnt):0;
@@ -619,7 +616,6 @@ function renderCharts(){
     data:{datasets:[{data:[avg,100-avg],backgroundColor:['#2563eb','#e2e8f0'],borderWidth:0,circumference:180,rotation:270}]},
     options:{responsive:false,cutout:'72%',plugins:{legend:{display:false},tooltip:{enabled:false},datalabels:{display:false}}}
   });
-
   var cuadMap={};
   r.forEach(function(x){var cu=(x[C.CUA]||'').trim();if(!cu)return;if(!cuadMap[cu])cuadMap[cu]=0;cuadMap[cu]+=toNum(x[C.KG_OC])/1000;});
   var cuadL=Object.keys(cuadMap),cuadV=cuadL.map(function(k){return parseFloat(cuadMap[k].toFixed(2));});
@@ -630,7 +626,6 @@ function renderCharts(){
       datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v+' T':'';}},},
       scales:{x:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return v+' T';}},grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}}}}
   });
-
   var modMap={};
   r.forEach(function(x){var m=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();if(!modMap[m])modMap[m]=0;modMap[m]+=toNum(x[C.KG_OC]);});
   var modL=Object.keys(modMap),modV=modL.map(function(k){return modMap[k];}),modC=['#0ea5e9','#f59e0b','#10b981','#a855f7','#ef4444'];
@@ -661,29 +656,6 @@ function startCountdown(){
 
 fetchData();
 startCountdown();
-  // Convertir todos los canvas a img antes de imprimir
-  var canvases=document.querySelectorAll('canvas');
-  var imgs=[];
-  canvases.forEach(function(canvas){
-    var img=document.createElement('img');
-    img.src=canvas.toDataURL('image/png');
-    img.style.width=canvas.offsetWidth+'px';
-    img.style.height=canvas.offsetHeight+'px';
-    img.style.display='block';
-    img.className='print-img';
-    canvas.parentNode.insertBefore(img,canvas);
-    canvas.style.display='none';
-    imgs.push({canvas:canvas,img:img});
-  });
-  window.print();
-  // Restaurar canvas después de imprimir
-  setTimeout(function(){
-    imgs.forEach(function(pair){
-      pair.canvas.style.display='';
-      pair.img.parentNode.removeChild(pair.img);
-    });
-  },1000);
-}
 </script>
 </body>
 </html>
