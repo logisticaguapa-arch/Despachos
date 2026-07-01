@@ -71,7 +71,7 @@ tbody tr:hover{background:#f8fafc}
   .kpi-row{grid-template-columns:repeat(6,1fr) !important}
   .charts-row{grid-template-columns:1.8fr 1fr 1fr !important}
   canvas{display:none !important}
-  .print-img{max-width:100% !important;display:block !important}
+  img.print-img{display:block !important;max-width:100% !important;page-break-inside:avoid !important}
   th{background:#1e293b !important;color:#94a3b8 !important}
   @page{margin:8mm;size:A4 landscape}
 }
@@ -79,7 +79,24 @@ tbody tr:hover{background:#f8fafc}
 </head>
 <body>
 
-<header>
+<header> style="position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#1B2A4A,#2d4a7a);display:flex;align-items:center;justify-content:center;z-index:9999">
+  <div style="background:white;border-radius:16px;padding:40px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:8px">📦</div>
+    <div style="font-size:1.2rem;font-weight:800;color:#1B2A4A;margin-bottom:4px">Panel de Despachos</div>
+    <div style="font-size:0.8rem;color:#64748b;margin-bottom:28px">AGRÍCOLA GUAPA S.A.S</div>
+    <input type="password" id="loginPass" placeholder="Ingresa la contraseña"
+      style="width:100%;padding:12px 16px;border:2px solid #e2e8f0;border-radius:10px;font-size:0.9rem;outline:none;margin-bottom:12px;text-align:center"
+      onkeydown="if(event.key==='Enter')checkLogin()"
+      onfocus="this.style.borderColor='#2563eb'"
+      onblur="this.style.borderColor='#e2e8f0'">
+    <div id="loginError" style="color:#dc2626;font-size:0.78rem;margin-bottom:10px;display:none">❌ Contraseña incorrecta</div>
+    <button onclick="checkLogin()"
+      style="width:100%;background:#2563eb;color:white;border:none;padding:12px;border-radius:10px;font-size:0.9rem;font-weight:700;cursor:pointer">
+      Ingresar
+    </button>
+    <div style="color:#94a3b8;font-size:0.7rem;margin-top:16px">Acceso restringido — Solo personal autorizado</div>
+  </div>
+</div>
   <div class="logo">📦 Panel de <span>Despachos SYOP</span></div>
   <div class="header-right">
     <span class="ubadge" id="lastUpdate">Cargando...</span>
@@ -294,26 +311,29 @@ function truckSVG(color,anim){
 }
 
 function downloadPDF(){
+  var btn=document.getElementById('pdfBtn');
+  btn.textContent='⏳ Preparando...';
+  btn.disabled=true;
   var canvases=document.querySelectorAll('canvas');
   var imgs=[];
   canvases.forEach(function(canvas){
     var img=document.createElement('img');
-    img.src=canvas.toDataURL('image/png');
-    img.style.width=canvas.offsetWidth+'px';
-    img.style.height=canvas.offsetHeight+'px';
-    img.style.display='block';
+    img.src=canvas.toDataURL('image/png',1.0);
     img.className='print-img';
+    img.style.cssText='width:'+canvas.offsetWidth+'px;height:'+canvas.offsetHeight+'px;display:block;max-width:100%';
     canvas.parentNode.insertBefore(img,canvas);
-    canvas.style.display='none';
     imgs.push({canvas:canvas,img:img});
   });
-  window.print();
   setTimeout(function(){
-    imgs.forEach(function(pair){
-      pair.canvas.style.display='';
-      if(pair.img.parentNode)pair.img.parentNode.removeChild(pair.img);
-    });
-  },2000);
+    window.print();
+    setTimeout(function(){
+      imgs.forEach(function(pair){
+        if(pair.img.parentNode)pair.img.parentNode.removeChild(pair.img);
+      });
+      btn.textContent='⬇ Descargar PDF';
+      btn.disabled=false;
+    },2000);
+  },300);
 }
 
 async function fetchData(){
@@ -361,10 +381,33 @@ function populateFilters(){
     if(c&&!cSet[c]){cSet[c]=1;clientes.push(c);}
     if(p&&!pSet[p]){pSet[p]=1;placas.push(p);}
   });
-  fechas.sort().reverse();clientes.sort();placas.sort();
+  // Ordenar fechas por valor real (más reciente primero)
+  fechas.sort(function(a,b){
+    function toDate(s){
+      var p=s.split('/');
+      if(p.length===3){
+        // DD/MM/YYYY o M/D/YYYY
+        var d=parseInt(p[0]),m=parseInt(p[1]),y=parseInt(p[2]);
+        if(y<100)y+=2000;
+        // Si el día > 12 asumimos DD/MM/YYYY, sino intentamos ambos
+        return new Date(y,m-1,d);
+      }
+      return new Date(s);
+    }
+    return toDate(b)-toDate(a);
+  });
+  clientes.sort();placas.sort();
   var fF=document.getElementById('fFecha'),curF=fF.value;
   fF.innerHTML='<option value="">Todas las fechas</option>'+fechas.map(function(f){return'<option value="'+f+'"'+(f===curF?' selected':'')+'>'+f+'</option>';}).join('');
-  if(!curF&&fechas.length)fF.value=fechas[0];
+  // Seleccionar fecha de hoy, si no existe la más reciente
+  if(!curF&&fechas.length){
+    var hoy=new Date();
+    var dd=hoy.getDate(),mm=hoy.getMonth()+1,yy=hoy.getFullYear();
+    var hoyStr1=dd+'/'+mm+'/'+yy;
+    var hoyStr2=(dd<10?'0'+dd:dd)+'/'+(mm<10?'0'+mm:mm)+'/'+yy;
+    var fechaHoy=fechas.find(function(f){return f===hoyStr1||f===hoyStr2;});
+    fF.value=fechaHoy||fechas[0];
+  }
   var fC=document.getElementById('fCliente'),curC=fC.value;
   fC.innerHTML='<option value="">Todos los clientes</option>'+clientes.map(function(c){return'<option value="'+c+'"'+(c===curC?' selected':'')+'>'+c+'</option>';}).join('');
   var fP=document.getElementById('fPlaca'),curP=fP.value;
