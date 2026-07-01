@@ -550,13 +550,27 @@ function renderOps(){
       +'</tr>';
   }).join('');
   var tonHora=efectivo>0?((kgCargado/1000)/(efectivo/60)).toFixed(1):'—';
+
+  // Kg cargados por empaque (solo status Cargado)
+  var kgGranel=0,kgCanasta=0;
+  r.forEach(function(x){
+    if(!isCargado(x[C.STATUS]))return;
+    var emp=(x[C.EMP]||'').trim().toUpperCase();
+    var kg=toNum(x[C.KG_OC]);
+    if(emp.indexOf('GRANEL')>=0)kgGranel+=kg;
+    else if(emp.indexOf('CANASTA')>=0||emp.indexOf('ENCAJABLE')>=0)kgCanasta+=kg;
+  });
+  var tonHoraGranel=efectivo>0&&kgGranel>0?((kgGranel/1000)/(efectivo/60)).toFixed(1):'—';
+  var tonHoraCanasta=efectivo>0&&kgCanasta>0?((kgCanasta/1000)/(efectivo/60)).toFixed(1):'—';
   document.getElementById('opsTiemposBody').innerHTML=[
     {label:'Hora Inicio',val:minToStr(hIni)},
     {label:'Hora Fin',val:minToStr(hFin)},
     {label:'Total Horas',val:minToHM(totalMin)},
     {label:'Tiempo no efectivo',val:minToHM(noEfectivo)},
     {label:'Tiempo efectivo',val:minToHM(efectivo)},
-    {label:'Ton / Hora',val:tonHora,bold:true,color:'#2563eb'}
+    {label:'Ton / Hora',val:tonHora,bold:true,color:'#2563eb'},
+    {label:'Ton / Hora Granel',val:tonHoraGranel,bold:false,color:'#0ea5e9'},
+    {label:'Ton / Hora Canasta',val:tonHoraCanasta,bold:false,color:'#f59e0b'}
   ].map(function(t){
     return'<tr style="border-bottom:1px solid #f1f5f9">'
       +'<td style="padding:4px 8px;color:#374151;font-weight:600">'+t.label+'</td>'
