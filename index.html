@@ -69,6 +69,8 @@ tbody tr:hover{background:#f8fafc}
   .container{padding:6px 10px !important;gap:8px !important}
   .card,.table-card{box-shadow:none !important;border:1px solid #e2e8f0 !important}
   th{background:#1e293b !important;color:#94a3b8 !important}
+  .print-img{max-width:100% !important;page-break-inside:avoid !important}
+  canvas{display:none !important}
   @page{margin:8mm;size:A4 landscape}
 }
 </style>
@@ -81,7 +83,7 @@ tbody tr:hover{background:#f8fafc}
     <span class="ubadge" id="lastUpdate">Cargando...</span>
     <span class="ubadge" id="countdown"></span>
     <button id="refreshBtn" onclick="fetchData()">↻ Actualizar</button>
-    <button id="pdfBtn" onclick="window.print()">⬇ Descargar PDF</button>
+    <button id="pdfBtn" onclick="downloadPDF()">⬇ Descargar PDF</button>
   </div>
 </header>
 <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:100%"></div></div>
@@ -659,6 +661,29 @@ function startCountdown(){
 
 fetchData();
 startCountdown();
+  // Convertir todos los canvas a img antes de imprimir
+  var canvases=document.querySelectorAll('canvas');
+  var imgs=[];
+  canvases.forEach(function(canvas){
+    var img=document.createElement('img');
+    img.src=canvas.toDataURL('image/png');
+    img.style.width=canvas.offsetWidth+'px';
+    img.style.height=canvas.offsetHeight+'px';
+    img.style.display='block';
+    img.className='print-img';
+    canvas.parentNode.insertBefore(img,canvas);
+    canvas.style.display='none';
+    imgs.push({canvas:canvas,img:img});
+  });
+  window.print();
+  // Restaurar canvas después de imprimir
+  setTimeout(function(){
+    imgs.forEach(function(pair){
+      pair.canvas.style.display='';
+      pair.img.parentNode.removeChild(pair.img);
+    });
+  },1000);
+}
 </script>
 </body>
 </html>
