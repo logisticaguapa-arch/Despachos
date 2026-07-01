@@ -159,19 +159,6 @@ tbody tr:hover{background:#f8fafc}
     </div>
   </div>
 
-  <div class="charts-row">
-    <div class="card"><div class="card-title">% Cumplimiento por Cliente</div><canvas id="chartCumplimiento" height="95"></canvas></div>
-    <div class="card"><div class="card-title">Estado de Flota</div><canvas id="chartEstado" height="95"></canvas><div class="donut-legend" id="donutLegend"></div></div>
-    <div class="card" style="display:flex;flex-direction:column"><div class="card-title">Cumplimiento General</div>
-      <div class="gauge-wrap"><canvas id="chartGauge" height="105" width="105"></canvas><div class="gauge-val" id="gaugeVal">—</div><div class="gauge-label">% promedio del día</div></div>
-    </div>
-  </div>
-
-  <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:12px">
-    <div class="card"><div class="card-title">Toneladas Cargadas por Cuadrilla</div><canvas id="chartCuadrilla" height="95"></canvas></div>
-    <div class="card"><div class="card-title">🍩 Kg por Modalidad</div><canvas id="chartModalidad" height="95"></canvas><div class="donut-legend" id="modalidadLegend"></div></div>
-  </div>
-
   <!-- PANEL OPERACIONES -->
   <div style="display:grid;grid-template-columns:repeat(3,280px);gap:12px;justify-content:start" id="panelOps">
 
@@ -213,6 +200,20 @@ tbody tr:hover{background:#f8fafc}
       </table>
     </div>
 
+  </div>
+
+  <!-- GRÁFICAS -->
+  <div class="charts-row">
+    <div class="card"><div class="card-title">% Cumplimiento por Cliente</div><canvas id="chartCumplimiento" height="95"></canvas></div>
+    <div class="card"><div class="card-title">Estado de Flota</div><canvas id="chartEstado" height="95"></canvas><div class="donut-legend" id="donutLegend"></div></div>
+    <div class="card" style="display:flex;flex-direction:column"><div class="card-title">Cumplimiento General</div>
+      <div class="gauge-wrap"><canvas id="chartGauge" height="105" width="105"></canvas><div class="gauge-val" id="gaugeVal">—</div><div class="gauge-label">% promedio del día</div></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:12px">
+    <div class="card"><div class="card-title">Toneladas Cargadas por Cuadrilla</div><canvas id="chartCuadrilla" height="95"></canvas></div>
+    <div class="card"><div class="card-title">🍩 Kg por Modalidad</div><canvas id="chartModalidad" height="95"></canvas><div class="donut-legend" id="modalidadLegend"></div></div>
   </div>
 </div>
 
