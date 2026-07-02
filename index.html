@@ -198,33 +198,20 @@ tbody tr:hover{background:#f8fafc}
     <div class="card"><div class="card-title">% Cumplimiento por Cliente</div><canvas id="chartCumplimiento" height="95"></canvas></div>
     <div class="card"><div class="card-title">Estado de Flota</div><canvas id="chartEstado" height="95"></canvas><div class="donut-legend" id="donutLegend"></div></div>
     <div class="card" style="display:flex;flex-direction:column">
-      <div class="card-title">Cumplimiento de Kg Cargados en OC</div>
+      <div class="card-title">% de Avance de Cargue</div>
       <div class="gauge-wrap">
-        <canvas id="chartGauge" height="105" width="105"></canvas>
-        <div class="gauge-val" id="gaugeVal">—</div>
-        <div class="gauge-label">% promedio del día</div>
+        <canvas id="chartAvance" height="105" width="105"></canvas>
+        <div class="gauge-val" id="avanceVal">—</div>
+        <div class="gauge-label">Kg Cargados / Kg Total OC</div>
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;padding:0 4px" id="kgSummary"></div>
     </div>
   </div>
 
-  <!-- NUEVA GRÁFICA: Kg OC vs Kg Cargados -->
-  <div class="card">
-    <div class="card-title">📊 Kg en Órdenes de Compra vs Kg con Status Cargado — Avance hora a hora</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center">
-      <div>
-        <canvas id="chartKgVsCargado" height="110"></canvas>
-      </div>
-      <div>
-        <!-- Velocímetro de avance -->
-        <div style="text-align:center;margin-bottom:12px">
-          <div style="font-size:0.72rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px">% de Avance de Cargue</div>
-          <canvas id="chartAvance" height="130" width="260" style="max-width:100%"></canvas>
-          <div id="avanceVal" style="font-size:2rem;font-weight:900;color:#2563eb;margin-top:-20px">—</div>
-          <div style="font-size:0.7rem;color:#64748b">Kg Cargados / Kg Total OC</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px" id="kgSummary"></div>
-      </div>
-    </div>
+  <!-- % Cumplimiento OC -->
+  <div class="charts-row" style="grid-template-columns:1.8fr 1fr">
+    <div class="card"><div class="card-title">% Cumplimiento de Órdenes de Compra</div><canvas id="chartGauge" height="95"></canvas></div>
+    <div class="card"><div class="card-title">🍩 Kg por Modalidad — solo Cargados</div><canvas id="chartModalidad" height="95"></canvas><div class="donut-legend" id="modalidadLegend"></div></div>
   </div>
 
   <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:12px">
@@ -657,7 +644,31 @@ function renderCharts(){
       datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v+' T':'';}},},
       scales:{x:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return v+' T';}},grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}}}}
   });
-  // Kg OC vs Kg Cargado por cliente (barras horizontales)
+  // Velocímetro de avance Kg Cargados vs Kg OC
+  var totalKgOC=r.reduce(function(a,x){return a+toNum(x[C.KG_OC]);},0);
+  var totalKgCarg=r.filter(function(x){return isCargado(x[C.STATUS]);}).reduce(function(a,x){return a+toNum(x[C.KG_OC]);},0);
+  var pctAvance=totalKgOC>0?Math.min(100,Math.round(totalKgCarg/totalKgOC*100)):0;
+  var avColor=pctAvance>=100?'#16a34a':pctAvance>=80?'#d97706':'#2563eb';
+  dc('avance');
+  charts['avance']=new Chart(document.getElementById('chartAvance'),{
+    type:'doughnut',
+    data:{datasets:[{data:[pctAvance,100-pctAvance],backgroundColor:[avColor,'#f1f5f9'],borderWidth:0,circumference:180,rotation:270}]},
+    options:{responsive:false,cutout:'72%',plugins:{legend:{display:false},tooltip:{enabled:false},datalabels:{display:false}}}
+  });
+  document.getElementById('avanceVal').textContent=pctAvance+'%';
+  document.getElementById('avanceVal').style.color=avColor;
+  document.getElementById('kgSummary').innerHTML=[
+    {label:'Kg en OC',val:(totalKgOC/1000).toFixed(1)+' T',color:'#64748b',bg:'#f8fafc'},
+    {label:'Kg Cargados',val:(totalKgCarg/1000).toFixed(1)+' T',color:'#16a34a',bg:'#f0fdf4'},
+    {label:'Pendientes',val:((totalKgOC-totalKgCarg)/1000).toFixed(1)+' T',color:'#dc2626',bg:'#fff1f2'},
+    {label:'Avance',val:pctAvance+'%',color:avColor,bg:'#eff6ff'}
+  ].map(function(x){
+    return'<div style="background:'+x.bg+';border-radius:8px;padding:6px 8px;text-align:center">'
+      +'<div style="font-size:0.9rem;font-weight:800;color:'+x.color+'">'+x.val+'</div>'
+      +'<div style="font-size:0.62rem;color:#64748b;margin-top:2px">'+x.label+'</div></div>';
+  }).join('');
+
+  // % Cumplimiento de OC (gauge barras por cliente)
   var kgOCxCliente={},kgCargxCliente={};
   r.forEach(function(x){
     var cl=(x[C.CLIENTE]||'Sin nombre').trim();
@@ -667,56 +678,19 @@ function renderCharts(){
     if(isCargado(x[C.STATUS]))kgCargxCliente[cl]+=toNum(x[C.KG_OC]);
   });
   var klabels=Object.keys(kgOCxCliente);
-  var kgOCvals=klabels.map(function(k){return parseFloat((kgOCxCliente[k]/1000).toFixed(1));});
-  var kgCargvals=klabels.map(function(k){return parseFloat((kgCargxCliente[k]/1000).toFixed(1));});
-  dc('kgVsCargado');
-  charts['kgVsCargado']=new Chart(document.getElementById('chartKgVsCargado'),{
+  var pctOC=klabels.map(function(k){return kgOCxCliente[k]>0?Math.round(kgCargxCliente[k]/kgOCxCliente[k]*100):0;});
+  dc('gauge');
+  charts['gauge']=new Chart(document.getElementById('chartGauge'),{
     type:'bar',
-    data:{labels:klabels,datasets:[
-      {label:'Kg OC (Ton)',data:kgOCvals,backgroundColor:'#bfdbfe',borderRadius:4,borderSkipped:false},
-      {label:'Kg Cargado (Ton)',data:kgCargvals,backgroundColor:'#2563eb',borderRadius:4,borderSkipped:false}
-    ]},
-    options:{responsive:true,indexAxis:'y',
-      plugins:{legend:{display:true,labels:{font:{size:9},color:'#64748b',boxWidth:10}},
-        datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:8,weight:'bold'},formatter:function(v){return v>0?v+'T':'';}},
-        tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.raw+' Ton';}}}},
+    data:{labels:klabels,datasets:[{label:'% Cumplimiento OC',data:pctOC,backgroundColor:pctOC.map(function(p){return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626';}),borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},
+      datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v+'%':'';}},
+      tooltip:{callbacks:{label:function(c){return c.raw+'%';}}}},
       scales:{
-        x:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return v+'T';}},grid:{color:'#f1f5f9'}},
-        y:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}}
+        x:{ticks:{font:{size:9},color:'#64748b',maxRotation:25},grid:{display:false}},
+        y:{ticks:{callback:function(v){return v+'%';},font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'},max:115}
       }}
   });
-
-  // Velocímetro de avance total
-  var totalKgOC=r.reduce(function(a,x){return a+toNum(x[C.KG_OC]);},0);
-  var totalKgCarg=r.filter(function(x){return isCargado(x[C.STATUS]);}).reduce(function(a,x){return a+toNum(x[C.KG_OC]);},0);
-  var pctAvance=totalKgOC>0?Math.min(100,Math.round(totalKgCarg/totalKgOC*100)):0;
-  var avColor=pctAvance>=100?'#16a34a':pctAvance>=80?'#d97706':'#2563eb';
-  dc('avance');
-  charts['avance']=new Chart(document.getElementById('chartAvance'),{
-    type:'doughnut',
-    data:{datasets:[{
-      data:[pctAvance,100-pctAvance],
-      backgroundColor:[avColor,'#f1f5f9'],
-      borderWidth:0,circumference:180,rotation:270
-    }]},
-    options:{responsive:false,cutout:'75%',
-      plugins:{legend:{display:false},tooltip:{enabled:false},datalabels:{display:false}}}
-  });
-  document.getElementById('avanceVal').textContent=pctAvance+'%';
-  document.getElementById('avanceVal').style.color=avColor;
-
-  // Resumen Kg
-  document.getElementById('kgSummary').innerHTML=[
-    {label:'Kg en OC',val:(totalKgOC/1000).toFixed(1)+' T',color:'#64748b',bg:'#f8fafc'},
-    {label:'Kg Cargados',val:(totalKgCarg/1000).toFixed(1)+' T',color:'#16a34a',bg:'#f0fdf4'},
-    {label:'Kg Pendientes',val:((totalKgOC-totalKgCarg)/1000).toFixed(1)+' T',color:'#dc2626',bg:'#fff1f2'},
-    {label:'Avance',val:pctAvance+'%',color:avColor,bg:'#eff6ff'}
-  ].map(function(x){
-    return'<div style="background:'+x.bg+';border-radius:8px;padding:8px 10px;text-align:center">'
-      +'<div style="font-size:1rem;font-weight:800;color:'+x.color+'">'+x.val+'</div>'
-      +'<div style="font-size:0.65rem;color:#64748b;margin-top:2px">'+x.label+'</div>'
-      +'</div>';
-  }).join('');
   r.forEach(function(x){var m=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();if(!modMap[m])modMap[m]=0;modMap[m]+=toNum(x[C.KG_OC]);});
   var modL=Object.keys(modMap),modV=modL.map(function(k){return modMap[k];}),modC=['#0ea5e9','#f59e0b','#10b981','#a855f7','#ef4444'];
   dc('modalidad');
