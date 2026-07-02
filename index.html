@@ -204,13 +204,13 @@ tbody tr:hover{background:#f8fafc}
         <div class="gauge-val" id="avanceVal">—</div>
         <div class="gauge-label">Kg Cargados / Kg Total OC</div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;padding:0 4px" id="kgSummary"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;padding:0 4px" id="kgSummary"></div>
     </div>
   </div>
 
-  <!-- % Cumplimiento OC -->
-  <div style="display:grid;grid-template-columns:1fr;gap:12px">
+  <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:12px">
     <div class="card"><div class="card-title">% Cumplimiento de Órdenes de Compra</div><canvas id="chartGauge" height="95"></canvas></div>
+    <div class="card"><div class="card-title">🍩 Kg por Modalidad</div><canvas id="chartModalidad" height="95"></canvas><div class="donut-legend" id="modalidadLegend"></div></div>
   </div>
 
   <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:12px">
