@@ -209,9 +209,9 @@ tbody tr:hover{background:#f8fafc}
   </div>
 
   <!-- % Cumplimiento OC -->
-  <div class="charts-row" style="grid-template-columns:1.8fr 1fr">
+  <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:12px">
     <div class="card"><div class="card-title">% Cumplimiento de Órdenes de Compra</div><canvas id="chartGauge" height="95"></canvas></div>
-    <div class="card"><div class="card-title">🍩 Kg por Modalidad — solo Cargados</div><canvas id="chartModalidad" height="95"></canvas><div class="donut-legend" id="modalidadLegend"></div></div>
+    <div class="card"><div class="card-title">🍩 Kg por Modalidad</div><canvas id="chartModalidad" height="95"></canvas><div class="donut-legend" id="modalidadLegend"></div></div>
   </div>
 
   <div style="display:grid;grid-template-columns:1.8fr 1fr;gap:12px">
@@ -431,7 +431,6 @@ function renderKPIs(){
   document.getElementById('kPend').textContent=pend;
   document.getElementById('kSinLlegar').textContent=sinL;
   document.getElementById('kPct').textContent=avg+'%';
-  document.getElementById('gaugeVal').textContent=avg+'%';
 }
 
 function renderTable(){
