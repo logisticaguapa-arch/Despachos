@@ -59,6 +59,8 @@ tbody tr:hover{background:#f8fafc}
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding-top:4px}
 .gauge-val{font-size:1.8rem;font-weight:900;color:#2563eb;line-height:1}
 .gauge-label{font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;margin-top:2px}
+.turno-chip{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#eff6ff;color:#2563eb;font-weight:800;font-size:0.68rem}
+.group-row td{padding:6px 8px;text-transform:uppercase;font-weight:800;font-size:0.68rem;letter-spacing:0.5px}
 @keyframes truckMove{from{transform:translateX(0)}to{transform:translateX(5px)}}
 @media(max-width:900px){.kpi-row{grid-template-columns:repeat(3,1fr)}}
 @media print{
@@ -122,11 +124,11 @@ tbody tr:hover{background:#f8fafc}
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th>Fecha</th><th>OC</th><th>Cliente</th><th>Placas</th>
+          <th>Fecha</th><th>OC</th><th>Cliente</th><th>Placas</th><th>Turno</th>
           <th>H.Cita</th><th>H.Llega</th><th>H.Ini</th><th>H.Fin</th><th>Duración</th>
           <th>Status</th><th>Kg OC</th><th>Cant.Desp</th><th>% Cumpl.</th>
         </tr></thead>
-        <tbody id="tableBody"><tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Cargando...</td></tr></tbody>
+        <tbody id="tableBody"><tr><td colspan="14" style="text-align:center;padding:20px;color:#94a3b8">Cargando...</td></tr></tbody>
         <tfoot id="tableFoot"></tfoot>
       </table>
     </div>
@@ -256,6 +258,32 @@ function truckSVG(color,anim){var st='display:inline-block;vertical-align:middle
 function parseFecha(s){var p=s.split('/');if(p.length===3){var d=parseInt(p[0]),m=parseInt(p[1]),y=parseInt(p[2]);if(y<100)y+=2000;return new Date(y,m-1,d);}return new Date(s);}
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 
+// ===== Agrupación de la tabla (Cargue > Patio > Sin Presentarse > Cargado) =====
+function statusGroup(s){
+  if(isEnCargue(s))return 0;
+  if(isEnPatio(s))return 1;
+  if(isCargado(s))return 3;
+  return 2; // sin presentarse
+}
+function groupInfo(g){
+  return [
+    {label:'🔄 En Cargue',bg:'#fffbeb',color:'#b45309'},
+    {label:'⏳ En Patio',bg:'#f5f3ff',color:'#6d28d9'},
+    {label:'🕐 Sin Presentarse',bg:'#fff1f2',color:'#dc2626'},
+    {label:'✅ Cargado',bg:'#f0fdf4',color:'#15803d'}
+  ][g];
+}
+// ===== Turno automático: SOLO para los que están En Patio esperando =====
+// En cuanto un vehículo pasa a "En Cargue" o "Cargado", pierde su turno
+// y los números se renumeran automáticamente entre los que siguen pendientes.
+function computeTurnos(rows){
+  var pendientes=rows.filter(function(x){return isEnPatio(x[C.STATUS])&&timeToMin(x[C.H_LLE])!==null;});
+  pendientes.sort(function(a,b){return timeToMin(a[C.H_LLE])-timeToMin(b[C.H_LLE]);});
+  var map={};
+  pendientes.forEach(function(row,i){map[row[C.OC]]=i+1;});
+  return map;
+}
+
 function downloadPDF(){
   var btn=document.getElementById('pdfBtn');btn.textContent='⏳ Preparando...';btn.disabled=true;
   var canvases=document.querySelectorAll('canvas'),imgs=[];
@@ -289,9 +317,62 @@ function renderAll(){renderKPIs();renderTable();renderAlertas();renderEtapas();r
 
 function renderKPIs(){var r=filteredData,desp=0,carg=0,pend=0,sinL=0,psum=0,pcnt=0;r.forEach(function(x){if(isCargado(x[C.STATUS]))desp++;else if(isEnCargue(x[C.STATUS]))carg++;else if(isEnPatio(x[C.STATUS]))pend++;else sinL++;var p=parsePct(x[C.PCT]);if(p>0){psum+=p;pcnt++;}});var avg=pcnt?Math.round(psum/pcnt):0;document.getElementById('kTotal').textContent=r.length;document.getElementById('kDesp').textContent=desp;document.getElementById('kCarg').textContent=carg;document.getElementById('kPend').textContent=pend;document.getElementById('kSinLlegar').textContent=sinL;document.getElementById('kPct').textContent=avg+'%';}
 
-function renderTable(){var rows=filteredData,tKg=0,tCant=0;var html=rows.length?rows.map(function(r){var pct=parsePct(r[C.PCT]),dur=calcDuracion(r[C.H_INI],r[C.H_FIN]);tKg+=toNum(r[C.KG_OC]);tCant+=toNum(r[C.CANT]);return'<tr><td style="color:#64748b;font-size:0.65rem">'+(r[C.FECHA]||'—')+'</td><td><strong style="color:#2563eb">'+(r[C.OC]||'—')+'</strong></td><td class="td-cliente" title="'+(r[C.CLIENTE]||'')+'">'+(r[C.CLIENTE]||'—')+'</td><td><strong>'+(r[C.PLACAS]||'—')+'</strong></td><td style="font-weight:600;color:#374151;font-size:0.68rem">'+fmtHora(r[C.H_CITA])+'</td><td style="font-weight:600;color:#374151;font-size:0.68rem">'+fmtHora(r[C.H_LLE])+'</td><td style="font-weight:600;color:#0ea5e9;font-size:0.68rem">'+fmtHora(r[C.H_INI])+'</td><td style="font-weight:600;color:#16a34a;font-size:0.68rem">'+fmtHora(r[C.H_FIN])+'</td><td style="font-weight:700;color:#7c3aed;font-size:0.68rem">'+dur+'</td><td><span class="badge '+badgeClass(r[C.STATUS])+'">'+(r[C.STATUS]||'—')+'</span></td><td>'+fmtKg(r[C.KG_OC])+'</td><td>'+fmtKg(r[C.CANT])+'</td><td><div class="pbar"><div class="pbar-bg"><div class="pbar-fill" style="width:'+Math.min(pct,100)+'%;background:'+pctColor(pct)+'"></div></div><span style="font-size:0.65rem;color:#64748b;width:28px">'+pct+'%</span></div></td></tr>';}).join(''):'<tr><td colspan="13" style="text-align:center;padding:20px;color:#94a3b8">Sin datos</td></tr>';
-document.getElementById('tableBody').innerHTML=html;
-document.getElementById('tableFoot').innerHTML=rows.length?'<tr style="background:#f8fafc;border-top:2px solid #1e293b"><td colspan="10" style="padding:8px;font-weight:700;color:#374151;font-size:0.72rem;text-align:right">TOTAL</td><td style="padding:8px;font-weight:800;color:#2563eb">'+tKg.toLocaleString('es-CO')+'</td><td style="padding:8px;font-weight:800;color:#16a34a">'+tCant.toLocaleString('es-CO')+'</td><td></td></tr>':'';}
+function renderTable(){
+  var turnoMap=computeTurnos(filteredData);
+  var rows=filteredData.slice().sort(function(a,b){
+    var ga=statusGroup(a[C.STATUS]),gb=statusGroup(b[C.STATUS]);
+    if(ga!==gb)return ga-gb;
+    if(ga===1){ // En Patio: orden por turno (llegada asc)
+      var ta=turnoMap[a[C.OC]],tb=turnoMap[b[C.OC]];
+      ta=ta===undefined?9999:ta;tb=tb===undefined?9999:tb;
+      return ta-tb;
+    }
+    if(ga===0){ // En Cargue: orden por hora de inicio de cargue
+      var ia=timeToMin(a[C.H_INI]),ib=timeToMin(b[C.H_INI]);
+      ia=ia===null?9999:ia;ib=ib===null?9999:ib;
+      return ia-ib;
+    }
+    if(ga===3){ // Cargado: orden por hora de fin
+      var fa=timeToMin(a[C.H_FIN]),fb=timeToMin(b[C.H_FIN]);
+      fa=fa===null?9999:fa;fb=fb===null?9999:fb;
+      return fa-fb;
+    }
+    // Sin Presentarse: orden por hora de cita
+    var ca=timeToMin(a[C.H_CITA]),cb=timeToMin(b[C.H_CITA]);
+    ca=ca===null?9999:ca;cb=cb===null?9999:cb;
+    return ca-cb;
+  });
+  var tKg=0,tCant=0,lastGroup=null,html='';
+  if(!rows.length){
+    html='<tr><td colspan="14" style="text-align:center;padding:20px;color:#94a3b8">Sin datos</td></tr>';
+  } else {
+    rows.forEach(function(r){
+      var g=statusGroup(r[C.STATUS]);
+      if(g!==lastGroup){
+        var gi=groupInfo(g);
+        var cnt=rows.filter(function(x){return statusGroup(x[C.STATUS])===g;}).length;
+        html+='<tr class="group-row"><td colspan="14" style="background:'+gi.bg+';color:'+gi.color+'">'+gi.label+' ('+cnt+')</td></tr>';
+        lastGroup=g;
+      }
+      var pct=parsePct(r[C.PCT]),dur=calcDuracion(r[C.H_INI],r[C.H_FIN]);
+      tKg+=toNum(r[C.KG_OC]);tCant+=toNum(r[C.CANT]);
+      var turno=turnoMap[r[C.OC]];
+      var turnoHtml;
+      if(isEnCargue(r[C.STATUS])){
+        turnoHtml='<span class="turno-chip" style="background:#fef3c7;color:#b45309" title="Cargando ahora, ya no ocupa turno">🔄</span>';
+      } else if(isCargado(r[C.STATUS])){
+        turnoHtml='<span class="turno-chip" style="background:#dcfce7;color:#15803d" title="Ya cargado, turno liberado">✅</span>';
+      } else if(turno){
+        turnoHtml='<span class="turno-chip" title="Orden de cargue por llegada">'+turno+'</span>';
+      } else {
+        turnoHtml='<span style="color:#cbd5e1">—</span>';
+      }
+      html+='<tr><td style="color:#64748b;font-size:0.65rem">'+(r[C.FECHA]||'—')+'</td><td><strong style="color:#2563eb">'+(r[C.OC]||'—')+'</strong></td><td class="td-cliente" title="'+(r[C.CLIENTE]||'')+'">'+(r[C.CLIENTE]||'—')+'</td><td><strong>'+(r[C.PLACAS]||'—')+'</strong></td><td style="text-align:center">'+turnoHtml+'</td><td style="font-weight:600;color:#374151;font-size:0.68rem">'+fmtHora(r[C.H_CITA])+'</td><td style="font-weight:600;color:#374151;font-size:0.68rem">'+fmtHora(r[C.H_LLE])+'</td><td style="font-weight:600;color:#0ea5e9;font-size:0.68rem">'+fmtHora(r[C.H_INI])+'</td><td style="font-weight:600;color:#16a34a;font-size:0.68rem">'+fmtHora(r[C.H_FIN])+'</td><td style="font-weight:700;color:#7c3aed;font-size:0.68rem">'+dur+'</td><td><span class="badge '+badgeClass(r[C.STATUS])+'">'+(r[C.STATUS]||'—')+'</span></td><td>'+fmtKg(r[C.KG_OC])+'</td><td>'+fmtKg(r[C.CANT])+'</td><td><div class="pbar"><div class="pbar-bg"><div class="pbar-fill" style="width:'+Math.min(pct,100)+'%;background:'+pctColor(pct)+'"></div></div><span style="font-size:0.65rem;color:#64748b;width:28px">'+pct+'%</span></div></td></tr>';
+    });
+  }
+  document.getElementById('tableBody').innerHTML=html;
+  document.getElementById('tableFoot').innerHTML=rows.length?'<tr style="background:#f8fafc;border-top:2px solid #1e293b"><td colspan="11" style="padding:8px;font-weight:700;color:#374151;font-size:0.72rem;text-align:right">TOTAL</td><td style="padding:8px;font-weight:800;color:#2563eb">'+tKg.toLocaleString('es-CO')+'</td><td style="padding:8px;font-weight:800;color:#16a34a">'+tCant.toLocaleString('es-CO')+'</td><td></td></tr>':'';
+}
 
 function renderAlertas(){var r=filteredData,ahora=new Date(),aMin=ahora.getHours()*60+ahora.getMinutes();var cv=r.filter(function(x){var c=timeToMin(x[C.H_CITA]),l=(x[C.H_LLE]||'').trim();return c&&!l&&aMin>c+10;});var pm=r.filter(function(x){var l=timeToMin(x[C.H_LLE]),i=(x[C.H_INI]||'').trim();return l&&!i&&aMin-l>60;});var el=document.getElementById('alertasContainer');if(!cv.length&&!pm.length){el.innerHTML='<div class="alerta-empty">✅ Sin alertas activas — La operación está bajo control</div>';return;}function mk(icon,titulo,items,fn){if(!items.length)return'';return'<div class="alerta alerta-roja"><span class="alerta-icon">'+icon+'</span><div class="alerta-body" style="width:100%"><div class="alerta-titulo">'+titulo+' — '+items.length+' vehículo'+(items.length>1?'s':'')+'</div>'+items.map(function(row){return'<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:#fee2e2;border-radius:8px;margin-top:5px"><span>🚛</span><span style="font-weight:800;color:#dc2626;font-size:0.8rem;min-width:70px">'+(row[C.PLACAS]||'Sin placa')+'</span><span style="color:#374151;font-size:0.78rem;flex:1">'+(row[C.CLIENTE]||'Sin cliente')+'</span><span style="color:#64748b;font-size:0.72rem">'+fn(row)+'</span></div>';}).join('')+'</div></div>';}
 el.innerHTML='<div class="alertas-wrap">'+mk('🚨','Cita VENCIDA — No han llegado',cv,function(r){return'Cita: '+fmtHora(r[C.H_CITA]);})+mk('⏰','En patio +1 hora sin iniciar cargue',pm,function(r){return'Llegó: '+fmtHora(r[C.H_LLE]);}	)+'</div>';}
