@@ -250,7 +250,18 @@ tbody tr:hover{background:#f8fafc}
 Chart.register(ChartDataLabels);
 var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
 var REFRESH_MS=60000;
-var C={FECHA:0,OC:1,KG_OC:2,CANT:3,PCT:4,CLIENTE:5,PLACAS:6,H_OC:7,H_CITA:8,H_LLE:9,H_INI:10,H_FIN:11,STATUS:12,OBS:13,HS:14,MIN:15,KGMIN:16,EMP:17,MUE:18,CUA:19,PER:20};
+/* ===== MAPEO DE COLUMNAS =====
+Orden real del encabezado de la hoja (0-indexado), actualizado el 19/08/2026.
+Se agregaron REMISION y DESTINO entre OC y Kg OC, y se eliminó la columna
+"H. LLEGADA" duplicada que estaba al final:
+0 Fecha | 1 OC | 2 # REMISION | 3 DESTINO | 4 Kg OC | 5 KG CARGADOS | 6 %
+7 Cliente | 8 Placas | 9 H OC | 10 H Cita | 11 H llegada | 12 H inicio Cargue
+13 FIN CARGUE | 14 Status | 15 Observaciones | 16 Horas de Cargue
+17 Minutos cargue | 18 Kg/Min | 19 EMPAQUE | 20 MUELLE | 21 CUADRILLA
+22 CANT. PERSONA | 23 N. CONDUCTOR | 24 C.C CONDUCTOR | 25 TELEFONO CONDUCTOR
+26 CANASTILLAS DESPACHADAS | 27 H.SALIDA
+*/
+var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8,H_OC:9,H_CITA:10,H_LLE:11,H_INI:12,H_FIN:13,STATUS:14,OBS:15,HS:16,MIN:17,KGMIN:18,EMP:19,MUE:20,CUA:21,PER:22,CONDUCTOR:23,CC_COND:24,TEL_COND:25,CANASTILLAS:26,H_SALIDA:27};
 var allData=[],filteredData=[],charts={},nextRefresh=0;
 
 function normStr(s){return(s||'').toLowerCase().trim();}
