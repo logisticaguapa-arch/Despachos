@@ -251,17 +251,21 @@ Chart.register(ChartDataLabels);
 var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
 var REFRESH_MS=60000;
 /* ===== MAPEO DE COLUMNAS =====
-Orden real del encabezado de la hoja (0-indexado), actualizado el 19/08/2026.
-Se agregaron REMISION y DESTINO entre OC y Kg OC, y se eliminó la columna
-"H. LLEGADA" duplicada que estaba al final:
+Orden real del encabezado de la hoja (0-indexado), actualizado el 19/08/2026 (2do ajuste del día):
+- Se movió "H.SALIDA" de la última posición a justo después de "H llegada"
+  (antes de "H inicio Cargue"), por lo que TODO lo que sigue se corrió +1.
+- La columna única "CANASTILLAS DESPACHADAS" se dividió en 3:
+  ENCAJABLES, GRANDES y PEQUEÑAS, al final de la fila.
+
 0 Fecha | 1 OC | 2 # REMISION | 3 DESTINO | 4 Kg OC | 5 KG CARGADOS | 6 %
-7 Cliente | 8 Placas | 9 H OC | 10 H Cita | 11 H llegada | 12 H inicio Cargue
-13 FIN CARGUE | 14 Status | 15 Observaciones | 16 Horas de Cargue
-17 Minutos cargue | 18 Kg/Min | 19 EMPAQUE | 20 MUELLE | 21 CUADRILLA
-22 CANT. PERSONA | 23 N. CONDUCTOR | 24 C.C CONDUCTOR | 25 TELEFONO CONDUCTOR
-26 CANASTILLAS DESPACHADAS | 27 H.SALIDA
+7 Cliente | 8 Placas | 9 H OC | 10 H Cita | 11 H llegada | 12 H.SALIDA
+13 H inicio Cargue | 14 FIN CARGUE | 15 Status | 16 Observaciones
+17 Horas de Cargue | 18 Minutos cargue | 19 Kg/Min | 20 EMPAQUE | 21 MUELLE
+22 CUADRILLA | 23 CANT. PERSONA | 24 N. CONDUCTOR | 25 C.C CONDUCTOR
+26 TELEFONO CONDUCTOR | 27 CANASTILLAS ENCAJABLES | 28 CANASTILLAS GRANDES
+29 CANASTILLAS PEQUEÑAS
 */
-var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8,H_OC:9,H_CITA:10,H_LLE:11,H_INI:12,H_FIN:13,STATUS:14,OBS:15,HS:16,MIN:17,KGMIN:18,EMP:19,MUE:20,CUA:21,PER:22,CONDUCTOR:23,CC_COND:24,TEL_COND:25,CANASTILLAS:26,H_SALIDA:27};
+var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8,H_OC:9,H_CITA:10,H_LLE:11,H_SALIDA:12,H_INI:13,H_FIN:14,STATUS:15,OBS:16,HS:17,MIN:18,KGMIN:19,EMP:20,MUE:21,CUA:22,PER:23,CONDUCTOR:24,CC_COND:25,TEL_COND:26,CAN_ENCAJABLES:27,CAN_GRANDES:28,CAN_PEQUENAS:29};
 var allData=[],filteredData=[],charts={},nextRefresh=0;
 
 function normStr(s){return(s||'').toLowerCase().trim();}
