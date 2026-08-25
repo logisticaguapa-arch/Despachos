@@ -62,6 +62,7 @@ tbody tr:hover{background:#f8fafc}
 .gauge-label{font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;margin-top:2px}
 .turno-chip{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#eff6ff;color:#2563eb;font-weight:800;font-size:0.68rem}
 .group-row td{padding:6px 8px;text-transform:uppercase;font-weight:800;font-size:0.68rem;letter-spacing:0.5px}
+.warn-icon{display:inline-block;margin-left:4px;cursor:help}
 @keyframes truckMove{from{transform:translateX(0)}to{transform:translateX(5px)}}
 @media(max-width:900px){.kpi-row{grid-template-columns:repeat(3,1fr)}}
 @media print{
@@ -253,12 +254,6 @@ Chart.register(ChartDataLabels);
 var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
 var REFRESH_MS=60000;
 /* ===== MAPEO DE COLUMNAS =====
-Orden real del encabezado de la hoja (0-indexado), actualizado el 19/08/2026 (2do ajuste del día):
-- Se movió "H.SALIDA" de la última posición a justo después de "H llegada"
-  (antes de "H inicio Cargue"), por lo que TODO lo que sigue se corrió +1.
-- La columna única "CANASTILLAS DESPACHADAS" se dividió en 3:
-  ENCAJABLES, GRANDES y PEQUEÑAS, al final de la fila.
-
 0 Fecha | 1 OC | 2 # REMISION | 3 DESTINO | 4 Kg OC | 5 KG CARGADOS | 6 %
 7 Cliente | 8 Placas | 9 H OC | 10 H Cita | 11 H llegada | 12 H.SALIDA
 13 H inicio Cargue | 14 FIN CARGUE | 15 Status | 16 Observaciones
@@ -302,14 +297,36 @@ function groupInfo(g){
   ][g];
 }
 // ===== Turno automático: SOLO para los que están En Patio esperando =====
-// En cuanto un vehículo pasa a "En Cargue" o "Cargado", pierde su turno
-// y los números se renumeran automáticamente entre los que siguen pendientes.
 function computeTurnos(rows){
   var pendientes=rows.filter(function(x){return isEnPatio(x[C.STATUS])&&timeToMin(x[C.H_LLE])!==null;});
   pendientes.sort(function(a,b){return timeToMin(a[C.H_LLE])-timeToMin(b[C.H_LLE]);});
   var map={};
   pendientes.forEach(function(row,i){map[row[C.OC]]=i+1;});
   return map;
+}
+
+// ===== Validación de consistencia de horarios =====
+// Orden lógico correcto: Llegada -> Inicio Cargue -> Fin Cargue -> Salida.
+// diffOk considera válido un salto hacia atrás grande (>12h) como cruce de
+// medianoche; un salto negativo pequeño es un error de digitación real.
+function diffOk(a,b){
+  if(a===null||b===null) return null; // sin datos suficientes para comparar
+  var diff=b-a;
+  if(diff>=0) return true;
+  if(diff<-720) return true; // probable cruce de medianoche, no es error
+  return false;
+}
+function detectarInconsistencias(row){
+  var llegada=timeToMin(row[C.H_LLE]);
+  var inicio=timeToMin(row[C.H_INI]);
+  var fin=timeToMin(row[C.H_FIN]);
+  var salida=timeToMin(row[C.H_SALIDA]);
+  var problemas=[];
+  if(diffOk(llegada,inicio)===false) problemas.push('Inicio de cargue antes de la llegada');
+  if(diffOk(inicio,fin)===false) problemas.push('Fin de cargue antes del inicio');
+  if(diffOk(fin,salida)===false) problemas.push('Salida antes de terminar el cargue');
+  if(diffOk(llegada,salida)===false) problemas.push('Salida antes de la llegada');
+  return problemas;
 }
 
 function downloadPDF(){
@@ -350,22 +367,21 @@ function renderTable(){
   var rows=filteredData.slice().sort(function(a,b){
     var ga=statusGroup(a[C.STATUS]),gb=statusGroup(b[C.STATUS]);
     if(ga!==gb)return ga-gb;
-    if(ga===1){ // En Patio: orden por turno (llegada asc)
+    if(ga===1){
       var ta=turnoMap[a[C.OC]],tb=turnoMap[b[C.OC]];
       ta=ta===undefined?9999:ta;tb=tb===undefined?9999:tb;
       return ta-tb;
     }
-    if(ga===0){ // En Cargue: orden por hora de inicio de cargue
+    if(ga===0){
       var ia=timeToMin(a[C.H_INI]),ib=timeToMin(b[C.H_INI]);
       ia=ia===null?9999:ia;ib=ib===null?9999:ib;
       return ia-ib;
     }
-    if(ga===3){ // Cargado: orden por hora de fin
+    if(ga===3){
       var fa=timeToMin(a[C.H_FIN]),fb=timeToMin(b[C.H_FIN]);
       fa=fa===null?9999:fa;fb=fb===null?9999:fb;
       return fa-fb;
     }
-    // Sin Presentarse: orden por hora de cita
     var ca=timeToMin(a[C.H_CITA]),cb=timeToMin(b[C.H_CITA]);
     ca=ca===null?9999:ca;cb=cb===null?9999:cb;
     return ca-cb;
@@ -395,21 +411,51 @@ function renderTable(){
       } else {
         turnoHtml='<span style="color:#cbd5e1">—</span>';
       }
-      html+='<tr><td style="color:#64748b;font-size:0.65rem">'+(r[C.FECHA]||'—')+'</td><td><strong style="color:#2563eb">'+(r[C.OC]||'—')+'</strong></td><td class="td-cliente" title="'+(r[C.CLIENTE]||'')+'">'+(r[C.CLIENTE]||'—')+'</td><td><strong>'+(r[C.PLACAS]||'—')+'</strong></td><td style="text-align:center">'+turnoHtml+'</td><td style="font-weight:600;color:#374151;font-size:0.68rem">'+fmtHora(r[C.H_CITA])+'</td><td style="font-weight:600;color:#374151;font-size:0.68rem">'+fmtHora(r[C.H_LLE])+'</td><td style="font-weight:600;color:#0ea5e9;font-size:0.68rem">'+fmtHora(r[C.H_INI])+'</td><td style="font-weight:600;color:#16a34a;font-size:0.68rem">'+fmtHora(r[C.H_FIN])+'</td><td style="font-weight:700;color:#7c3aed;font-size:0.68rem">'+dur+'</td><td><span class="badge '+badgeClass(r[C.STATUS])+'">'+(r[C.STATUS]||'—')+'</span></td><td>'+fmtKg(r[C.KG_OC])+'</td><td>'+fmtKg(r[C.CANT])+'</td><td><div class="pbar"><div class="pbar-bg"><div class="pbar-fill" style="width:'+Math.min(pct,100)+'%;background:'+pctColor(pct)+'"></div></div><span style="font-size:0.65rem;color:#64748b;width:28px">'+pct+'%</span></div></td></tr>';
+      var problemas=detectarInconsistencias(r);
+      var warnHtml=problemas.length?'<span class="warn-icon" title="'+problemas.join(' · ').replace(/"/g,'&quot;')+'">⚠️</span>':'';
+      html+='<tr><td style="color:#64748b;font-size:0.65rem">'+(r[C.FECHA]||'—')+'</td><td><strong style="color:#2563eb">'+(r[C.OC]||'—')+'</strong></td><td class="td-cliente" title="'+(r[C.CLIENTE]||'')+'">'+(r[C.CLIENTE]||'—')+'</td><td><strong>'+(r[C.PLACAS]||'—')+'</strong></td><td style="text-align:center">'+turnoHtml+'</td><td style="font-weight:600;color:#374151;font-size:0.68rem">'+fmtHora(r[C.H_CITA])+'</td><td style="font-weight:600;color:#374151;font-size:0.68rem">'+fmtHora(r[C.H_LLE])+'</td><td style="font-weight:600;color:#0ea5e9;font-size:0.68rem">'+fmtHora(r[C.H_INI])+'</td><td style="font-weight:600;color:#16a34a;font-size:0.68rem">'+fmtHora(r[C.H_FIN])+'</td><td style="font-weight:700;color:#7c3aed;font-size:0.68rem">'+dur+'</td><td><span class="badge '+badgeClass(r[C.STATUS])+'">'+(r[C.STATUS]||'—')+'</span>'+warnHtml+'</td><td>'+fmtKg(r[C.KG_OC])+'</td><td>'+fmtKg(r[C.CANT])+'</td><td><div class="pbar"><div class="pbar-bg"><div class="pbar-fill" style="width:'+Math.min(pct,100)+'%;background:'+pctColor(pct)+'"></div></div><span style="font-size:0.65rem;color:#64748b;width:28px">'+pct+'%</span></div></td></tr>';
     });
   }
   document.getElementById('tableBody').innerHTML=html;
   document.getElementById('tableFoot').innerHTML=rows.length?'<tr style="background:#f8fafc;border-top:2px solid #1e293b"><td colspan="11" style="padding:8px;font-weight:700;color:#374151;font-size:0.72rem;text-align:right">TOTAL</td><td style="padding:8px;font-weight:800;color:#2563eb">'+tKg.toLocaleString('es-CO')+'</td><td style="padding:8px;font-weight:800;color:#16a34a">'+tCant.toLocaleString('es-CO')+'</td><td></td></tr>':'';
 }
 
-function renderAlertas(){var r=filteredData,ahora=new Date(),aMin=ahora.getHours()*60+ahora.getMinutes();var cv=r.filter(function(x){var c=timeToMin(x[C.H_CITA]),l=(x[C.H_LLE]||'').trim();return c&&!l&&aMin>c+10;});var pm=r.filter(function(x){var l=timeToMin(x[C.H_LLE]),i=(x[C.H_INI]||'').trim();return l&&!i&&aMin-l>60;});var el=document.getElementById('alertasContainer');if(!cv.length&&!pm.length){el.innerHTML='<div class="alerta-empty">✅ Sin alertas activas — La operación está bajo control</div>';return;}function mk(icon,titulo,items,fn){if(!items.length)return'';return'<div class="alerta alerta-roja"><span class="alerta-icon">'+icon+'</span><div class="alerta-body" style="width:100%"><div class="alerta-titulo">'+titulo+' — '+items.length+' vehículo'+(items.length>1?'s':'')+'</div>'+items.map(function(row){return'<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:#fee2e2;border-radius:8px;margin-top:5px"><span>🚛</span><span style="font-weight:800;color:#dc2626;font-size:0.8rem;min-width:70px">'+(row[C.PLACAS]||'Sin placa')+'</span><span style="color:#374151;font-size:0.78rem;flex:1">'+(row[C.CLIENTE]||'Sin cliente')+'</span><span style="color:#64748b;font-size:0.72rem">'+fn(row)+'</span></div>';}).join('')+'</div></div>';}
-el.innerHTML='<div class="alertas-wrap">'+mk('🚨','Cita VENCIDA — No han llegado',cv,function(r){return'Cita: '+fmtHora(r[C.H_CITA]);})+mk('⏰','En patio +1 hora sin iniciar cargue',pm,function(r){return'Llegó: '+fmtHora(r[C.H_LLE]);}	)+'</div>';}
+function renderAlertas(){
+  var r=filteredData,ahora=new Date(),aMin=ahora.getHours()*60+ahora.getMinutes();
+  var cv=r.filter(function(x){var c=timeToMin(x[C.H_CITA]),l=(x[C.H_LLE]||'').trim();return c&&!l&&aMin>c+10;});
+  var pm=r.filter(function(x){var l=timeToMin(x[C.H_LLE]),i=(x[C.H_INI]||'').trim();return l&&!i&&aMin-l>60;});
+  var inconsist=r.map(function(x){return {row:x,problemas:detectarInconsistencias(x)};}).filter(function(x){return x.problemas.length>0;});
+  var el=document.getElementById('alertasContainer');
+  if(!cv.length&&!pm.length&&!inconsist.length){el.innerHTML='<div class="alerta-empty">✅ Sin alertas activas — La operación está bajo control</div>';return;}
+  function mk(icon,titulo,items,fn){
+    if(!items.length)return'';
+    return '<div class="alerta alerta-roja"><span class="alerta-icon">'+icon+'</span><div class="alerta-body" style="width:100%"><div class="alerta-titulo">'+titulo+' — '+items.length+' vehículo'+(items.length>1?'s':'')+'</div>'
+      +items.map(function(row){return'<div style="display:flex;align-items:center;gap:10px;padding:6px 10px;background:#fee2e2;border-radius:8px;margin-top:5px"><span>🚛</span><span style="font-weight:800;color:#dc2626;font-size:0.8rem;min-width:70px">'+(row[C.PLACAS]||'Sin placa')+'</span><span style="color:#374151;font-size:0.78rem;flex:1">'+(row[C.CLIENTE]||'Sin cliente')+'</span><span style="color:#64748b;font-size:0.72rem">'+fn(row)+'</span></div>';}).join('')
+      +'</div></div>';
+  }
+  function mkInconsist(items){
+    if(!items.length)return'';
+    return '<div class="alerta alerta-roja"><span class="alerta-icon">⚠️</span><div class="alerta-body" style="width:100%"><div class="alerta-titulo">Inconsistencia en horarios (llegada / inicio / fin / salida) — '+items.length+' vehículo'+(items.length>1?'s':'')+', requiere corrección del auxiliar</div>'
+      +items.map(function(it){
+        var row=it.row;
+        return '<div style="display:flex;align-items:flex-start;gap:10px;padding:6px 10px;background:#fee2e2;border-radius:8px;margin-top:5px">'
+          +'<span>🚛</span>'
+          +'<span style="font-weight:800;color:#dc2626;font-size:0.8rem;min-width:70px">'+(row[C.PLACAS]||row[C.OC]||'Sin placa')+'</span>'
+          +'<span style="color:#374151;font-size:0.78rem;flex:1">'+(row[C.CLIENTE]||'Sin cliente')+' &middot; OC '+(row[C.OC]||'—')+'</span>'
+          +'<span style="color:#64748b;font-size:0.72rem;text-align:right">'+it.problemas.join('<br>')+'</span>'
+          +'</div>';
+      }).join('')
+      +'</div></div>';
+  }
+  el.innerHTML='<div class="alertas-wrap">'
+    +mk('🚨','Cita VENCIDA — No han llegado',cv,function(r){return'Cita: '+fmtHora(r[C.H_CITA]);})
+    +mk('⏰','En patio +1 hora sin iniciar cargue',pm,function(r){return'Llegó: '+fmtHora(r[C.H_LLE]);})
+    +mkInconsist(inconsist)
+    +'</div>';
+}
 
 function renderEtapas(){var r=filteredData;var patio=r.filter(function(x){return isEnPatio(x[C.STATUS]);});var cargue=r.filter(function(x){return isEnCargue(x[C.STATUS]);});var listo=r.filter(function(x){return isCargado(x[C.STATUS]);});var sinPresentar=r.filter(function(x){return !isEnPatio(x[C.STATUS])&&!isEnCargue(x[C.STATUS])&&!isCargado(x[C.STATUS]);});document.getElementById('countPatio').textContent=patio.length;document.getElementById('countCargue').textContent=cargue.length;document.getElementById('countListo').textContent=listo.length;document.getElementById('countSinPresentar').textContent=sinPresentar.length;function chip(row,bg,border,color,anim){return'<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;background:'+bg+';border:1px solid '+border+';white-space:nowrap">'+truckSVG(color,anim)+'<span style="font-weight:700;color:#1a1a2e;font-size:0.72rem">'+(row[C.PLACAS]||'?')+'</span><span style="color:#64748b;font-size:0.68rem;max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(row[C.CLIENTE]||'—')+'</span></div>';}function chipSinPresentar(row){return'<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;background:#fff1f2;border:1px solid #fecaca;white-space:nowrap"><span style="font-size:1rem">🕐</span><span style="font-weight:700;color:#dc2626;font-size:0.72rem;min-width:30px">&nbsp;</span><span style="color:#374151;font-size:0.72rem;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis">'+(row[C.CLIENTE]||'—')+'</span></div>';}var empty='<p style="color:#94a3b8;font-size:0.72rem;padding:6px">Sin vehículos</p>';document.getElementById('trucksPatio').innerHTML=patio.length?patio.map(function(r){return chip(r,'#f5f3ff','#ddd6fe','#7c3aed',false);}).join(''):empty;document.getElementById('trucksCargue').innerHTML=cargue.length?cargue.map(function(r){return chip(r,'#fffbeb','#fde68a','#d97706',true);}).join(''):empty;document.getElementById('trucksListo').innerHTML=listo.length?listo.map(function(r){return chip(r,'#f0fdf4','#bbf7d0','#16a34a',false);}).join(''):empty;document.getElementById('trucksSinPresentar').innerHTML=sinPresentar.length?sinPresentar.map(chipSinPresentar).join(''):empty;}
 
-// ===== Kg Cargados / Rango de Horario =====
-// Franjas: 6:00am-1:00pm | 1:00pm-8:00pm | 8:00pm-3:00am (cruza medianoche)
-// Se clasifica cada vehículo CARGADO según su hora real de fin de cargue (H.Fin)
 function renderRangos(r){
   var cargados=r.filter(function(x){return isCargado(x[C.STATUS]);});
   var rangos=[
@@ -456,19 +502,16 @@ function renderCharts(){
   var bx={ticks:{font:{size:9},color:'#64748b',maxRotation:25},grid:{display:false}};
   var by={ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}};
 
-  // % Cumplimiento por cliente
   var cMap={};r.forEach(function(x){var cl=(x[C.CLIENTE]||'Sin nombre').trim();if(!cMap[cl])cMap[cl]={ps:0,pc:0};var p=parsePct(x[C.PCT]);if(p>0){cMap[cl].ps+=p;cMap[cl].pc++;}});
   var cL=Object.keys(cMap),cV=cL.map(function(k){return cMap[k].pc?Math.round(cMap[k].ps/cMap[k].pc):0;});
   dc('cumpl');charts['cumpl']=new Chart(document.getElementById('chartCumplimiento'),{type:'bar',data:{labels:cL,datasets:[{label:'%',data:cV,backgroundColor:cV.map(function(p){return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626';}),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v+'%':'';}},tooltip:{callbacks:{label:function(c){return c.raw+'%';}}}},scales:{x:bx,y:{ticks:{callback:function(v){return v+'%';},font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'},max:115}}}});
 
-  // Estado flota
   var desp=r.filter(function(x){return isCargado(x[C.STATUS]);}).length;
   var carg=r.filter(function(x){return isEnCargue(x[C.STATUS]);}).length;
   var pend=r.filter(function(x){return isEnPatio(x[C.STATUS]);}).length;
   dc('estado');charts['estado']=new Chart(document.getElementById('chartEstado'),{type:'doughnut',data:{labels:['Cargados','En Cargue','En Patio'],datasets:[{data:[desp,carg,pend],backgroundColor:['#16a34a','#d97706','#7c3aed'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,cutout:'65%',plugins:{legend:{display:false},datalabels:{display:true,color:'white',font:{size:10,weight:'bold'},formatter:function(v){return v>0?v:'';}},tooltip:{callbacks:{label:function(c){return c.label+': '+c.raw;}}}}}});
   document.getElementById('donutLegend').innerHTML=[['#16a34a','✅ Cargados',desp],['#d97706','🔄 En Cargue',carg],['#7c3aed','⏳ En Patio',pend]].map(function(x){return'<div class="legend-item"><div class="legend-dot" style="background:'+x[0]+'"></div><span class="legend-label">'+x[1]+'</span><span class="legend-val">'+x[2]+'</span></div>';}).join('');
 
-  // Avance de cargue
   var totalKgOC=r.reduce(function(a,x){return a+toNum(x[C.KG_OC]);},0);
   var totalKgCarg=r.filter(function(x){return isCargado(x[C.STATUS]);}).reduce(function(a,x){return a+toNum(x[C.KG_OC]);},0);
   var pctAv=totalKgOC>0?Math.min(100,Math.round(totalKgCarg/totalKgOC*100)):0;
@@ -482,19 +525,16 @@ function renderCharts(){
     {label:'Pendiente',val:((totalKgOC-totalKgCarg)/1000).toFixed(1)+'T',color:'#dc2626',bg:'#fff1f2'}
   ].map(function(x){return'<div style="background:'+x.bg+';border-radius:8px;padding:5px 6px;text-align:center"><div style="font-size:0.85rem;font-weight:800;color:'+x.color+'">'+x.val+'</div><div style="font-size:0.58rem;color:#64748b;margin-top:1px">'+x.label+'</div></div>';}).join('');
 
-  // % Cumplimiento OC por cliente
   var kgOCxCl={},kgCxCl={};r.forEach(function(x){var cl=(x[C.CLIENTE]||'Sin nombre').trim();if(!kgOCxCl[cl])kgOCxCl[cl]=0;if(!kgCxCl[cl])kgCxCl[cl]=0;kgOCxCl[cl]+=toNum(x[C.KG_OC]);if(isCargado(x[C.STATUS]))kgCxCl[cl]+=toNum(x[C.KG_OC]);});
   var klabels=Object.keys(kgOCxCl);
   var pctOC=klabels.map(function(k){return kgOCxCl[k]>0?Math.round(kgCxCl[k]/kgOCxCl[k]*100):0;});
   dc('cumplOC');charts['cumplOC']=new Chart(document.getElementById('chartCumplOC'),{type:'bar',data:{labels:klabels,datasets:[{label:'% Cumplimiento OC',data:pctOC,backgroundColor:pctOC.map(function(p){return p>=100?'#16a34a':p>=80?'#d97706':'#dc2626';}),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v+'%':'';}},tooltip:{callbacks:{label:function(c){return c.raw+'%';}}}},scales:{x:bx,y:{ticks:{callback:function(v){return v+'%';},font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'},max:115}}}});
 
-  // Kg por Modalidad (UNA SOLA)
   var modMap={};r.forEach(function(x){var m=(x[C.EMP]||'Sin modalidad').trim().toUpperCase();if(!modMap[m])modMap[m]=0;modMap[m]+=toNum(x[C.KG_OC]);});
   var modL=Object.keys(modMap),modV=modL.map(function(k){return modMap[k];}),modC=['#0ea5e9','#f59e0b','#10b981','#a855f7','#ef4444'];
   dc('modalidad');charts['modalidad']=new Chart(document.getElementById('chartModalidad'),{type:'doughnut',data:{labels:modL,datasets:[{data:modV,backgroundColor:modC.slice(0,modL.length),borderWidth:0,hoverOffset:4}]},options:{responsive:true,cutout:'60%',plugins:{legend:{display:false},datalabels:{display:true,color:'white',font:{size:9,weight:'bold'},formatter:function(v){return v>0?(v/1000).toFixed(1)+'T':'';}},tooltip:{callbacks:{label:function(c){return c.label+': '+(c.raw/1000).toFixed(1)+' Ton';}}}}}});
   document.getElementById('modalidadLegend').innerHTML=modL.map(function(l,i){return'<div class="legend-item"><div class="legend-dot" style="background:'+modC[i]+'"></div><span class="legend-label">'+l+'</span><span class="legend-val">'+(modMap[l]/1000).toFixed(1)+' Ton</span></div>';}).join('');
 
-  // Cuadrilla
   var cuadMap={};r.forEach(function(x){var cu=(x[C.CUA]||'').trim();if(!cu)return;if(!cuadMap[cu])cuadMap[cu]=0;cuadMap[cu]+=toNum(x[C.KG_OC])/1000;});
   var cuadL=Object.keys(cuadMap),cuadV=cuadL.map(function(k){return parseFloat(cuadMap[k].toFixed(2));});
   dc('cuadrilla');charts['cuadrilla']=new Chart(document.getElementById('chartCuadrilla'),{type:'bar',data:{labels:cuadL,datasets:[{label:'Ton',data:cuadV,backgroundColor:'#818cf8',borderRadius:4}]},options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v+' T':'';}},},scales:{x:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return v+' T';}},grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}}}}});
