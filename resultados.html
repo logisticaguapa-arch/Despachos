@@ -54,17 +54,24 @@ header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:10px 20px;displ
 .tab-btn.active{background:#7c3aed;color:white}
 
 .card{background:white;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
-.card-title{font-size:0.73rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card-title{font-size:0.78rem;font-weight:700;color:#374151;margin-bottom:10px;display:flex;align-items:center;gap:6px}
 .card-title::before{content:'';width:3px;height:13px;background:#7c3aed;border-radius:2px;display:inline-block}
 
-.tbl-wrap{overflow-x:auto;max-width:100%}
+.metric-card{display:flex;gap:14px;align-items:stretch}
+.metric-table-wrap{flex:0 0 220px;max-height:280px;overflow-y:auto;border-radius:8px;border:1px solid #f1f5f9}
+.metric-chart-wrap{flex:1;min-width:0}
+@media(max-width:800px){.metric-card{flex-direction:column}.metric-table-wrap{flex:none;max-height:180px}}
+
 table{width:100%;border-collapse:collapse;font-size:0.72rem}
-th{padding:7px 8px;background:#1e293b;color:#94a3b8;font-weight:700;text-transform:uppercase;font-size:0.6rem;letter-spacing:0.4px;white-space:nowrap;text-align:right}
+th{padding:6px 8px;background:#1e293b;color:#94a3b8;font-weight:700;text-transform:uppercase;font-size:0.58rem;letter-spacing:0.3px;white-space:nowrap;text-align:right;position:sticky;top:0}
 th.left,td.left{text-align:left}
-td{padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;text-align:right;color:#1e293b}
+td{padding:4px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;text-align:right;color:#1e293b}
 tbody tr:hover{background:#f8fafc}
-.trow-top td{background:#f5f3ff}
+.trow-total td{background:#ede9fe;color:#5b21b6;font-weight:800;border-top:2px solid #a78bfa}
 .empty{text-align:center;padding:30px;color:#94a3b8;font-size:0.85rem}
+
+.metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:1100px){.metric-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -107,33 +114,87 @@ tbody tr:hover{background:#f8fafc}
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" id="tab-dia" onclick="setTab('dia')">📅 Diario</button>
-    <button class="tab-btn" id="tab-semana" onclick="setTab('semana')">🗓️ Semanal</button>
+    <button class="tab-btn active" id="tab-semana" onclick="setTab('semana')">🗓️ Semanal</button>
     <button class="tab-btn" id="tab-mes" onclick="setTab('mes')">📆 Mensual</button>
   </div>
 
-  <div class="card">
-    <div class="card-title" id="chartTitle">Evolución de Kg Cargados</div>
-    <canvas id="chartEvol" height="90"></canvas>
+  <!-- ===== VISTA SEMANAL (7 indicadores homologados con las tablas dinámicas) ===== -->
+  <div id="viewSemana">
+    <div class="metric-grid">
+
+      <div class="card">
+        <div class="card-title">⚡ KL/MIN Cargados semanal</div>
+        <div class="metric-card">
+          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Kg/Min</th><th>Cant Despachada</th></tr></thead><tbody id="tblKlMin"></tbody></table></div>
+          <div class="metric-chart-wrap"><canvas id="chartKlMin" height="180"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🕐 Tiempo total (llegada → fin de cargue) promedio semanal</div>
+        <div class="metric-card">
+          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Tiempo</th></tr></thead><tbody id="tblTiempoTotal"></tbody></table></div>
+          <div class="metric-chart-wrap"><canvas id="chartTiempoTotal" height="180"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">👷 KL/HORA/HOMBRE promedio semanal</div>
+        <div class="metric-card">
+          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Kl/Hora/H</th><th>Cant Despachada</th></tr></thead><tbody id="tblKlHoraHombre"></tbody></table></div>
+          <div class="metric-chart-wrap"><canvas id="chartKlHoraHombre" height="180"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">👷 KL/MIN/HOMBRE promedio semanal</div>
+        <div class="metric-card">
+          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Kl/Min/H</th><th>Cant Despachada</th></tr></thead><tbody id="tblKlMinHombre"></tbody></table></div>
+          <div class="metric-chart-wrap"><canvas id="chartKlMinHombre" height="180"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⏱️ Tiempo de Cargue Neto (inicio → fin) promedio semanal</div>
+        <div class="metric-card">
+          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Tiempo</th><th>Cant Despachada</th></tr></thead><tbody id="tblCargueNeto"></tbody></table></div>
+          <div class="metric-chart-wrap"><canvas id="chartCargueNeto" height="180"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🕐 Tiempo de Espera (llegada → inicio) promedio semanal</div>
+        <div class="metric-card">
+          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Tiempo</th></tr></thead><tbody id="tblEspera"></tbody></table></div>
+          <div class="metric-chart-wrap"><canvas id="chartEspera" height="180"></canvas></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">🍩 KL / EMPAQUE semanal (% Canasta vs Granel)</div>
+      <canvas id="chartEmpaque" height="90"></canvas>
+    </div>
   </div>
 
-  <div class="card">
-    <div class="card-title" id="tableTitle">Detalle por período</div>
-    <div class="tbl-wrap">
-      <table>
-        <thead><tr>
-          <th class="left">Período</th>
-          <th>Vehículos</th>
-          <th>Kg Cargados</th>
-          <th>% Cumpl.</th>
-          <th>KL/MIN</th>
-          <th>KL/Hora/Hombre</th>
-          <th>KL/Min/Hombre</th>
-          <th>T. Cargue Neto</th>
-          <th>T. Espera</th>
-        </tr></thead>
-        <tbody id="periodBody"><tr><td colspan="9" class="empty">Cargando...</td></tr></tbody>
-      </table>
+  <!-- ===== VISTA MENSUAL (resumen general) ===== -->
+  <div id="viewMes" style="display:none">
+    <div class="card">
+      <div class="card-title">Evolución de Kg Cargados por mes</div>
+      <canvas id="chartMes" height="90"></canvas>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">Detalle mensual</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th class="left">Mes</th><th>Vehículos</th><th>Kg Cargados</th><th>% Cumpl.</th>
+            <th>KL/MIN</th><th>KL/Hora/Hombre</th><th>KL/Min/Hombre</th><th>T. Cargue Neto</th><th>T. Espera</th>
+          </tr></thead>
+          <tbody id="periodBodyMes"><tr><td colspan="9" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -166,15 +227,15 @@ if(sessionStorage.getItem('resultadosUnlocked')==='1'){ unlock(); }
 /* ===== Mismo CSV y mapeo de columnas que el tablero de Despachos ===== */
 var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
 var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8,H_OC:9,H_CITA:10,H_LLE:11,H_SALIDA:12,H_INI:13,H_FIN:14,STATUS:15,OBS:16,HS:17,MIN:18,KGMIN:19,EMP:20,MUE:21,CUA:22,PER:23,CONDUCTOR:24,CC_COND:25,TEL_COND:26,CAN_ENCAJABLES:27,CAN_GRANDES:28,CAN_PEQUENAS:29};
-var allData=[], chartRef=null, currentTab='dia';
+var allData=[], charts={}, currentTab='semana';
 
 function normStr(s){return(s||'').toLowerCase().trim();}
 function isCargado(s){return normStr(s)==='cargado';}
 function toNum(v){if(!v)return 0;var s=v.toString().replace(/"/g,'').replace('%','').trim();s=s.replace(/\./g,'').replace(',','.');return parseFloat(s)||0;}
-function parsePct(v){if(!v)return 0;var s=v.toString().replace(/"/g,'').trim();if(s.indexOf('%')>=0)return parseFloat(s.replace('%','').replace(',','.'))||0;var n=parseFloat(s.replace(',','.'))||0;if(n>0&&n<=1.5)return Math.round(n*100);return n;}
 function timeToMin(t){if(!t)return null;var s=(t+'').trim();var m12=s.match(/(\d+):(\d+)(?::\d+)?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);if(m12){var h=parseInt(m12[1]),m=parseInt(m12[2]),pm=/p/i.test(m12[3]);if(pm&&h!==12)h+=12;if(!pm&&h===12)h=0;return h*60+m;}var p=s.split(':');if(p.length>=2)return parseInt(p[0])*60+parseInt(p[1]);return null;}
 function parseFecha(s){var p=(s||'').split('/');if(p.length===3){var d=parseInt(p[0]),m=parseInt(p[1]),y=parseInt(p[2]);if(y<100)y+=2000;return new Date(y,m-1,d);}return null;}
-function minToHM(m){if(m===null||isNaN(m))return'—';m=Math.round(m);var h=Math.floor(m/60),mi=m%60;return h>0?(h+'h '+mi+'m'):(mi+'m');}
+function minToHM(m){if(m===null||m===undefined||isNaN(m))return'—';m=Math.round(m);var h=Math.floor(m/60),mi=m%60;return h+':'+(mi<10?'0'+mi:mi);}
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 
 function parseCSV(txt){
   var lines=txt.trim().split('\n');
@@ -206,7 +267,7 @@ async function fetchData(){
   }
 }
 
-/* ===== Cálculo de indicadores por fila (solo filas Cargado tienen datos completos) ===== */
+/* ===== Métricas por fila (solo filas Cargado tienen datos completos) ===== */
 function metricsForRow(r){
   var kg=toNum(r[C.CANT]);
   var minutos=toNum(r[C.MIN]);
@@ -217,11 +278,12 @@ function metricsForRow(r){
   var fin=timeToMin(r[C.H_FIN]);
   var espera=(llegada!==null&&ini!==null&&ini>=llegada)?(ini-llegada):null;
   var cargueNeto=minutos>0?minutos:((ini!==null&&fin!==null&&fin>ini)?(fin-ini):null);
+  var tiempoTotal=(llegada!==null&&fin!==null&&fin>=llegada)?(fin-llegada):null;
   var klHoraHombre=(personas>0&&cargueNeto>0)?((kg/(cargueNeto/60))/personas):null;
   var klMinHombre=(personas>0&&kgMin>0)?(kgMin/personas):null;
-  return {kg:kg,kgOC:toNum(r[C.KG_OC]),kgMin:kgMin>0?kgMin:null,espera:espera,cargueNeto:cargueNeto,klHoraHombre:klHoraHombre,klMinHombre:klMinHombre};
+  var empaque=(r[C.EMP]||'').trim().toUpperCase();
+  return {kg:kg,kgOC:toNum(r[C.KG_OC]),kgMin:kgMin>0?kgMin:null,espera:espera,cargueNeto:cargueNeto,tiempoTotal:tiempoTotal,klHoraHombre:klHoraHombre,klMinHombre:klMinHombre,empaque:empaque};
 }
-
 function avg(arr){var v=arr.filter(function(x){return x!==null&&x!==undefined&&!isNaN(x);});if(!v.length)return null;return v.reduce(function(a,b){return a+b;},0)/v.length;}
 function sum(arr){return arr.reduce(function(a,b){return a+b;},0);}
 
@@ -241,7 +303,7 @@ function renderGlobal(){
   document.getElementById('gTiempoEspera').textContent=minToHM(avg(m.map(function(x){return x.espera;})));
 }
 
-/* ===== Semana ISO simplificada (año calendario de la fecha) ===== */
+/* ===== Semana ISO (número de semana dentro del año) ===== */
 function getISOWeek(date){
   var d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
   var dayNum=(d.getUTCDay()+6)%7;
@@ -254,19 +316,15 @@ function getISOWeek(date){
 var MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 function buildBuckets(mode){
-  var buckets={}; // key -> {label, sortKey, rows:[]}
+  var buckets={};
   allData.forEach(function(r){
     var fecha=parseFecha(r[C.FECHA]);
     if(!fecha) return;
     var key,label,sortKey;
-    if(mode==='dia'){
-      key=r[C.FECHA].trim();
-      label=key;
-      sortKey=fecha.getTime();
-    } else if(mode==='semana'){
+    if(mode==='semana'){
       var wk=getISOWeek(fecha), yr=fecha.getFullYear();
       key=yr+'-W'+wk;
-      label='Semana '+wk+' ('+yr+')';
+      label=''+wk;
       sortKey=yr*100+wk;
     } else {
       var yr2=fecha.getFullYear(), mo=fecha.getMonth();
@@ -277,7 +335,7 @@ function buildBuckets(mode){
     if(!buckets[key]) buckets[key]={label:label,sortKey:sortKey,rows:[]};
     buckets[key].rows.push(r);
   });
-  return Object.keys(buckets).map(function(k){return buckets[k];}).sort(function(a,b){return b.sortKey-a.sortKey;});
+  return Object.keys(buckets).map(function(k){return buckets[k];}).sort(function(a,b){return a.sortKey-b.sortKey;}); // ascendente
 }
 
 function computeBucketStats(bucket){
@@ -286,9 +344,10 @@ function computeBucketStats(bucket){
   var m=cargados.map(metricsForRow);
   var kgTotal=sum(m.map(function(x){return x.kg;}));
   var kgOCTotal=sum(rows.map(function(r){return toNum(r[C.KG_OC]);}));
+  var kgCanasta=sum(m.filter(function(x){return x.empaque==='CANASTA';}).map(function(x){return x.kg;}));
+  var kgGranel=sum(m.filter(function(x){return x.empaque==='GRANEL';}).map(function(x){return x.kg;}));
   return {
     label:bucket.label,
-    sortKey:bucket.sortKey,
     vehiculos:rows.length,
     kg:kgTotal,
     pct:kgOCTotal>0?Math.round(kgTotal/kgOCTotal*100):0,
@@ -296,39 +355,122 @@ function computeBucketStats(bucket){
     klHoraHombre:avg(m.map(function(x){return x.klHoraHombre;})),
     klMinHombre:avg(m.map(function(x){return x.klMinHombre;})),
     cargueNeto:avg(m.map(function(x){return x.cargueNeto;})),
-    espera:avg(m.map(function(x){return x.espera;}))
+    espera:avg(m.map(function(x){return x.espera;})),
+    tiempoTotal:avg(m.map(function(x){return x.tiempoTotal;})),
+    pctCanasta:kgTotal>0?Math.round(kgCanasta/kgTotal*100):null,
+    pctGranel:kgTotal>0?Math.round(kgGranel/kgTotal*100):null
   };
+}
+
+function lineChart(canvasId, labels, data, opts){
+  opts=opts||{};
+  dc(canvasId);
+  charts[canvasId]=new Chart(document.getElementById(canvasId),{
+    type:'line',
+    data:{labels:labels,datasets:[{
+      label:opts.label||'',
+      data:data,
+      borderColor:opts.color||'#1e6f8f',
+      backgroundColor:opts.color||'#1e6f8f',
+      tension:0.3,
+      pointRadius:3,
+      borderWidth:2
+    }]},
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{display:false},
+        datalabels:{display:true,align:'top',anchor:'end',color:'#374151',font:{size:9,weight:'bold'},formatter:opts.labelFormatter||function(v){return v;}},
+        tooltip:{callbacks:{label:function(c){return opts.tooltipFormatter?opts.tooltipFormatter(c.raw):c.raw;}}}
+      },
+      scales:{
+        x:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}},
+        y:opts.yOptions||{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}
+      }
+    }
+  });
 }
 
 function setTab(mode){
   currentTab=mode;
-  ['dia','semana','mes'].forEach(function(t){document.getElementById('tab-'+t).classList.toggle('active',t===mode);});
+  document.getElementById('tab-semana').classList.toggle('active',mode==='semana');
+  document.getElementById('tab-mes').classList.toggle('active',mode==='mes');
+  document.getElementById('viewSemana').style.display=mode==='semana'?'block':'none';
+  document.getElementById('viewMes').style.display=mode==='mes'?'block':'none';
   if(!allData.length) return;
-  var buckets=buildBuckets(mode).map(computeBucketStats);
-  var titulo=mode==='dia'?'Detalle Diario':mode==='semana'?'Detalle Semanal':'Detalle Mensual';
-  document.getElementById('tableTitle').textContent=titulo;
-  document.getElementById('chartTitle').textContent='Evolución de Kg Cargados — '+(mode==='dia'?'por día':mode==='semana'?'por semana':'por mes');
 
-  document.getElementById('periodBody').innerHTML = buckets.length ? buckets.map(function(b,i){
-    return '<tr'+(i===0?' class="trow-top"':'')+'>'
-      +'<td class="left">'+b.label+'</td>'
-      +'<td>'+b.vehiculos+'</td>'
-      +'<td>'+(b.kg/1000).toFixed(2)+' T</td>'
-      +'<td>'+b.pct+'%</td>'
-      +'<td>'+(b.klMin!==null?b.klMin.toFixed(1):'—')+'</td>'
-      +'<td>'+(b.klHoraHombre!==null?b.klHoraHombre.toFixed(1):'—')+'</td>'
-      +'<td>'+(b.klMinHombre!==null?b.klMinHombre.toFixed(1):'—')+'</td>'
-      +'<td>'+minToHM(b.cargueNeto)+'</td>'
-      +'<td>'+minToHM(b.espera)+'</td>'
-      +'</tr>';
+  if(mode==='semana'){ renderSemanal(); } else { renderMensual(); }
+}
+
+function renderSemanal(){
+  var buckets=buildBuckets('semana').map(computeBucketStats);
+  if(!buckets.length) return;
+  var labels=buckets.map(function(b){return b.label;});
+
+  // Tabla + gráfico: KL/MIN
+  document.getElementById('tblKlMin').innerHTML=buckets.map(function(b){
+    return '<tr><td class="left">'+b.label+'</td><td>'+(b.klMin!==null?b.klMin.toFixed(1):'—')+'</td><td>'+Math.round(b.kg).toLocaleString('es-CO')+'</td></tr>';
+  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+(avg(buckets.map(function(b){return b.klMin;}))||0).toFixed(1)+'</td><td>'+Math.round(sum(buckets.map(function(b){return b.kg;}))).toLocaleString('es-CO')+'</td></tr>';
+  lineChart('chartKlMin',labels,buckets.map(function(b){return b.klMin!==null?parseFloat(b.klMin.toFixed(1)):null;}),{color:'#1e6f8f'});
+
+  // Tiempo total llegada->fin
+  document.getElementById('tblTiempoTotal').innerHTML=buckets.map(function(b){
+    return '<tr><td class="left">'+b.label+'</td><td>'+minToHM(b.tiempoTotal)+'</td></tr>';
+  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+minToHM(avg(buckets.map(function(b){return b.tiempoTotal;})))+'</td></tr>';
+  lineChart('chartTiempoTotal',labels,buckets.map(function(b){return b.tiempoTotal;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+
+  // KL/HORA/HOMBRE
+  document.getElementById('tblKlHoraHombre').innerHTML=buckets.map(function(b){
+    return '<tr><td class="left">'+b.label+'</td><td>'+(b.klHoraHombre!==null?Math.round(b.klHoraHombre):'—')+'</td><td>'+Math.round(b.kg).toLocaleString('es-CO')+'</td></tr>';
+  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+Math.round(avg(buckets.map(function(b){return b.klHoraHombre;}))||0)+'</td><td>'+Math.round(sum(buckets.map(function(b){return b.kg;}))).toLocaleString('es-CO')+'</td></tr>';
+  lineChart('chartKlHoraHombre',labels,buckets.map(function(b){return b.klHoraHombre!==null?Math.round(b.klHoraHombre):null;}),{color:'#1e6f8f'});
+
+  // KL/MIN/HOMBRE
+  document.getElementById('tblKlMinHombre').innerHTML=buckets.map(function(b){
+    return '<tr><td class="left">'+b.label+'</td><td>'+(b.klMinHombre!==null?b.klMinHombre.toFixed(1):'—')+'</td><td>'+Math.round(b.kg).toLocaleString('es-CO')+'</td></tr>';
+  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+(avg(buckets.map(function(b){return b.klMinHombre;}))||0).toFixed(1)+'</td><td>'+Math.round(sum(buckets.map(function(b){return b.kg;}))).toLocaleString('es-CO')+'</td></tr>';
+  lineChart('chartKlMinHombre',labels,buckets.map(function(b){return b.klMinHombre!==null?parseFloat(b.klMinHombre.toFixed(1)):null;}),{color:'#1e6f8f'});
+
+  // Tiempo cargue neto (inicio->fin)
+  document.getElementById('tblCargueNeto').innerHTML=buckets.map(function(b){
+    return '<tr><td class="left">'+b.label+'</td><td>'+minToHM(b.cargueNeto)+'</td><td>'+Math.round(b.kg).toLocaleString('es-CO')+'</td></tr>';
+  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+minToHM(avg(buckets.map(function(b){return b.cargueNeto;})))+'</td><td>'+Math.round(sum(buckets.map(function(b){return b.kg;}))).toLocaleString('es-CO')+'</td></tr>';
+  lineChart('chartCargueNeto',labels,buckets.map(function(b){return b.cargueNeto;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+
+  // Tiempo de espera (llegada->inicio)
+  document.getElementById('tblEspera').innerHTML=buckets.map(function(b){
+    return '<tr><td class="left">'+b.label+'</td><td>'+minToHM(b.espera)+'</td></tr>';
+  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+minToHM(avg(buckets.map(function(b){return b.espera;})))+'</td></tr>';
+  lineChart('chartEspera',labels,buckets.map(function(b){return b.espera;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+
+  // % Kg por Empaque (Canasta vs Granel)
+  dc('chartEmpaque');
+  charts['chartEmpaque']=new Chart(document.getElementById('chartEmpaque'),{
+    type:'line',
+    data:{labels:labels,datasets:[
+      {label:'CANASTA',data:buckets.map(function(b){return b.pctCanasta;}),borderColor:'#1e6f8f',backgroundColor:'#1e6f8f',tension:0.3,pointRadius:3,borderWidth:2},
+      {label:'GRANEL',data:buckets.map(function(b){return b.pctGranel;}),borderColor:'#f97316',backgroundColor:'#f97316',tension:0.3,pointRadius:3,borderWidth:2}
+    ]},
+    options:{responsive:true,plugins:{legend:{display:true,position:'right',labels:{font:{size:10}}},
+      datalabels:{display:true,align:'top',anchor:'end',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v!==null?v+'%':'';}},
+      tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.raw+'%';}}}},
+      scales:{x:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}},
+        y:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'}}}}
+  });
+}
+
+function renderMensual(){
+  var buckets=buildBuckets('mes').map(computeBucketStats);
+  document.getElementById('periodBodyMes').innerHTML = buckets.length ? buckets.map(function(b){
+    return '<tr><td class="left">'+b.label+'</td><td>'+b.vehiculos+'</td><td>'+(b.kg/1000).toFixed(2)+' T</td><td>'+b.pct+'%</td>'
+      +'<td>'+(b.klMin!==null?b.klMin.toFixed(1):'—')+'</td><td>'+(b.klHoraHombre!==null?b.klHoraHombre.toFixed(1):'—')+'</td>'
+      +'<td>'+(b.klMinHombre!==null?b.klMinHombre.toFixed(1):'—')+'</td><td>'+minToHM(b.cargueNeto)+'</td><td>'+minToHM(b.espera)+'</td></tr>';
   }).join('') : '<tr><td colspan="9" class="empty">Sin datos</td></tr>';
 
-  // Gráfica: últimos 20 períodos, ordenados de más antiguo a más reciente
-  var chartBuckets=buckets.slice(0,20).slice().reverse();
-  var labels=chartBuckets.map(function(b){return b.label;});
-  var data=chartBuckets.map(function(b){return parseFloat((b.kg/1000).toFixed(2));});
-  if(chartRef){chartRef.destroy();}
-  chartRef=new Chart(document.getElementById('chartEvol'),{
+  var labels=buckets.map(function(b){return b.label;});
+  var data=buckets.map(function(b){return parseFloat((b.kg/1000).toFixed(2));});
+  dc('chartMes');
+  charts['chartMes']=new Chart(document.getElementById('chartMes'),{
     type:'bar',
     data:{labels:labels,datasets:[{label:'Ton Cargadas',data:data,backgroundColor:'#7c3aed',borderRadius:4}]},
     options:{responsive:true,plugins:{legend:{display:false},
