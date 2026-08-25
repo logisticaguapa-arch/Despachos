@@ -28,8 +28,11 @@ header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:10px 20px;displ
 .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .ubadge{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#a0c4ff;padding:4px 10px;border-radius:20px;font-size:0.7rem}
 #backBtn{background:#2563eb;border:none;color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+#retryBtn{background:#dc2626;border:none;color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:600;display:none}
+#retryBtn:hover{background:#b91c1c}
 
 .container{padding:12px 18px;display:grid;gap:12px}
+.banner-error{background:#fff1f2;border-left:4px solid #dc2626;border-radius:8px;padding:12px 16px;font-size:0.82rem;color:#991b1b;display:none;align-items:center;gap:10px}
 
 /* ===== KPIs ===== */
 .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
@@ -95,11 +98,16 @@ tbody tr:hover{background:#f8fafc}
   <div class="logo">📊 Resultados <span>Globales — Despachos SYOP</span></div>
   <div class="header-right">
     <span class="ubadge" id="lastUpdate">Cargando...</span>
+    <button id="retryBtn" onclick="manualRetry()">🔄 Reintentar</button>
     <a id="backBtn" href="index.html">← Volver al tablero</a>
   </div>
 </header>
 
 <div class="container">
+
+  <div class="banner-error" id="errorBanner">
+    ⚠️ <span id="errorText">No se pudo cargar la información.</span>
+  </div>
 
   <div class="section-title">📈 Indicadores Históricos (todo el período disponible)</div>
   <div class="kpi-row" id="kpiGlobal">
@@ -227,7 +235,7 @@ if(sessionStorage.getItem('resultadosUnlocked')==='1'){ unlock(); }
 /* ===== Mismo CSV y mapeo de columnas que el tablero de Despachos ===== */
 var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
 var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8,H_OC:9,H_CITA:10,H_LLE:11,H_SALIDA:12,H_INI:13,H_FIN:14,STATUS:15,OBS:16,HS:17,MIN:18,KGMIN:19,EMP:20,MUE:21,CUA:22,PER:23,CONDUCTOR:24,CC_COND:25,TEL_COND:26,CAN_ENCAJABLES:27,CAN_GRANDES:28,CAN_PEQUENAS:29};
-var allData=[], charts={}, currentTab='semana';
+var allData=[], charts={}, currentTab='semana', retryCount=0, MAX_AUTO_RETRIES=3;
 
 function normStr(s){return(s||'').toLowerCase().trim();}
 function isCargado(s){return normStr(s)==='cargado';}
@@ -253,17 +261,43 @@ function parseCSV(txt){
   });
 }
 
+function showError(msg){
+  document.getElementById('errorText').textContent=msg;
+  document.getElementById('errorBanner').style.display='flex';
+  document.getElementById('retryBtn').style.display='inline-flex';
+  document.getElementById('lastUpdate').textContent='🔴 Error';
+}
+function hideError(){
+  document.getElementById('errorBanner').style.display='none';
+  document.getElementById('retryBtn').style.display='none';
+}
+
+function manualRetry(){
+  retryCount=0;
+  document.getElementById('lastUpdate').textContent='⏳ Reintentando...';
+  fetchData();
+}
+
 async function fetchData(){
   try{
-    var res=await fetch(CSV_URL+'&t='+Date.now());
-    if(!res.ok)throw new Error('HTTP '+res.status);
+    var res=await fetch(CSV_URL+'&t='+Date.now(), {cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
     var txt=await res.text();
+    if(!txt || txt.trim().length===0) throw new Error('Respuesta vacía');
     allData=parseCSV(txt);
+    retryCount=0;
+    hideError();
     document.getElementById('lastUpdate').textContent='🟢 '+new Date().toLocaleTimeString('es-CO');
     renderGlobal();
     setTab(currentTab);
   }catch(e){
-    document.getElementById('lastUpdate').textContent='🔴 Error: '+e.message;
+    retryCount++;
+    if(retryCount<=MAX_AUTO_RETRIES){
+      document.getElementById('lastUpdate').textContent='⏳ Reintentando ('+retryCount+'/'+MAX_AUTO_RETRIES+')...';
+      setTimeout(fetchData, 1800*retryCount);
+    } else {
+      showError('No se pudo cargar la información después de '+MAX_AUTO_RETRIES+' intentos ('+e.message+'). Verifica tu conexión y presiona Reintentar.');
+    }
   }
 }
 
