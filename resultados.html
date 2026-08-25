@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resultados Globales - Despachos SYOP</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
+
+/* ===== Pantalla de contraseña ===== */
+#lockScreen{position:fixed;inset:0;background:linear-gradient(135deg,#1B2A4A,#2d4a7a);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px}
+.lock-card{background:white;border-radius:16px;padding:36px 32px;max-width:340px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.3)}
+.lock-icon{font-size:2.5rem;margin-bottom:10px}
+.lock-card h2{font-size:1.15rem;color:#1e293b;margin-bottom:6px}
+.lock-card p{font-size:0.8rem;color:#64748b;margin-bottom:20px;line-height:1.4}
+#passInput{width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.95rem;margin-bottom:12px;text-align:center;letter-spacing:2px}
+#passInput:focus{outline:none;border-color:#7c3aed}
+#lockBtn{width:100%;padding:11px;background:#7c3aed;color:white;border:none;border-radius:8px;font-size:0.9rem;font-weight:700;cursor:pointer}
+#lockBtn:hover{background:#6d28d9}
+#passError{color:#dc2626;font-size:0.78rem;margin-top:10px;display:none;font-weight:600}
+
+/* ===== Header ===== */
+header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.logo{color:white;font-size:1.1rem;font-weight:700;letter-spacing:1px}.logo span{color:#a78bfa}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ubadge{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#a0c4ff;padding:4px 10px;border-radius:20px;font-size:0.7rem}
+#backBtn{background:#2563eb;border:none;color:white;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+
+.container{padding:12px 18px;display:grid;gap:12px}
+
+/* ===== KPIs ===== */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media(max-width:900px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:white;border-radius:10px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border-top:3px solid #e2e8f0;display:flex;flex-direction:column;gap:3px}
+.kpi .v{font-size:1.5rem;font-weight:800;line-height:1;color:#1e293b}
+.kpi .l{font-size:0.62rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;font-weight:600}
+.kpi.c1{border-top-color:#2563eb}.kpi.c1 .v{color:#2563eb}
+.kpi.c2{border-top-color:#16a34a}.kpi.c2 .v{color:#16a34a}
+.kpi.c3{border-top-color:#7c3aed}.kpi.c3 .v{color:#7c3aed}
+.kpi.c4{border-top-color:#d97706}.kpi.c4 .v{color:#d97706}
+.kpi.c5{border-top-color:#dc2626}.kpi.c5 .v{color:#dc2626}
+.kpi.c6{border-top-color:#0ea5e9}.kpi.c6 .v{color:#0ea5e9}
+.kpi.c7{border-top-color:#ea580c}.kpi.c7 .v{color:#ea580c}
+.kpi.c8{border-top-color:#a855f7}.kpi.c8 .v{color:#a855f7}
+
+.section-title{font-size:0.8rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:8px;margin-top:4px}
+
+/* ===== Tabs ===== */
+.tabs{display:flex;gap:8px;background:white;border-radius:10px;padding:6px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.tab-btn{flex:1;padding:9px;border:none;background:transparent;color:#64748b;font-weight:700;font-size:0.82rem;border-radius:7px;cursor:pointer;font-family:inherit}
+.tab-btn.active{background:#7c3aed;color:white}
+
+.card{background:white;border-radius:10px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.card-title{font-size:0.73rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card-title::before{content:'';width:3px;height:13px;background:#7c3aed;border-radius:2px;display:inline-block}
+
+.tbl-wrap{overflow-x:auto;max-width:100%}
+table{width:100%;border-collapse:collapse;font-size:0.72rem}
+th{padding:7px 8px;background:#1e293b;color:#94a3b8;font-weight:700;text-transform:uppercase;font-size:0.6rem;letter-spacing:0.4px;white-space:nowrap;text-align:right}
+th.left,td.left{text-align:left}
+td{padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;text-align:right;color:#1e293b}
+tbody tr:hover{background:#f8fafc}
+.trow-top td{background:#f5f3ff}
+.empty{text-align:center;padding:30px;color:#94a3b8;font-size:0.85rem}
+</style>
+</head>
+<body>
+
+<!-- ===== Pantalla de bloqueo ===== -->
+<div id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <h2>Resultados Globales</h2>
+    <p>Acceso restringido — indicadores de rendimiento del área de despachos.<br>Ingresa la contraseña para continuar.</p>
+    <input type="password" id="passInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkPass()">
+    <button id="lockBtn" onclick="checkPass()">Ingresar</button>
+    <div id="passError">Contraseña incorrecta, intenta de nuevo.</div>
+  </div>
+</div>
+
+<!-- ===== Contenido principal (oculto hasta desbloquear) ===== -->
+<div id="mainContent" style="display:none">
+
+<header>
+  <div class="logo">📊 Resultados <span>Globales — Despachos SYOP</span></div>
+  <div class="header-right">
+    <span class="ubadge" id="lastUpdate">Cargando...</span>
+    <a id="backBtn" href="index.html">← Volver al tablero</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="section-title">📈 Indicadores Históricos (todo el período disponible)</div>
+  <div class="kpi-row" id="kpiGlobal">
+    <div class="kpi c1"><div class="v" id="gTotal">—</div><div class="l">🚛 Total Vehículos</div></div>
+    <div class="kpi c2"><div class="v" id="gKg">—</div><div class="l">📦 Kg Cargados (Ton)</div></div>
+    <div class="kpi c3"><div class="v" id="gPct">—</div><div class="l">📊 % Cumplimiento</div></div>
+    <div class="kpi c4"><div class="v" id="gKlMin">—</div><div class="l">⚡ KL/MIN Promedio</div></div>
+    <div class="kpi c5"><div class="v" id="gKlHoraHombre">—</div><div class="l">👷 KL/Hora/Hombre</div></div>
+    <div class="kpi c6"><div class="v" id="gKlMinHombre">—</div><div class="l">👷 KL/Min/Hombre</div></div>
+    <div class="kpi c7"><div class="v" id="gTiempoCargue">—</div><div class="l">⏱️ Tiempo Cargue Neto</div></div>
+    <div class="kpi c8"><div class="v" id="gTiempoEspera">—</div><div class="l">🕐 Tiempo de Espera</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-dia" onclick="setTab('dia')">📅 Diario</button>
+    <button class="tab-btn" id="tab-semana" onclick="setTab('semana')">🗓️ Semanal</button>
+    <button class="tab-btn" id="tab-mes" onclick="setTab('mes')">📆 Mensual</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title" id="chartTitle">Evolución de Kg Cargados</div>
+    <canvas id="chartEvol" height="90"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="card-title" id="tableTitle">Detalle por período</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th class="left">Período</th>
+          <th>Vehículos</th>
+          <th>Kg Cargados</th>
+          <th>% Cumpl.</th>
+          <th>KL/MIN</th>
+          <th>KL/Hora/Hombre</th>
+          <th>KL/Min/Hombre</th>
+          <th>T. Cargue Neto</th>
+          <th>T. Espera</th>
+        </tr></thead>
+        <tbody id="periodBody"><tr><td colspan="9" class="empty">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+Chart.register(ChartDataLabels);
+
+/* ===== CONTRASEÑA =====
+Para cambiarla, edita el valor entre comillas de la siguiente línea: */
+var CLAVE_ACCESO = 'GuapaSYOP2026';
+
+function checkPass(){
+  var v = document.getElementById('passInput').value;
+  if(v === CLAVE_ACCESO){
+    sessionStorage.setItem('resultadosUnlocked','1');
+    unlock();
+  } else {
+    document.getElementById('passError').style.display='block';
+  }
+}
+function unlock(){
+  document.getElementById('lockScreen').style.display='none';
+  document.getElementById('mainContent').style.display='block';
+  fetchData();
+}
+if(sessionStorage.getItem('resultadosUnlocked')==='1'){ unlock(); }
+
+/* ===== Mismo CSV y mapeo de columnas que el tablero de Despachos ===== */
+var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
+var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8,H_OC:9,H_CITA:10,H_LLE:11,H_SALIDA:12,H_INI:13,H_FIN:14,STATUS:15,OBS:16,HS:17,MIN:18,KGMIN:19,EMP:20,MUE:21,CUA:22,PER:23,CONDUCTOR:24,CC_COND:25,TEL_COND:26,CAN_ENCAJABLES:27,CAN_GRANDES:28,CAN_PEQUENAS:29};
+var allData=[], chartRef=null, currentTab='dia';
+
+function normStr(s){return(s||'').toLowerCase().trim();}
+function isCargado(s){return normStr(s)==='cargado';}
+function toNum(v){if(!v)return 0;var s=v.toString().replace(/"/g,'').replace('%','').trim();s=s.replace(/\./g,'').replace(',','.');return parseFloat(s)||0;}
+function parsePct(v){if(!v)return 0;var s=v.toString().replace(/"/g,'').trim();if(s.indexOf('%')>=0)return parseFloat(s.replace('%','').replace(',','.'))||0;var n=parseFloat(s.replace(',','.'))||0;if(n>0&&n<=1.5)return Math.round(n*100);return n;}
+function timeToMin(t){if(!t)return null;var s=(t+'').trim();var m12=s.match(/(\d+):(\d+)(?::\d+)?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);if(m12){var h=parseInt(m12[1]),m=parseInt(m12[2]),pm=/p/i.test(m12[3]);if(pm&&h!==12)h+=12;if(!pm&&h===12)h=0;return h*60+m;}var p=s.split(':');if(p.length>=2)return parseInt(p[0])*60+parseInt(p[1]);return null;}
+function parseFecha(s){var p=(s||'').split('/');if(p.length===3){var d=parseInt(p[0]),m=parseInt(p[1]),y=parseInt(p[2]);if(y<100)y+=2000;return new Date(y,m-1,d);}return null;}
+function minToHM(m){if(m===null||isNaN(m))return'—';m=Math.round(m);var h=Math.floor(m/60),mi=m%60;return h>0?(h+'h '+mi+'m'):(mi+'m');}
+
+function parseCSV(txt){
+  var lines=txt.trim().split('\n');
+  if(lines.length<2)return[];
+  return lines.slice(1).map(function(line){
+    var cols=[],cur='',inQ=false;
+    for(var i=0;i<line.length;i++){var ch=line[i];if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){cols.push(cur.trim());cur='';}else{cur+=ch;}}
+    cols.push(cur.trim());
+    return cols;
+  }).filter(function(r){
+    var oc=(r[C.OC]||'').replace(/"/g,'').trim();
+    if(!oc)return false;
+    var lo=oc.toLowerCase();
+    return lo!=='oc'&&lo.indexOf('cargue')<0&&lo.indexOf('minutos')<0&&lo.indexOf('empaque')<0&&lo.indexOf('fecha')<0;
+  });
+}
+
+async function fetchData(){
+  try{
+    var res=await fetch(CSV_URL+'&t='+Date.now());
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var txt=await res.text();
+    allData=parseCSV(txt);
+    document.getElementById('lastUpdate').textContent='🟢 '+new Date().toLocaleTimeString('es-CO');
+    renderGlobal();
+    setTab(currentTab);
+  }catch(e){
+    document.getElementById('lastUpdate').textContent='🔴 Error: '+e.message;
+  }
+}
+
+/* ===== Cálculo de indicadores por fila (solo filas Cargado tienen datos completos) ===== */
+function metricsForRow(r){
+  var kg=toNum(r[C.CANT]);
+  var minutos=toNum(r[C.MIN]);
+  var kgMin=toNum(r[C.KGMIN]);
+  var personas=toNum(r[C.PER]);
+  var llegada=timeToMin(r[C.H_LLE]);
+  var ini=timeToMin(r[C.H_INI]);
+  var fin=timeToMin(r[C.H_FIN]);
+  var espera=(llegada!==null&&ini!==null&&ini>=llegada)?(ini-llegada):null;
+  var cargueNeto=minutos>0?minutos:((ini!==null&&fin!==null&&fin>ini)?(fin-ini):null);
+  var klHoraHombre=(personas>0&&cargueNeto>0)?((kg/(cargueNeto/60))/personas):null;
+  var klMinHombre=(personas>0&&kgMin>0)?(kgMin/personas):null;
+  return {kg:kg,kgOC:toNum(r[C.KG_OC]),kgMin:kgMin>0?kgMin:null,espera:espera,cargueNeto:cargueNeto,klHoraHombre:klHoraHombre,klMinHombre:klMinHombre};
+}
+
+function avg(arr){var v=arr.filter(function(x){return x!==null&&x!==undefined&&!isNaN(x);});if(!v.length)return null;return v.reduce(function(a,b){return a+b;},0)/v.length;}
+function sum(arr){return arr.reduce(function(a,b){return a+b;},0);}
+
+function renderGlobal(){
+  var cargados=allData.filter(function(r){return isCargado(r[C.STATUS]);});
+  var m=cargados.map(metricsForRow);
+  var kgTotal=sum(m.map(function(x){return x.kg;}));
+  var kgOCTotal=sum(allData.map(function(r){return toNum(r[C.KG_OC]);}));
+  var pct=kgOCTotal>0?Math.round(kgTotal/kgOCTotal*100):0;
+  document.getElementById('gTotal').textContent=allData.length.toLocaleString('es-CO');
+  document.getElementById('gKg').textContent=(kgTotal/1000).toFixed(1)+' T';
+  document.getElementById('gPct').textContent=pct+'%';
+  document.getElementById('gKlMin').textContent=(avg(m.map(function(x){return x.kgMin;}))||0).toFixed(1);
+  document.getElementById('gKlHoraHombre').textContent=(avg(m.map(function(x){return x.klHoraHombre;}))||0).toFixed(1);
+  document.getElementById('gKlMinHombre').textContent=(avg(m.map(function(x){return x.klMinHombre;}))||0).toFixed(1);
+  document.getElementById('gTiempoCargue').textContent=minToHM(avg(m.map(function(x){return x.cargueNeto;})));
+  document.getElementById('gTiempoEspera').textContent=minToHM(avg(m.map(function(x){return x.espera;})));
+}
+
+/* ===== Semana ISO simplificada (año calendario de la fecha) ===== */
+function getISOWeek(date){
+  var d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
+  var dayNum=(d.getUTCDay()+6)%7;
+  d.setUTCDate(d.getUTCDate()-dayNum+3);
+  var firstThursday=d.valueOf();
+  d.setUTCMonth(0,1);
+  if(d.getUTCDay()!==4) d.setUTCMonth(0,1+((4-d.getUTCDay())+7)%7);
+  return 1+Math.round((firstThursday-d)/604800000);
+}
+var MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function buildBuckets(mode){
+  var buckets={}; // key -> {label, sortKey, rows:[]}
+  allData.forEach(function(r){
+    var fecha=parseFecha(r[C.FECHA]);
+    if(!fecha) return;
+    var key,label,sortKey;
+    if(mode==='dia'){
+      key=r[C.FECHA].trim();
+      label=key;
+      sortKey=fecha.getTime();
+    } else if(mode==='semana'){
+      var wk=getISOWeek(fecha), yr=fecha.getFullYear();
+      key=yr+'-W'+wk;
+      label='Semana '+wk+' ('+yr+')';
+      sortKey=yr*100+wk;
+    } else {
+      var yr2=fecha.getFullYear(), mo=fecha.getMonth();
+      key=yr2+'-'+mo;
+      label=MESES[mo]+' '+yr2;
+      sortKey=yr2*100+mo;
+    }
+    if(!buckets[key]) buckets[key]={label:label,sortKey:sortKey,rows:[]};
+    buckets[key].rows.push(r);
+  });
+  return Object.keys(buckets).map(function(k){return buckets[k];}).sort(function(a,b){return b.sortKey-a.sortKey;});
+}
+
+function computeBucketStats(bucket){
+  var rows=bucket.rows;
+  var cargados=rows.filter(function(r){return isCargado(r[C.STATUS]);});
+  var m=cargados.map(metricsForRow);
+  var kgTotal=sum(m.map(function(x){return x.kg;}));
+  var kgOCTotal=sum(rows.map(function(r){return toNum(r[C.KG_OC]);}));
+  return {
+    label:bucket.label,
+    sortKey:bucket.sortKey,
+    vehiculos:rows.length,
+    kg:kgTotal,
+    pct:kgOCTotal>0?Math.round(kgTotal/kgOCTotal*100):0,
+    klMin:avg(m.map(function(x){return x.kgMin;})),
+    klHoraHombre:avg(m.map(function(x){return x.klHoraHombre;})),
+    klMinHombre:avg(m.map(function(x){return x.klMinHombre;})),
+    cargueNeto:avg(m.map(function(x){return x.cargueNeto;})),
+    espera:avg(m.map(function(x){return x.espera;}))
+  };
+}
+
+function setTab(mode){
+  currentTab=mode;
+  ['dia','semana','mes'].forEach(function(t){document.getElementById('tab-'+t).classList.toggle('active',t===mode);});
+  if(!allData.length) return;
+  var buckets=buildBuckets(mode).map(computeBucketStats);
+  var titulo=mode==='dia'?'Detalle Diario':mode==='semana'?'Detalle Semanal':'Detalle Mensual';
+  document.getElementById('tableTitle').textContent=titulo;
+  document.getElementById('chartTitle').textContent='Evolución de Kg Cargados — '+(mode==='dia'?'por día':mode==='semana'?'por semana':'por mes');
+
+  document.getElementById('periodBody').innerHTML = buckets.length ? buckets.map(function(b,i){
+    return '<tr'+(i===0?' class="trow-top"':'')+'>'
+      +'<td class="left">'+b.label+'</td>'
+      +'<td>'+b.vehiculos+'</td>'
+      +'<td>'+(b.kg/1000).toFixed(2)+' T</td>'
+      +'<td>'+b.pct+'%</td>'
+      +'<td>'+(b.klMin!==null?b.klMin.toFixed(1):'—')+'</td>'
+      +'<td>'+(b.klHoraHombre!==null?b.klHoraHombre.toFixed(1):'—')+'</td>'
+      +'<td>'+(b.klMinHombre!==null?b.klMinHombre.toFixed(1):'—')+'</td>'
+      +'<td>'+minToHM(b.cargueNeto)+'</td>'
+      +'<td>'+minToHM(b.espera)+'</td>'
+      +'</tr>';
+  }).join('') : '<tr><td colspan="9" class="empty">Sin datos</td></tr>';
+
+  // Gráfica: últimos 20 períodos, ordenados de más antiguo a más reciente
+  var chartBuckets=buckets.slice(0,20).slice().reverse();
+  var labels=chartBuckets.map(function(b){return b.label;});
+  var data=chartBuckets.map(function(b){return parseFloat((b.kg/1000).toFixed(2));});
+  if(chartRef){chartRef.destroy();}
+  chartRef=new Chart(document.getElementById('chartEvol'),{
+    type:'bar',
+    data:{labels:labels,datasets:[{label:'Ton Cargadas',data:data,backgroundColor:'#7c3aed',borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},
+      datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v+'T':'';}},
+      tooltip:{callbacks:{label:function(c){return c.raw+' Ton';}}}},
+      scales:{x:{ticks:{font:{size:9},color:'#64748b',maxRotation:35},grid:{display:false}},
+        y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}
+  });
+}
+</script>
+</body>
+</html>
