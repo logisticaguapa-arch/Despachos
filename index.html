@@ -67,7 +67,7 @@ tbody tr:hover{background:#f8fafc}
 @media(max-width:900px){.kpi-row{grid-template-columns:repeat(3,1fr)}}
 @media print{
   *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
-  .filter-bar,.progress-wrap,#refreshBtn,#pdfBtn,#resultadosBtn,.ubadge,.header-right{display:none !important}
+  .filter-bar,.progress-wrap,#refreshBtn,#pdfBtn,#resultadosBtn,#controlBtn,.ubadge,.header-right{display:none !important}
   body{background:white !important}
   .container{padding:6px 10px !important;gap:8px !important}
   .card,.table-card{box-shadow:none !important;border:1px solid #e2e8f0 !important;page-break-inside:avoid !important}
@@ -86,6 +86,7 @@ tbody tr:hover{background:#f8fafc}
     <span class="ubadge" id="lastUpdate">Cargando...</span>
     <span class="ubadge" id="countdown"></span>
     <a id="resultadosBtn" href="resultados.html">📊 Resultados</a>
+    <a id="controlBtn" href="control-operativo.html" style="background:#0f172a;border:none;color:white;padding:6px 14px;border-radius:6px;font-size:0.78rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:4px">🧭 Control Operativo</a>
     <button id="refreshBtn" onclick="fetchData()">↻ Actualizar</button>
     <button id="pdfBtn" onclick="downloadPDF()">⬇ Descargar PDF</button>
   </div>
