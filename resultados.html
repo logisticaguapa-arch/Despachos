@@ -49,6 +49,7 @@ header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:10px 20px;displ
 .kpi.c6{border-top-color:#0ea5e9}.kpi.c6 .v{color:#0ea5e9}
 .kpi.c7{border-top-color:#ea580c}.kpi.c7 .v{color:#ea580c}
 .kpi.c8{border-top-color:#a855f7}.kpi.c8 .v{color:#a855f7}
+.kpi.c9{border-top-color:#0d9488}.kpi.c9 .v{color:#0d9488}
 
 .section-title{font-size:0.8rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:8px;margin-top:4px}
 
@@ -111,7 +112,7 @@ tbody tr:hover{background:#f8fafc}
   </div>
 
   <div class="banner-info">
-    ℹ️ Los promedios se calculan directamente sobre los datos de la hoja (ya corregidos en la fuente). Solo se descartan registros sin tiempo de cargue registrado (división por cero).
+    ℹ️ Los kilos se toman siempre de la Columna F (KG CARGADOS). El indicador Kg/Min se calcula aquí como Columna F ÷ minutos de cargue — no se lee directamente de la columna ya calculada en la hoja.
   </div>
 
   <div class="section-title">📈 Indicadores Históricos (todo el período disponible)</div>
@@ -124,6 +125,7 @@ tbody tr:hover{background:#f8fafc}
     <div class="kpi c6"><div class="v" id="gKlMinHombre">—</div><div class="l">👷 KL/Min/Hombre</div></div>
     <div class="kpi c7"><div class="v" id="gTiempoCargue">—</div><div class="l">⏱️ Tiempo Cargue Neto</div></div>
     <div class="kpi c8"><div class="v" id="gTiempoEspera">—</div><div class="l">🕐 Tiempo de Espera</div></div>
+    <div class="kpi c9"><div class="v" id="gPctCitas">—</div><div class="l">📅 Cumplimiento de Citas</div></div>
   </div>
 
   <div class="tabs">
@@ -180,6 +182,14 @@ tbody tr:hover{background:#f8fafc}
         <div class="metric-card">
           <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Tiempo</th></tr></thead><tbody id="tblEspera"></tbody></table></div>
           <div class="metric-chart-wrap"><canvas id="chartEspera" height="180"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📅 % Cumplimiento de Citas (llegada de los carros)</div>
+        <div class="metric-card">
+          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>% Cumpl.</th><th>Citas</th></tr></thead><tbody id="tblCitas"></tbody></table></div>
+          <div class="metric-chart-wrap"><canvas id="chartCitas" height="180"></canvas></div>
         </div>
       </div>
 
@@ -243,12 +253,15 @@ var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8
 var allData=[], charts={}, currentTab='semana', retryCount=0, MAX_AUTO_RETRIES=3;
 
 /* ===== Umbral mínimo de seguridad =====
-Los datos de origen ya fueron corregidos manualmente en la hoja, así que aquí
-solo se descarta lo estrictamente imposible (minutos en cero, división por
-cero). Ya NO se aplica ningún techo artificial a Kg/Min: el promedio se calcula
-de forma directa sobre los datos reales, igual que la tabla dinámica. */
+Los kilos siempre se toman de la Columna F (KG CARGADOS). El Kg/Min NO se lee
+de la columna precalculada de la hoja (columna S) — se calcula aquí mismo como
+Kilos (Col. F) ÷ Minutos de cargue, para no depender de esa columna si llegara
+a tener algún error de fórmula. */
 var MIN_MINUTOS_VALIDOS = 1;
-var KGMIN_MAX_RAZONABLE = Infinity;
+/* Margen de tolerancia para considerar una llegada "a tiempo" respecto a la
+   hora de cita, igual al que ya usa la alerta de "Cita VENCIDA" en el tablero
+   principal. */
+var TOLERANCIA_CITA_MIN = 10;
 
 function normStr(s){return(s||'').toLowerCase().trim();}
 function isCargado(s){return normStr(s)==='cargado';}
@@ -319,21 +332,18 @@ Los registros con minutos casi en cero (error de digitación) se marcan como
 null y quedan fuera de los promedios, pero el kg despachado sigue siendo real
 y se sigue sumando en los totales. */
 function metricsForRow(r){
-  var kg=toNum(r[C.CANT]);
-  var minutosRaw=toNum(r[C.MIN]);
-  var kgMinRaw=toNum(r[C.KGMIN]);
+  var kg=toNum(r[C.CANT]); // Columna F: KG CARGADOS — única fuente de kilos para graficar
   var personas=toNum(r[C.PER]);
   var llegada=timeToMin(r[C.H_LLE]);
   var ini=timeToMin(r[C.H_INI]);
   var fin=timeToMin(r[C.H_FIN]);
-
-  var minutos = (minutosRaw>=MIN_MINUTOS_VALIDOS) ? minutosRaw : null;
-  var kgMin = (kgMinRaw>0 && kgMinRaw<=KGMIN_MAX_RAZONABLE && minutos!==null) ? kgMinRaw : null;
+  var minutosRaw=toNum(r[C.MIN]);
+  var minutos = minutosRaw>0 ? minutosRaw : ((ini!==null&&fin!==null&&fin>ini)?(fin-ini):null);
 
   var espera=(llegada!==null&&ini!==null&&ini>=llegada)?(ini-llegada):null;
-
-  var cargueNetoCalc = minutos!==null ? minutos : ((ini!==null&&fin!==null&&fin>ini)?(fin-ini):null);
-  var cargueNeto = (cargueNetoCalc!==null && cargueNetoCalc>=MIN_MINUTOS_VALIDOS) ? cargueNetoCalc : null;
+  var cargueNeto = (minutos!==null && minutos>=MIN_MINUTOS_VALIDOS) ? minutos : null;
+  // Kg/Min calculado aquí = Columna F (kilos cargados) ÷ minutos de cargue, NO se toma de la columna S de la hoja
+  var kgMin = (cargueNeto!==null && kg>0) ? (kg/cargueNeto) : null;
 
   var tiempoTotal=(llegada!==null&&fin!==null&&fin>=llegada)?(fin-llegada):null;
   if(tiempoTotal!==null && tiempoTotal<=0) tiempoTotal=null;
@@ -360,6 +370,18 @@ function renderGlobal(){
   document.getElementById('gKlMinHombre').textContent=(avg(m.map(function(x){return x.klMinHombre;}))||0).toFixed(1);
   document.getElementById('gTiempoCargue').textContent=minToHM(avg(m.map(function(x){return x.cargueNeto;})));
   document.getElementById('gTiempoEspera').textContent=minToHM(avg(m.map(function(x){return x.espera;})));
+
+  // % Cumplimiento de Citas: se calcula sobre TODOS los registros (no solo Cargado),
+  // ya que un vehículo que nunca llegó también incumple su cita.
+  var totalCitasG=0, citasCumplidasG=0;
+  allData.forEach(function(rw){
+    var cita=timeToMin(rw[C.H_CITA]);
+    if(cita===null) return;
+    totalCitasG++;
+    var lleg=timeToMin(rw[C.H_LLE]);
+    if(lleg!==null && lleg<=cita+TOLERANCIA_CITA_MIN) citasCumplidasG++;
+  });
+  document.getElementById('gPctCitas').textContent = totalCitasG>0 ? Math.round(citasCumplidasG/totalCitasG*100)+'%' : '—';
 }
 
 /* ===== Semana ISO (número de semana dentro del año) ===== */
@@ -405,6 +427,17 @@ function computeBucketStats(bucket){
   var kgOCTotal=sum(rows.map(function(r){return toNum(r[C.KG_OC]);}));
   var kgCanasta=sum(m.filter(function(x){return x.empaque==='CANASTA';}).map(function(x){return x.kg;}));
   var kgGranel=sum(m.filter(function(x){return x.empaque==='GRANEL';}).map(function(x){return x.kg;}));
+
+  // % Cumplimiento de Citas: sobre todos los registros del período (llegaron o no)
+  var totalCitas=0, citasCumplidas=0;
+  rows.forEach(function(rw){
+    var cita=timeToMin(rw[C.H_CITA]);
+    if(cita===null) return;
+    totalCitas++;
+    var lleg=timeToMin(rw[C.H_LLE]);
+    if(lleg!==null && lleg<=cita+TOLERANCIA_CITA_MIN) citasCumplidas++;
+  });
+
   return {
     label:bucket.label,
     vehiculos:rows.length,
@@ -417,7 +450,9 @@ function computeBucketStats(bucket){
     espera:avg(m.map(function(x){return x.espera;})),
     tiempoTotal:avg(m.map(function(x){return x.tiempoTotal;})),
     pctCanasta:kgTotal>0?Math.round(kgCanasta/kgTotal*100):null,
-    pctGranel:kgTotal>0?Math.round(kgGranel/kgTotal*100):null
+    pctGranel:kgTotal>0?Math.round(kgGranel/kgTotal*100):null,
+    pctCitas: totalCitas>0 ? Math.round(citasCumplidas/totalCitas*100) : null,
+    totalCitas: totalCitas
   };
 }
 
@@ -501,6 +536,12 @@ function renderSemanal(){
     return '<tr><td class="left">'+b.label+'</td><td>'+minToHM(b.espera)+'</td></tr>';
   }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+minToHM(avg(buckets.map(function(b){return b.espera;})))+'</td></tr>';
   lineChart('chartEspera',labels,buckets.map(function(b){return b.espera;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+
+  // % Cumplimiento de Citas
+  document.getElementById('tblCitas').innerHTML=buckets.map(function(b){
+    return '<tr><td class="left">'+b.label+'</td><td>'+(b.pctCitas!==null?b.pctCitas+'%':'—')+'</td><td>'+b.totalCitas+'</td></tr>';
+  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+(avg(buckets.map(function(b){return b.pctCitas;}))||0).toFixed(0)+'%</td><td>'+sum(buckets.map(function(b){return b.totalCitas;}))+'</td></tr>';
+  lineChart('chartCitas',labels,buckets.map(function(b){return b.pctCitas;}),{color:'#0d9488',labelFormatter:function(v){return v!==null?v+'%':'';},tooltipFormatter:function(v){return v+'%';},yOptions:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'},min:0,max:100}});
 
   // % Kg por Empaque (Canasta vs Granel)
   dc('chartEmpaque');
