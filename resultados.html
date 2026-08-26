@@ -62,10 +62,7 @@ header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:10px 20px;displ
 .card-title{font-size:0.78rem;font-weight:700;color:#374151;margin-bottom:10px;display:flex;align-items:center;gap:6px}
 .card-title::before{content:'';width:3px;height:13px;background:#7c3aed;border-radius:2px;display:inline-block}
 
-.metric-card{display:flex;gap:14px;align-items:stretch}
-.metric-table-wrap{flex:0 0 220px;max-height:280px;overflow-y:auto;border-radius:8px;border:1px solid #f1f5f9}
-.metric-chart-wrap{flex:1;min-width:0}
-@media(max-width:800px){.metric-card{flex-direction:column}.metric-table-wrap{flex:none;max-height:180px}}
+.metric-chart-wrap{width:100%}
 
 table{width:100%;border-collapse:collapse;font-size:0.72rem}
 th{padding:6px 8px;background:#1e293b;color:#94a3b8;font-weight:700;text-transform:uppercase;font-size:0.58rem;letter-spacing:0.3px;white-space:nowrap;text-align:right;position:sticky;top:0}
@@ -139,58 +136,37 @@ tbody tr:hover{background:#f8fafc}
 
       <div class="card">
         <div class="card-title">⚡ KL/MIN Cargados semanal</div>
-        <div class="metric-card">
-          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Kg/Min</th><th>Cant Despachada</th></tr></thead><tbody id="tblKlMin"></tbody></table></div>
-          <div class="metric-chart-wrap"><canvas id="chartKlMin" height="180"></canvas></div>
-        </div>
+        <div class="metric-chart-wrap"><canvas id="chartKlMin" height="180"></canvas></div>
       </div>
 
       <div class="card">
         <div class="card-title">🕐 Tiempo total (llegada → fin de cargue) promedio semanal</div>
-        <div class="metric-card">
-          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Tiempo</th></tr></thead><tbody id="tblTiempoTotal"></tbody></table></div>
-          <div class="metric-chart-wrap"><canvas id="chartTiempoTotal" height="180"></canvas></div>
-        </div>
+        <div class="metric-chart-wrap"><canvas id="chartTiempoTotal" height="180"></canvas></div>
       </div>
 
       <div class="card">
         <div class="card-title">👷 KL/HORA/HOMBRE promedio semanal</div>
-        <div class="metric-card">
-          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Kl/Hora/H</th><th>Cant Despachada</th></tr></thead><tbody id="tblKlHoraHombre"></tbody></table></div>
-          <div class="metric-chart-wrap"><canvas id="chartKlHoraHombre" height="180"></canvas></div>
-        </div>
+        <div class="metric-chart-wrap"><canvas id="chartKlHoraHombre" height="180"></canvas></div>
       </div>
 
       <div class="card">
         <div class="card-title">👷 KL/MIN/HOMBRE promedio semanal</div>
-        <div class="metric-card">
-          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Kl/Min/H</th><th>Cant Despachada</th></tr></thead><tbody id="tblKlMinHombre"></tbody></table></div>
-          <div class="metric-chart-wrap"><canvas id="chartKlMinHombre" height="180"></canvas></div>
-        </div>
+        <div class="metric-chart-wrap"><canvas id="chartKlMinHombre" height="180"></canvas></div>
       </div>
 
       <div class="card">
         <div class="card-title">⏱️ Tiempo de Cargue Neto (inicio → fin) promedio semanal</div>
-        <div class="metric-card">
-          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Tiempo</th><th>Cant Despachada</th></tr></thead><tbody id="tblCargueNeto"></tbody></table></div>
-          <div class="metric-chart-wrap"><canvas id="chartCargueNeto" height="180"></canvas></div>
-        </div>
+        <div class="metric-chart-wrap"><canvas id="chartCargueNeto" height="180"></canvas></div>
       </div>
 
       <div class="card">
         <div class="card-title">🕐 Tiempo de Espera (llegada → inicio) promedio semanal</div>
-        <div class="metric-card">
-          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>Tiempo</th></tr></thead><tbody id="tblEspera"></tbody></table></div>
-          <div class="metric-chart-wrap"><canvas id="chartEspera" height="180"></canvas></div>
-        </div>
+        <div class="metric-chart-wrap"><canvas id="chartEspera" height="180"></canvas></div>
       </div>
 
       <div class="card">
         <div class="card-title">📅 % Cumplimiento de Citas (llegada de los carros)</div>
-        <div class="metric-card">
-          <div class="metric-table-wrap"><table><thead><tr><th class="left">Semana</th><th>% Cumpl.</th><th>Citas</th></tr></thead><tbody id="tblCitas"></tbody></table></div>
-          <div class="metric-chart-wrap"><canvas id="chartCitas" height="180"></canvas></div>
-        </div>
+        <div class="metric-chart-wrap"><canvas id="chartCitas" height="180"></canvas></div>
       </div>
 
     </div>
@@ -510,46 +486,18 @@ function renderSemanal(){
   if(!buckets.length) return;
   var labels=buckets.map(function(b){return b.label;});
 
-  // Tabla + gráfico: KL/MIN
-  document.getElementById('tblKlMin').innerHTML=buckets.map(function(b){
-    return '<tr><td class="left">'+b.label+'</td><td>'+(b.klMin!==null?b.klMin.toFixed(1):'—')+'</td><td>'+Math.round(b.kg).toLocaleString('es-CO')+'</td></tr>';
-  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+(avg(buckets.map(function(b){return b.klMin;}))||0).toFixed(1)+'</td><td>'+Math.round(sum(buckets.map(function(b){return b.kg;}))).toLocaleString('es-CO')+'</td></tr>';
   lineChart('chartKlMin',labels,buckets.map(function(b){return b.klMin!==null?parseFloat(b.klMin.toFixed(1)):null;}),{color:'#1e6f8f'});
 
-  // Tiempo total llegada->fin
-  document.getElementById('tblTiempoTotal').innerHTML=buckets.map(function(b){
-    return '<tr><td class="left">'+b.label+'</td><td>'+minToHM(b.tiempoTotal)+'</td></tr>';
-  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+minToHM(avg(buckets.map(function(b){return b.tiempoTotal;})))+'</td></tr>';
   lineChart('chartTiempoTotal',labels,buckets.map(function(b){return b.tiempoTotal;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
-  // KL/HORA/HOMBRE
-  document.getElementById('tblKlHoraHombre').innerHTML=buckets.map(function(b){
-    return '<tr><td class="left">'+b.label+'</td><td>'+(b.klHoraHombre!==null?Math.round(b.klHoraHombre):'—')+'</td><td>'+Math.round(b.kg).toLocaleString('es-CO')+'</td></tr>';
-  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+Math.round(avg(buckets.map(function(b){return b.klHoraHombre;}))||0)+'</td><td>'+Math.round(sum(buckets.map(function(b){return b.kg;}))).toLocaleString('es-CO')+'</td></tr>';
   lineChart('chartKlHoraHombre',labels,buckets.map(function(b){return b.klHoraHombre!==null?Math.round(b.klHoraHombre):null;}),{color:'#1e6f8f'});
 
-  // KL/MIN/HOMBRE
-  document.getElementById('tblKlMinHombre').innerHTML=buckets.map(function(b){
-    return '<tr><td class="left">'+b.label+'</td><td>'+(b.klMinHombre!==null?b.klMinHombre.toFixed(1):'—')+'</td><td>'+Math.round(b.kg).toLocaleString('es-CO')+'</td></tr>';
-  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+(avg(buckets.map(function(b){return b.klMinHombre;}))||0).toFixed(1)+'</td><td>'+Math.round(sum(buckets.map(function(b){return b.kg;}))).toLocaleString('es-CO')+'</td></tr>';
   lineChart('chartKlMinHombre',labels,buckets.map(function(b){return b.klMinHombre!==null?parseFloat(b.klMinHombre.toFixed(1)):null;}),{color:'#1e6f8f'});
 
-  // Tiempo cargue neto (inicio->fin)
-  document.getElementById('tblCargueNeto').innerHTML=buckets.map(function(b){
-    return '<tr><td class="left">'+b.label+'</td><td>'+minToHM(b.cargueNeto)+'</td><td>'+Math.round(b.kg).toLocaleString('es-CO')+'</td></tr>';
-  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+minToHM(avg(buckets.map(function(b){return b.cargueNeto;})))+'</td><td>'+Math.round(sum(buckets.map(function(b){return b.kg;}))).toLocaleString('es-CO')+'</td></tr>';
   lineChart('chartCargueNeto',labels,buckets.map(function(b){return b.cargueNeto;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
-  // Tiempo de espera (llegada->inicio)
-  document.getElementById('tblEspera').innerHTML=buckets.map(function(b){
-    return '<tr><td class="left">'+b.label+'</td><td>'+minToHM(b.espera)+'</td></tr>';
-  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+minToHM(avg(buckets.map(function(b){return b.espera;})))+'</td></tr>';
   lineChart('chartEspera',labels,buckets.map(function(b){return b.espera;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
-  // % Cumplimiento de Citas
-  document.getElementById('tblCitas').innerHTML=buckets.map(function(b){
-    return '<tr><td class="left">'+b.label+'</td><td>'+(b.pctCitas!==null?b.pctCitas+'%':'—')+'</td><td>'+b.totalCitas+'</td></tr>';
-  }).join('')+'<tr class="trow-total"><td class="left">Total gral.</td><td>'+(avg(buckets.map(function(b){return b.pctCitas;}))||0).toFixed(0)+'%</td><td>'+sum(buckets.map(function(b){return b.totalCitas;}))+'</td></tr>';
   lineChart('chartCitas',labels,buckets.map(function(b){return b.pctCitas;}),{color:'#0d9488',labelFormatter:function(v){return v!==null?v+'%':'';},tooltipFormatter:function(v){return v+'%';},yOptions:{ticks:{font:{size:9},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'},min:0,max:100}});
 
   // % Kg por Empaque (Canasta vs Granel)
