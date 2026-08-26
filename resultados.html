@@ -258,10 +258,19 @@ de la columna precalculada de la hoja (columna S) — se calcula aquí mismo com
 Kilos (Col. F) ÷ Minutos de cargue, para no depender de esa columna si llegara
 a tener algún error de fórmula. */
 var MIN_MINUTOS_VALIDOS = 1;
-/* Margen de tolerancia para considerar una llegada "a tiempo" respecto a la
-   hora de cita, igual al que ya usa la alerta de "Cita VENCIDA" en el tablero
-   principal. */
-var TOLERANCIA_CITA_MIN = 10;
+/* % de cumplimiento de cita, proporcional al retraso:
+   - Llegó a tiempo o antes de la cita -> 100%
+   - Llegó tarde -> baja en línea recta hasta 0% a los MAX_RETRASO_CITA_MIN minutos
+   - Nunca llegó -> 0% */
+var MAX_RETRASO_CITA_MIN = 30;
+function citaCompliancePct(citaMin, llegadaMin){
+  if(citaMin===null) return null; // sin cita registrada, no aplica
+  if(llegadaMin===null) return 0; // nunca llegó
+  var retraso=llegadaMin-citaMin;
+  if(retraso<=0) return 100;
+  if(retraso>=MAX_RETRASO_CITA_MIN) return 0;
+  return Math.round(100*(1-retraso/MAX_RETRASO_CITA_MIN));
+}
 
 function normStr(s){return(s||'').toLowerCase().trim();}
 function isCargado(s){return normStr(s)==='cargado';}
@@ -371,17 +380,16 @@ function renderGlobal(){
   document.getElementById('gTiempoCargue').textContent=minToHM(avg(m.map(function(x){return x.cargueNeto;})));
   document.getElementById('gTiempoEspera').textContent=minToHM(avg(m.map(function(x){return x.espera;})));
 
-  // % Cumplimiento de Citas: se calcula sobre TODOS los registros (no solo Cargado),
-  // ya que un vehículo que nunca llegó también incumple su cita.
-  var totalCitasG=0, citasCumplidasG=0;
+  // % Cumplimiento de Citas: promedio del % individual de cada vehículo
+  // (100% si llegó a tiempo, baja proporcionalmente hasta 0% a los 30 min tarde).
+  var citaPctsG=[];
   allData.forEach(function(rw){
     var cita=timeToMin(rw[C.H_CITA]);
     if(cita===null) return;
-    totalCitasG++;
     var lleg=timeToMin(rw[C.H_LLE]);
-    if(lleg!==null && lleg<=cita+TOLERANCIA_CITA_MIN) citasCumplidasG++;
+    citaPctsG.push(citaCompliancePct(cita,lleg));
   });
-  document.getElementById('gPctCitas').textContent = totalCitasG>0 ? Math.round(citasCumplidasG/totalCitasG*100)+'%' : '—';
+  document.getElementById('gPctCitas').textContent = citaPctsG.length ? Math.round(avg(citaPctsG))+'%' : '—';
 }
 
 /* ===== Semana ISO (número de semana dentro del año) ===== */
@@ -428,15 +436,16 @@ function computeBucketStats(bucket){
   var kgCanasta=sum(m.filter(function(x){return x.empaque==='CANASTA';}).map(function(x){return x.kg;}));
   var kgGranel=sum(m.filter(function(x){return x.empaque==='GRANEL';}).map(function(x){return x.kg;}));
 
-  // % Cumplimiento de Citas: sobre todos los registros del período (llegaron o no)
-  var totalCitas=0, citasCumplidas=0;
+  // % Cumplimiento de Citas: promedio del % individual de cada vehículo del período
+  var citaPcts=[];
   rows.forEach(function(rw){
     var cita=timeToMin(rw[C.H_CITA]);
     if(cita===null) return;
-    totalCitas++;
     var lleg=timeToMin(rw[C.H_LLE]);
-    if(lleg!==null && lleg<=cita+TOLERANCIA_CITA_MIN) citasCumplidas++;
+    citaPcts.push(citaCompliancePct(cita,lleg));
   });
+  var pctCitas = citaPcts.length ? Math.round(avg(citaPcts)) : null;
+  var totalCitas = citaPcts.length;
 
   return {
     label:bucket.label,
@@ -451,7 +460,7 @@ function computeBucketStats(bucket){
     tiempoTotal:avg(m.map(function(x){return x.tiempoTotal;})),
     pctCanasta:kgTotal>0?Math.round(kgCanasta/kgTotal*100):null,
     pctGranel:kgTotal>0?Math.round(kgGranel/kgTotal*100):null,
-    pctCitas: totalCitas>0 ? Math.round(citasCumplidas/totalCitas*100) : null,
+    pctCitas: pctCitas,
     totalCitas: totalCitas
   };
 }
