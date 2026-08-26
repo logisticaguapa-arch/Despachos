@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control Operativo - Despachos SYOP</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
+
+/* Lock screen (reutiliza el mismo patrón de Resultados) */
+#lockScreen{position:fixed;inset:0;background:linear-gradient(135deg,#0f172a,#1e3a5f);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px}
+.lock-card{background:white;border-radius:16px;padding:36px 32px;max-width:340px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.3)}
+.lock-icon{font-size:2.5rem;margin-bottom:10px}
+.lock-card h2{font-size:1.1rem;color:#1e293b;margin-bottom:6px}
+.lock-card p{font-size:0.78rem;color:#64748b;margin-bottom:18px;line-height:1.4}
+#passInput{width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.95rem;margin-bottom:12px;text-align:center;letter-spacing:2px}
+#lockBtn{width:100%;padding:11px;background:#0f172a;color:white;border:none;border-radius:8px;font-size:0.9rem;font-weight:700;cursor:pointer}
+#passError{color:#dc2626;font-size:0.76rem;margin-top:10px;display:none;font-weight:600}
+
+header{background:linear-gradient(90deg,#0f172a,#1e3a5f);padding:14px 20px}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.hdr-title h1{color:#fff;font-size:1.15rem;font-weight:800;letter-spacing:.3px}
+.hdr-title span{display:block;color:#93c5fd;font-size:.68rem;font-weight:600;letter-spacing:1px;margin-top:2px}
+.hdr-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hdr-badge{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#cbd5e1;padding:5px 12px;border-radius:20px;font-size:.7rem;font-weight:600}
+.hdr-link{background:#2563eb;color:#fff;border:none;padding:7px 14px;border-radius:7px;font-size:.76rem;font-weight:700;text-decoration:none;cursor:pointer}
+.hdr-link.alt{background:rgba(255,255,255,.12)}
+
+.period-bar{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;align-items:center}
+.pbtn{padding:6px 13px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.06);color:#cbd5e1;border-radius:20px;font-size:.72rem;font-weight:700;cursor:pointer;font-family:inherit}
+.pbtn.active{background:#2563eb;border-color:#2563eb;color:#fff}
+#customRange{display:none;gap:6px;align-items:center}
+#customRange input{padding:5px 8px;border-radius:6px;border:none;font-size:.72rem}
+
+.filter-bar{background:#fff;padding:10px 20px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-bottom:1px solid #e2e8f0}
+.msel{position:relative}
+.msel-btn{padding:7px 12px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;color:#1e293b;font-size:.74rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:8px;min-width:110px;justify-content:space-between}
+.msel.open .msel-btn{border-color:#2563eb}
+.msel-panel{display:none;position:absolute;top:calc(100% + 5px);left:0;z-index:60;background:#fff;border:1px solid #e2e8f0;border-radius:9px;box-shadow:0 10px 28px rgba(0,0,0,.14);padding:6px;min-width:210px;max-height:260px;overflow-y:auto}
+.msel.open .msel-panel{display:block}
+.msel-panel label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:.78rem;font-weight:600;color:#1e293b;cursor:pointer}
+.msel-panel label:hover{background:#f1f5f9}
+.msel-panel input[type=checkbox]{width:15px;height:15px;accent-color:#2563eb}
+.msel-actions{display:flex;gap:6px;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid #f1f5f9}
+.msel-actions button{flex:1;padding:5px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#475569;font-size:.7rem;font-weight:700;cursor:pointer;font-family:inherit}
+.range-input{display:flex;align-items:center;gap:5px;font-size:.72rem;color:#64748b;font-weight:600}
+.range-input input{width:64px;padding:6px 7px;border:1px solid #e2e8f0;border-radius:6px;font-size:.72rem}
+#btnClearAll{padding:7px 14px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;color:#dc2626;cursor:pointer;font-size:.72rem;font-weight:700;font-family:inherit}
+
+.container{padding:14px 20px;display:grid;gap:16px;max-width:1500px;margin:0 auto}
+.level-title{font-size:.72rem;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:8px;margin-top:6px}
+.level-title .n{background:#0f172a;color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:1000px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-top:3px solid #e2e8f0}
+.kpi .v{font-size:1.65rem;font-weight:800;line-height:1;color:#0f172a}
+.kpi .l{font-size:.66rem;color:#64748b;text-transform:uppercase;letter-spacing:.4px;font-weight:700;margin-top:4px}
+.kpi .delta{font-size:.7rem;font-weight:700;margin-top:6px;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:10px}
+.delta.up{background:#dcfce7;color:#15803d}.delta.down{background:#fef2f2;color:#dc2626}.delta.flat{background:#f1f5f9;color:#64748b}
+
+.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.card-title{font-size:.82rem;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:7px}
+.card-title::before{content:'';width:3px;height:14px;background:#2563eb;border-radius:2px}
+.card-sub{font-size:.68rem;color:#94a3b8;margin-top:2px}
+.seg{display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:8px}
+.seg button{padding:5px 11px;border:none;background:transparent;color:#64748b;font-size:.7rem;font-weight:700;border-radius:6px;cursor:pointer;font-family:inherit}
+.seg button.active{background:#fff;color:#2563eb;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+@media(max-width:1000px){.grid2,.grid3{grid-template-columns:1fr}}
+
+table.rtable{width:100%;border-collapse:collapse;font-size:.74rem}
+table.rtable th{padding:8px 10px;background:#0f172a;color:#94a3b8;font-weight:700;text-transform:uppercase;font-size:.62rem;letter-spacing:.3px;text-align:right;white-space:nowrap;cursor:pointer;user-select:none}
+table.rtable th.left{text-align:left}
+table.rtable th:hover{color:#fff}
+table.rtable td{padding:7px 10px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap;color:#1e293b}
+table.rtable td.left{text-align:left;font-weight:700}
+table.rtable tbody tr:hover{background:#f8fafc}
+.medal{font-size:1rem;margin-right:4px}
+.stat-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.stat-chip{background:#f8fafc;border-radius:8px;padding:8px 12px;flex:1;min-width:90px;text-align:center}
+.stat-chip .sv{font-size:1rem;font-weight:800;color:#1e293b}
+.stat-chip .sl{font-size:.62rem;color:#64748b;font-weight:700;text-transform:uppercase}
+
+.alert-card{border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;border:1px solid}
+.alert-card.crit{background:#fff1f2;border-color:#fecaca}
+.alert-card.warn{background:#fffbeb;border-color:#fde68a}
+.alert-card .ac-n{font-size:1.4rem;font-weight:800}
+.alert-card.crit .ac-n{color:#dc2626}.alert-card.warn .ac-n{color:#b45309}
+.alert-card .ac-l{font-size:.72rem;font-weight:700;color:#374151;flex:1}
+.alert-detail{display:none;margin-top:8px;max-height:220px;overflow-y:auto;background:#fff;border-radius:8px;padding:6px}
+.alert-detail.open{display:block}
+.alert-row{padding:6px 8px;font-size:.72rem;border-bottom:1px solid #f1f5f9;display:flex;gap:8px}
+.alert-row b{color:#dc2626;min-width:65px}
+
+.heat-table{width:100%;border-collapse:collapse;font-size:.64rem}
+.heat-table th{padding:4px;background:#0f172a;color:#94a3b8;font-size:.6rem}
+.heat-table td{padding:0;text-align:center;height:26px;color:#fff;font-weight:700;font-size:.6rem}
+
+.dtable-wrap{overflow-x:auto;max-height:560px;overflow-y:auto;border-radius:8px}
+.dtable-tools{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+#dSearch{flex:1;min-width:180px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:7px;font-size:.76rem}
+.exportBtn{padding:8px 14px;background:#16a34a;color:#fff;border:none;border-radius:7px;font-size:.74rem;font-weight:700;cursor:pointer}
+.pager{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:10px;font-size:.74rem;color:#64748b}
+.pager button{padding:5px 10px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;font-weight:700}
+.pager button:disabled{opacity:.4;cursor:default}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.62rem;font-weight:700;text-transform:uppercase}
+.badge-ok{background:#dcfce7;color:#15803d}.badge-warn{background:#fef3c7;color:#b45309}.badge-bad{background:#fee2e2;color:#dc2626}
+
+.empty{text-align:center;padding:26px;color:#94a3b8;font-size:.82rem}
+.donut-legend{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.legend-item{display:flex;align-items:center;gap:7px;font-size:.72rem}
+.legend-dot{width:9px;height:9px;border-radius:50%}
+.legend-label{color:#374151;flex:1}.legend-val{font-weight:800;color:#1e293b}
+
+@media(max-width:700px){.filter-bar,.container{padding-left:12px;padding-right:12px}}
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <h2>Control Operativo — Despachos</h2>
+    <p>Acceso restringido a supervisión y jefatura del área.<br>Ingresa la contraseña para continuar.</p>
+    <input type="password" id="passInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkPass()">
+    <button id="lockBtn" onclick="checkPass()">Ingresar</button>
+    <div id="passError">Contraseña incorrecta, intenta de nuevo.</div>
+  </div>
+</div>
+
+<div id="mainContent" style="display:none">
+
+<header>
+  <div class="hdr-top">
+    <div class="hdr-title">
+      <h1>DESPACHOS — CONTROL OPERATIVO Y RENDIMIENTO</h1>
+      <span id="hdrMeta">Cargando…</span>
+    </div>
+    <div class="hdr-right">
+      <span class="hdr-badge" id="lastUpdate">—</span>
+      <a class="hdr-link alt" href="index.html">← Tablero en vivo</a>
+      <a class="hdr-link alt" href="resultados.html">📊 Resultados semanales</a>
+    </div>
+  </div>
+  <div class="period-bar" id="periodBar">
+    <button class="pbtn" data-p="hoy">Hoy</button>
+    <button class="pbtn" data-p="ayer">Ayer</button>
+    <button class="pbtn" data-p="7d">Últimos 7 días</button>
+    <button class="pbtn active" data-p="30d">Últimos 30 días</button>
+    <button class="pbtn" data-p="mes">Este mes</button>
+    <button class="pbtn" data-p="mesant">Mes anterior</button>
+    <button class="pbtn" data-p="todo">Todo el histórico</button>
+    <button class="pbtn" data-p="custom">Personalizado</button>
+    <span id="customRange"><input type="date" id="custStart"> a <input type="date" id="custEnd"><button class="pbtn" onclick="aplicarCustom()">Aplicar</button></span>
+  </div>
+</header>
+
+<div class="filter-bar" id="filterBar"></div>
+
+<div class="container">
+
+  <!-- NIVEL 1 -->
+  <div class="level-title"><span class="n">1</span>¿Cómo estamos? — KPIs ejecutivos</div>
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- NIVEL 2 -->
+  <div class="level-title"><span class="n">2</span>¿Cuánto hemos movido? — Volumen y cumplimiento</div>
+  <div class="card">
+    <div class="card-hdr">
+      <div><div class="card-title">Kg Programados vs Kg Cargados</div><div class="card-sub" id="volSub">—</div></div>
+      <div class="seg" id="volSeg">
+        <button data-g="dia" class="active">Día</button>
+        <button data-g="semana">Semana</button>
+        <button data-g="mes">Mes</button>
+      </div>
+    </div>
+    <canvas id="chartVolumen" height="80"></canvas>
+  </div>
+
+  <!-- NIVEL 3 -->
+  <div class="level-title"><span class="n">3</span>¿Qué tan eficientes somos? — Rendimiento y tiempos</div>
+  <div class="grid2">
+    <div class="card"><div class="card-title">Rendimiento Kg/Min por día</div><canvas id="chartKgMinDia" height="90"></canvas></div>
+    <div class="card"><div class="card-title">Rendimiento Kg/Hora por día</div><canvas id="chartKgHoraDia" height="90"></canvas></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="card-title">Tiempo promedio de cargue por día (min)</div><canvas id="chartTiempoDia" height="90"></canvas></div>
+    <div class="card">
+      <div class="card-title">Distribución de tiempos de cargue</div>
+      <canvas id="chartDistribucion" height="90"></canvas>
+      <div class="stat-row" id="statsCargue"></div>
+    </div>
+  </div>
+
+  <!-- NIVEL 4 -->
+  <div class="level-title"><span class="n">4</span>¿Dónde está el problema? — Cuadrillas, clientes, destinos y alertas</div>
+
+  <div class="card">
+    <div class="card-hdr"><div class="card-title">🏆 Ranking de Cuadrillas (por rendimiento Kg/Min)</div></div>
+    <div class="dtable-wrap"><table class="rtable" id="tblCuadrillas"></table></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-title">Ranking de Clientes</div>
+        <div class="seg" id="segCliente">
+          <button data-m="kg" class="active">Volumen</button>
+          <button data-m="tiempo">Tiempo</button>
+          <button data-m="rend">Rendimiento</button>
+          <button data-m="cumpl">Cumplimiento</button>
+        </div>
+      </div>
+      <div class="dtable-wrap"><table class="rtable" id="tblClientes"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div class="card-title">Ranking de Destinos</div></div>
+      <div class="dtable-wrap"><table class="rtable" id="tblDestinos"></table></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">🔄 Ciclo del Vehículo — tiempos promedio por etapa</div>
+      <canvas id="chartCiclo" height="90"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><div class="card-title">🚛 Ranking de Vehículos (por N° de viajes)</div></div>
+      <div class="dtable-wrap"><table class="rtable" id="tblVehiculos"></table></div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">📦 Canastillas</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px" id="kpiCanastillas"></div>
+      <canvas id="chartCanastillas" height="90"></canvas>
+      <div class="donut-legend" id="legendCanastillas"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">👷 Personal — Kg por persona por cuadrilla</div>
+      <canvas id="chartPersonal" height="140"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr">
+      <div class="card-title">🕐 Heatmap Operativo — Día vs Hora</div>
+      <div class="seg" id="segHeat">
+        <button data-h="desp" class="active">Despachos</button>
+        <button data-h="kg">Kg cargados</button>
+        <button data-h="kgmin">Kg/Min</button>
+        <button data-h="tiempo">Tiempo cargue</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto"><table class="heat-table" id="heatTable"></table></div>
+  </div>
+
+  <div class="level-title"><span class="n">⚠</span>Alertas operativas</div>
+  <div class="grid3" id="alertGrid"></div>
+
+  <!-- NIVEL 5 -->
+  <div class="level-title"><span class="n">5</span>¿Qué pasó en cada despacho? — Detalle operativo</div>
+  <div class="card">
+    <div class="dtable-tools">
+      <input id="dSearch" placeholder="Buscar por OC, cliente, placa, destino…" oninput="renderDetalle()">
+      <button class="exportBtn" onclick="exportCSV()">⬇ Exportar CSV</button>
+    </div>
+    <div class="dtable-wrap"><table class="rtable" id="tblDetalle"></table></div>
+    <div class="pager" id="pager"></div>
+  </div>
+
+</div>
+
+</div>
+
+<script>
+Chart.register(ChartDataLabels);
+/* ==================================================================
+   CONTROL OPERATIVO DE DESPACHOS
+   Reutiliza exactamente la misma fuente de datos (CSV publicado) y el
+   mismo mapeo de columnas que index.html y resultados.html. No se
+   modifica la conexión, ni se inventan datos.
+   ================================================================== */
+
+/* ---------- Contraseña (mismo patrón que resultados.html) ---------- */
+var CLAVE_ACCESO='GuapaSYOP2026';
+function checkPass(){
+  if(document.getElementById('passInput').value===CLAVE_ACCESO){ sessionStorage.setItem('controlUnlocked','1'); unlock(); }
+  else document.getElementById('passError').style.display='block';
+}
+function unlock(){ document.getElementById('lockScreen').style.display='none'; document.getElementById('mainContent').style.display='block'; fetchData(); }
+if(sessionStorage.getItem('controlUnlocked')==='1') unlock();
+
+/* ---------- Misma fuente CSV y mapeo de columnas ---------- */
+var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
+var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8,H_OC:9,H_CITA:10,H_LLE:11,H_SALIDA:12,H_INI:13,H_FIN:14,STATUS:15,OBS:16,HS:17,MIN:18,KGMIN:19,EMP:20,MUE:21,CUA:22,PER:23,CONDUCTOR:24,CC_COND:25,TEL_COND:26,CAN_ENCAJABLES:27,CAN_GRANDES:28,CAN_PEQUENAS:29};
+
+/* ---------- Umbrales configurables (sección 24 del spec) ----------
+   Si se dejan en null, se calculan automáticamente por percentiles
+   sobre los datos históricos reales (no se inventan objetivos). */
+var OBJETIVO_CUMPLIMIENTO=90;      // % mínimo aceptable
+var OBJETIVO_RENDIMIENTO=null;     // Kg/Min mínimo aceptable (null = p25 histórico)
+var MAX_TIEMPO_ESPERA=null;        // minutos (null = p75 histórico)
+var MAX_TIEMPO_CARGUE=null;        // minutos (null = p75 histórico)
+
+var allData=[], allMetrics=[], filteredMetrics=[], charts={};
+var periodMode='30d', periodStart=null, periodEnd=null;
+var filtros={clientes:[],destinos:[],status:[],placas:[],empaques:[],muelles:[],cuadrillas:[],conductores:[],kgMin:null,kgMax:null,rendMin:null,rendMax:null};
+var volGranularidad='dia', clienteMetric='kg', heatMetric='desp';
+var detallePage=1, detallePageSize=50, detalleSortCol='fecha', detalleSortDir=-1;
+
+function normStr(s){return(s||'').toLowerCase().trim();}
+function isCargado(s){return normStr(s)==='cargado';}
+function toNum(v){if(!v)return 0;var s=v.toString().replace(/"/g,'').replace('%','').trim();s=s.replace(/\./g,'').replace(',','.');return parseFloat(s)||0;}
+function timeToMin(t){if(!t)return null;var s=(t+'').trim();var m12=s.match(/(\d+):(\d+)(?::\d+)?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);if(m12){var h=parseInt(m12[1]),m=parseInt(m12[2]),pm=/p/i.test(m12[3]);if(pm&&h!==12)h+=12;if(!pm&&h===12)h=0;return h*60+m;}var p=s.split(':');if(p.length>=2)return parseInt(p[0])*60+parseInt(p[1]);return null;}
+function parseFecha(s){var p=(s||'').split('/');if(p.length===3){var d=parseInt(p[0]),m=parseInt(p[1]),y=parseInt(p[2]);if(y<100)y+=2000;return new Date(y,m-1,d);}return null;}
+function minToHM(m){if(m===null||m===undefined||isNaN(m))return'—';m=Math.round(m);var h=Math.floor(m/60),mi=m%60;return h+':'+(mi<10?'0'+mi:mi);}
+function fmtN(n){return Math.round(n).toLocaleString('es-CO');}
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function diffMinutesSafe(a,b){ if(a===null||b===null) return null; var d=b-a; if(d>=0) return d; if(d<-720) return d+1440; return null; }
+function percentile(arr,p){ var v=arr.filter(function(x){return x!==null&&!isNaN(x);}).slice().sort(function(a,b){return a-b;}); if(!v.length) return null; var idx=(p/100)*(v.length-1); var lo=Math.floor(idx),hi=Math.ceil(idx); if(lo===hi) return v[lo]; return v[lo]+(v[hi]-v[lo])*(idx-lo); }
+function avg(arr){var v=arr.filter(function(x){return x!==null&&x!==undefined&&!isNaN(x);});if(!v.length)return null;return v.reduce(function(a,b){return a+b;},0)/v.length;}
+function sum(arr){return arr.reduce(function(a,b){return a+(b||0);},0);}
+
+function parseCSV(txt){
+  var lines=txt.trim().split('\n');
+  if(lines.length<2)return[];
+  return lines.slice(1).map(function(line){
+    var cols=[],cur='',inQ=false;
+    for(var i=0;i<line.length;i++){var ch=line[i];if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){cols.push(cur.trim());cur='';}else{cur+=ch;}}
+    cols.push(cur.trim());
+    return cols;
+  }).filter(function(r){
+    var oc=(r[C.OC]||'').replace(/"/g,'').trim();
+    if(!oc)return false;
+    var lo=oc.toLowerCase();
+    return lo!=='oc'&&lo.indexOf('cargue')<0&&lo.indexOf('minutos')<0&&lo.indexOf('empaque')<0&&lo.indexOf('fecha')<0;
+  });
+}
+
+/* ---------- Métricas por fila (fórmulas documentadas, sección 4) ---------- */
+function metricsForRow(r){
+  var fecha=parseFecha(r[C.FECHA]);
+  var kgOC=toNum(r[C.KG_OC]);
+  var kg=toNum(r[C.CANT]);            // Columna F: KG CARGADOS
+  var personas=toNum(r[C.PER]);
+  var citaMin=timeToMin(r[C.H_CITA]);
+  var llegadaMin=timeToMin(r[C.H_LLE]);
+  var iniMin=timeToMin(r[C.H_INI]);
+  var finMin=timeToMin(r[C.H_FIN]);
+  var salidaMin=timeToMin(r[C.H_SALIDA]);
+  var minutosRaw=toNum(r[C.MIN]);
+  // Minutos cargue = columna de la hoja si es válida, si no FIN-INICIO
+  var minutos = minutosRaw>0?minutosRaw:((iniMin!==null&&finMin!==null&&finMin>iniMin)?(finMin-iniMin):null);
+  // Kg/Min = KG CARGADOS / Minutos cargue (se calcula aquí, no se lee de la columna precalculada)
+  var kgMin=(minutos&&minutos>0&&kg>0)?(kg/minutos):null;
+  var kgHora=kgMin!==null?kgMin*60:null;
+  var espera=diffMinutesSafe(llegadaMin,iniMin);          // H inicio Cargue - H llegada
+  var tCargue=diffMinutesSafe(iniMin,finMin);              // FIN CARGUE - H inicio Cargue
+  var tPost=diffMinutesSafe(finMin,salidaMin);             // H.SALIDA - FIN CARGUE
+  var tTotal=diffMinutesSafe(llegadaMin,salidaMin);        // H.SALIDA - H llegada
+  var tCitaLlegada=(citaMin!==null&&llegadaMin!==null)?(llegadaMin-citaMin):null; // H llegada - H Cita
+  var kgPersona=(personas>0&&kg>0)?(kg/personas):null;     // KG CARGADOS / CANT. PERSONA
+  var kgMinPersona=(personas>0&&kgMin!==null)?(kgMin/personas):null; // Kg/Min / CANT. PERSONA
+  var canEnc=toNum(r[C.CAN_ENCAJABLES]), canGra=toNum(r[C.CAN_GRANDES]), canPeq=toNum(r[C.CAN_PEQUENAS]);
+  return {
+    row:r, fecha:fecha, fechaStr:r[C.FECHA]||'',
+    oc:r[C.OC]||'', remision:(r[C.REMISION]||'').trim(), destino:(r[C.DESTINO]||'').trim(),
+    cliente:(r[C.CLIENTE]||'').trim()||'Sin cliente', placa:(r[C.PLACAS]||'').trim(),
+    muelle:(r[C.MUE]||'').trim()||'Sin muelle', cuadrilla:(r[C.CUA]||'').trim()||'Sin cuadrilla',
+    conductor:(r[C.CONDUCTOR]||'').trim(), empaque:(r[C.EMP]||'').trim().toUpperCase()||'SIN DATO',
+    status:(r[C.STATUS]||'').trim(), isCargado:isCargado(r[C.STATUS]),
+    kgOC:kgOC, kg:kg, pctCumpl: kgOC>0?(kg/kgOC*100):null,
+    personas:personas, minutos:minutos, kgMin:kgMin, kgHora:kgHora,
+    espera:espera, tCargue:tCargue, tPost:tPost, tTotal:tTotal, tCitaLlegada:tCitaLlegada,
+    kgPersona:kgPersona, kgMinPersona:kgMinPersona,
+    canEnc:canEnc, canGra:canGra, canPeq:canPeq, canTotal:canEnc+canGra+canPeq,
+    citaMin:citaMin, llegadaMin:llegadaMin, iniMin:iniMin, finMin:finMin, salidaMin:salidaMin
+  };
+}
+
+/* ---------- Detección de alertas por fila ---------- */
+function detectAlerts(m){
+  var a=[];
+  if(m.isCargado){
+    if(m.llegadaMin===null) a.push('Sin hora de llegada');
+    if(m.iniMin===null) a.push('Sin inicio de cargue');
+    if(m.finMin===null) a.push('Sin fin de cargue');
+    if(m.salidaMin===null) a.push('Sin hora de salida');
+  }
+  if(m.cuadrilla==='Sin cuadrilla') a.push('Sin cuadrilla');
+  if(!m.placa) a.push('Sin placa');
+  if(m.cliente==='Sin cliente') a.push('Sin cliente');
+  if(!m.destino) a.push('Sin destino');
+  if(m.finMin!==null&&m.iniMin!==null&&m.finMin<m.iniMin&&(m.iniMin-m.finMin)<720) a.push('Fin de cargue antes del inicio');
+  if(m.salidaMin!==null&&m.finMin!==null&&m.salidaMin<m.finMin&&(m.finMin-m.salidaMin)<720) a.push('Salida antes de fin de cargue');
+  if(m.kgOC>0&&m.kg>m.kgOC*1.02) a.push('Kg cargados superan Kg OC');
+  if(m.kgMin!==null&&m.kgMin<=0) a.push('Rendimiento inválido');
+  return a;
+}
+
+/* ---------- Carga de datos (misma conexión existente) ---------- */
+async function fetchData(){
+  try{
+    var res=await fetch(CSV_URL+'&t='+Date.now());
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    var txt=await res.text();
+    allData=parseCSV(txt);
+    allMetrics=allData.map(metricsForRow);
+    document.getElementById('lastUpdate').textContent='🟢 '+new Date().toLocaleTimeString('es-CO');
+    buildFilters();
+    setPeriod('30d');
+  }catch(e){
+    document.getElementById('lastUpdate').textContent='🔴 Error: '+e.message;
+  }
+}
+
+/* ---------- Selector de período ---------- */
+document.getElementById('periodBar').addEventListener('click',function(e){
+  var b=e.target.closest('.pbtn');
+  if(!b) return;
+  var p=b.dataset.p;
+  if(!p) return;
+  document.querySelectorAll('.pbtn').forEach(function(x){x.classList.remove('active');});
+  b.classList.add('active');
+  document.getElementById('customRange').style.display = p==='custom' ? 'inline-flex' : 'none';
+  if(p!=='custom') setPeriod(p);
+});
+function aplicarCustom(){
+  var s=document.getElementById('custStart').value, e=document.getElementById('custEnd').value;
+  if(!s||!e) return;
+  periodMode='custom'; periodStart=new Date(s+'T00:00:00'); periodEnd=new Date(e+'T23:59:59');
+  render();
+}
+function setPeriod(mode){
+  periodMode=mode;
+  var hoy=new Date(); hoy.setHours(23,59,59,999);
+  var ini=new Date(hoy);
+  if(mode==='hoy'){ ini=new Date(); ini.setHours(0,0,0,0); }
+  else if(mode==='ayer'){ ini=new Date(); ini.setDate(ini.getDate()-1); ini.setHours(0,0,0,0); hoy=new Date(ini); hoy.setHours(23,59,59,999); }
+  else if(mode==='7d'){ ini.setDate(ini.getDate()-6); ini.setHours(0,0,0,0); }
+  else if(mode==='30d'){ ini.setDate(ini.getDate()-29); ini.setHours(0,0,0,0); }
+  else if(mode==='mes'){ ini=new Date(hoy.getFullYear(),hoy.getMonth(),1); }
+  else if(mode==='mesant'){ ini=new Date(hoy.getFullYear(),hoy.getMonth()-1,1); hoy=new Date(hoy.getFullYear(),hoy.getMonth(),0,23,59,59); }
+  else if(mode==='todo'){ ini=null; }
+  periodStart=ini; periodEnd=hoy;
+  render();
+}
+function getPreviousPeriodRange(){
+  if(!periodStart||!periodEnd) return null;
+  var days=Math.round((periodEnd-periodStart)/86400000)+1;
+  var prevEnd=new Date(periodStart); prevEnd.setDate(prevEnd.getDate()-1); prevEnd.setHours(23,59,59,999);
+  var prevStart=new Date(prevEnd); prevStart.setDate(prevStart.getDate()-(days-1)); prevStart.setHours(0,0,0,0);
+  return {start:prevStart,end:prevEnd};
+}
+
+/* ---------- Filtros multi-selección ---------- */
+var MSEL_DEFS=[
+  {id:'fCliente',key:'clientes',label:'Cliente',getter:function(m){return m.cliente;}},
+  {id:'fDestino',key:'destinos',label:'Destino',getter:function(m){return m.destino||'(Sin destino)';}},
+  {id:'fStatus',key:'status',label:'Status',getter:function(m){return m.status||'(Sin status)';}},
+  {id:'fPlaca',key:'placas',label:'Placa',getter:function(m){return m.placa||'(Sin placa)';}},
+  {id:'fEmpaque',key:'empaques',label:'Empaque',getter:function(m){return m.empaque;}},
+  {id:'fMuelle',key:'muelles',label:'Muelle',getter:function(m){return m.muelle;}},
+  {id:'fCuadrilla',key:'cuadrillas',label:'Cuadrilla',getter:function(m){return m.cuadrilla;}},
+  {id:'fConductor',key:'conductores',label:'Conductor',getter:function(m){return m.conductor||'(Sin conductor)';}}
+];
+function buildFilters(){
+  var bar=document.getElementById('filterBar');
+  var html='';
+  MSEL_DEFS.forEach(function(def){
+    html+='<div class="msel" id="'+def.id+'"><button type="button" class="msel-btn" onclick="toggleMsel(\''+def.id+'\')"><span id="'+def.id+'-label">'+def.label+'</span><span>▾</span></button><div class="msel-panel" id="'+def.id+'-panel"></div></div>';
+  });
+  html+='<div class="range-input">Kg <input type="number" id="rKgMin" placeholder="min" onchange="onRangeChange()"> - <input type="number" id="rKgMax" placeholder="max" onchange="onRangeChange()"></div>';
+  html+='<div class="range-input">Kg/Min <input type="number" id="rRendMin" placeholder="min" onchange="onRangeChange()"> - <input type="number" id="rRendMax" placeholder="max" onchange="onRangeChange()"></div>';
+  html+='<button id="btnClearAll" onclick="clearAllFilters()">✖ Limpiar filtros</button>';
+  bar.innerHTML=html;
+  MSEL_DEFS.forEach(function(def){
+    var vals=[...new Set(allMetrics.map(def.getter))].filter(Boolean).sort();
+    fillMsel(def,vals);
+  });
+}
+function fillMsel(def,vals){
+  var panel=document.getElementById(def.id+'-panel');
+  var html='<div class="msel-actions"><button type="button" onclick="mselAll(\''+def.id+'\')">Todos</button><button type="button" onclick="mselNone(\''+def.id+'\')">Ninguno</button></div>';
+  html+=vals.map(function(v){
+    var checked=filtros[def.key].includes(v)?'checked':'';
+    return '<label><input type="checkbox" value="'+v.replace(/"/g,'&quot;')+'" '+checked+' onchange="onMselChange(\''+def.id+'\',\''+def.key+'\',this)">'+v+'</label>';
+  }).join('');
+  panel.innerHTML=html;
+}
+function toggleMsel(id){
+  var el=document.getElementById(id), wasOpen=el.classList.contains('open');
+  document.querySelectorAll('.msel.open').forEach(function(m){m.classList.remove('open');});
+  if(!wasOpen) el.classList.add('open');
+}
+document.addEventListener('click',function(e){ if(!e.target.closest('.msel')) document.querySelectorAll('.msel.open').forEach(function(m){m.classList.remove('open');}); });
+function onMselChange(id,key,cb){
+  if(cb.checked){ if(!filtros[key].includes(cb.value)) filtros[key].push(cb.value); }
+  else filtros[key]=filtros[key].filter(function(x){return x!==cb.value;});
+  updateMselLabel(id,key); render();
+}
+function mselAll(id){
+  var def=MSEL_DEFS.find(function(d){return d.id===id;});
+  document.querySelectorAll('#'+id+'-panel input[type=checkbox]').forEach(function(cb){cb.checked=true;if(!filtros[def.key].includes(cb.value))filtros[def.key].push(cb.value);});
+  updateMselLabel(id,def.key); render();
+}
+function mselNone(id){
+  var def=MSEL_DEFS.find(function(d){return d.id===id;});
+  document.querySelectorAll('#'+id+'-panel input[type=checkbox]').forEach(function(cb){cb.checked=false;});
+  filtros[def.key]=[]; updateMselLabel(id,def.key); render();
+}
+function updateMselLabel(id,key){
+  var def=MSEL_DEFS.find(function(d){return d.id===id;});
+  var n=filtros[key].length;
+  document.getElementById(id+'-label').textContent = n===0?def.label:(def.label+' ('+n+')');
+}
+function onRangeChange(){
+  filtros.kgMin=parseFloat(document.getElementById('rKgMin').value)||null;
+  filtros.kgMax=parseFloat(document.getElementById('rKgMax').value)||null;
+  filtros.rendMin=parseFloat(document.getElementById('rRendMin').value)||null;
+  filtros.rendMax=parseFloat(document.getElementById('rRendMax').value)||null;
+  render();
+}
+function clearAllFilters(){
+  MSEL_DEFS.forEach(function(def){ filtros[def.key]=[]; updateMselLabel(def.id,def.key); document.querySelectorAll('#'+def.id+'-panel input[type=checkbox]').forEach(function(cb){cb.checked=false;}); });
+  filtros.kgMin=filtros.kgMax=filtros.rendMin=filtros.rendMax=null;
+  ['rKgMin','rKgMax','rRendMin','rRendMax'].forEach(function(id){document.getElementById(id).value='';});
+  render();
+}
+
+/* ---------- Aplicar período + filtros ---------- */
+function applyAll(){
+  filteredMetrics = allMetrics.filter(function(m){
+    if(periodStart&&m.fecha&&m.fecha<periodStart) return false;
+    if(periodEnd&&m.fecha&&m.fecha>periodEnd) return false;
+    if(periodStart&&!m.fecha) return false;
+    if(filtros.clientes.length&&!filtros.clientes.includes(m.cliente)) return false;
+    if(filtros.destinos.length&&!filtros.destinos.includes(m.destino||'(Sin destino)')) return false;
+    if(filtros.status.length&&!filtros.status.includes(m.status||'(Sin status)')) return false;
+    if(filtros.placas.length&&!filtros.placas.includes(m.placa||'(Sin placa)')) return false;
+    if(filtros.empaques.length&&!filtros.empaques.includes(m.empaque)) return false;
+    if(filtros.muelles.length&&!filtros.muelles.includes(m.muelle)) return false;
+    if(filtros.cuadrillas.length&&!filtros.cuadrillas.includes(m.cuadrilla)) return false;
+    if(filtros.conductores.length&&!filtros.conductores.includes(m.conductor||'(Sin conductor)')) return false;
+    if(filtros.kgMin!==null&&m.kg<filtros.kgMin) return false;
+    if(filtros.kgMax!==null&&m.kg>filtros.kgMax) return false;
+    if(filtros.rendMin!==null&&(m.kgMin===null||m.kgMin<filtros.rendMin)) return false;
+    if(filtros.rendMax!==null&&(m.kgMin===null||m.kgMin>filtros.rendMax)) return false;
+    return true;
+  });
+}
+
+/* ---------- Render maestro ---------- */
+function render(){
+  applyAll();
+  var fmtDate=function(d){return d?d.toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}):'—';};
+  document.getElementById('hdrMeta').textContent = (periodStart?fmtDate(periodStart)+' — '+fmtDate(periodEnd):'Todo el histórico') + ' · ' + filteredMetrics.length.toLocaleString('es-CO') + ' registros analizados';
+  renderKPIs();
+  renderVolumen();
+  renderRendimientoDia();
+  renderDistribucion();
+  renderRankingCuadrillas();
+  renderRankingClientes();
+  renderRankingDestinos();
+  renderCiclo();
+  renderRankingVehiculos();
+  renderCanastillas();
+  renderPersonal();
+  renderHeatmap();
+  renderAlertas();
+  detallePage=1;
+  renderDetalle();
+}
+
+/* ---------- NIVEL 1: KPIs ejecutivos ---------- */
+function kpiSet(rows){
+  var cargados=rows.filter(function(m){return m.isCargado;});
+  var kgCargado=sum(rows.map(function(m){return m.kg;}));
+  var kgProgramado=sum(rows.map(function(m){return m.kgOC;}));
+  var cumpl=kgProgramado>0?(kgCargado/kgProgramado*100):null;
+  var despachos=[...new Set(rows.map(function(m){return m.remision;}).filter(Boolean))].length || rows.length;
+  var vehiculos=[...new Set(rows.map(function(m){return m.placa;}).filter(Boolean))].length;
+  var minutosTot=sum(cargados.map(function(m){return m.minutos||0;}));
+  var rendGlobal=minutosTot>0?(kgCargado/minutosTot):null; // SUM(kg)/SUM(min), no promedio simple
+  var tiempoProm=avg(cargados.map(function(m){return m.minutos;}));
+  var personas=sum(rows.map(function(m){return m.personas;}));
+  return {kgCargado:kgCargado,kgProgramado:kgProgramado,cumpl:cumpl,despachos:despachos,vehiculos:vehiculos,rendGlobal:rendGlobal,tiempoProm:tiempoProm,personas:personas};
+}
+function deltaHtml(cur,prev,invert){
+  if(prev===null||prev===undefined||prev===0||cur===null||cur===undefined) return '';
+  var d=((cur-prev)/Math.abs(prev))*100;
+  var up = invert ? d<0 : d>0;
+  var cls = Math.abs(d)<1?'flat':(up?'up':'down');
+  var arrow = Math.abs(d)<1?'→':(d>0?'↑':'↓');
+  return '<span class="delta '+cls+'">'+arrow+' '+(Math.abs(d)).toFixed(1)+'%</span>';
+}
+function renderKPIs(){
+  var cur=kpiSet(filteredMetrics);
+  var prevRange=getPreviousPeriodRange();
+  var prev=null;
+  if(prevRange){
+    var prevRows=allMetrics.filter(function(m){return m.fecha&&m.fecha>=prevRange.start&&m.fecha<=prevRange.end;});
+    prev=kpiSet(prevRows);
+  }
+  var items=[
+    {v:(cur.kgCargado/1000).toFixed(1)+' T',l:'📦 Kg Despachados',d:prev?deltaHtml(cur.kgCargado,prev.kgCargado):''},
+    {v:(cur.kgProgramado/1000).toFixed(1)+' T',l:'📋 Kg Programados',d:prev?deltaHtml(cur.kgProgramado,prev.kgProgramado):''},
+    {v:cur.cumpl!==null?cur.cumpl.toFixed(0)+'%':'—',l:'✅ Cumplimiento OC',d:prev?deltaHtml(cur.cumpl,prev.cumpl):''},
+    {v:cur.despachos.toLocaleString('es-CO'),l:'🚚 Despachos',d:prev?deltaHtml(cur.despachos,prev.despachos):''},
+    {v:cur.vehiculos.toLocaleString('es-CO'),l:'🚛 Vehículos Únicos',d:prev?deltaHtml(cur.vehiculos,prev.vehiculos):''},
+    {v:cur.rendGlobal!==null?cur.rendGlobal.toFixed(1)+' Kg/Min':'—',l:'⚡ Rendimiento (Σkg/Σmin)',d:prev?deltaHtml(cur.rendGlobal,prev.rendGlobal):''},
+    {v:cur.tiempoProm!==null?minToHM(cur.tiempoProm):'—',l:'⏱️ Tiempo Prom. Cargue',d:prev?deltaHtml(cur.tiempoProm,prev.tiempoProm,true):''},
+    {v:cur.personas.toLocaleString('es-CO'),l:'👷 Personas Involucradas',d:''}
+  ];
+  document.getElementById('kpiGrid').innerHTML=items.map(function(it){
+    return '<div class="kpi"><div class="v">'+it.v+'</div><div class="l">'+it.l+'</div>'+(it.d?'<div>'+it.d+'</div>':'')+'</div>';
+  }).join('');
+}
+
+/* ---------- NIVEL 2: Volumen y cumplimiento ---------- */
+document.getElementById('volSeg').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#volSeg button').forEach(function(x){x.classList.remove('active');});
+  b.classList.add('active'); volGranularidad=b.dataset.g; renderVolumen();
+});
+function bucketKey(fecha,gran){
+  if(gran==='dia') return fecha.toISOString().slice(0,10);
+  if(gran==='semana'){ var d=new Date(Date.UTC(fecha.getFullYear(),fecha.getMonth(),fecha.getDate())); var dn=(d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-dn+3); var ft=d.valueOf(); d.setUTCMonth(0,1); if(d.getUTCDay()!==4)d.setUTCMonth(0,1+((4-d.getUTCDay())+7)%7); var wk=1+Math.round((ft-d)/604800000); return fecha.getFullYear()+'-S'+wk; }
+  return fecha.getFullYear()+'-'+(fecha.getMonth()+1);
+}
+function renderVolumen(){
+  var rows=filteredMetrics.filter(function(m){return m.fecha;});
+  var buckets={};
+  rows.forEach(function(m){
+    var k=bucketKey(m.fecha,volGranularidad);
+    if(!buckets[k]) buckets[k]={kgOC:0,kg:0,sortKey:m.fecha.getTime()};
+    buckets[k].kgOC+=m.kgOC; buckets[k].kg+=m.kg;
+  });
+  var keys=Object.keys(buckets).sort(function(a,b){return buckets[a].sortKey-buckets[b].sortKey;});
+  var labels=keys.map(function(k){return volGranularidad==='dia'?k.slice(5):k;});
+  var kgOC=keys.map(function(k){return parseFloat((buckets[k].kgOC/1000).toFixed(2));});
+  var kg=keys.map(function(k){return parseFloat((buckets[k].kg/1000).toFixed(2));});
+  var totalOC=sum(kgOC), totalKg=sum(kg);
+  document.getElementById('volSub').textContent='Brecha total: '+(totalOC-totalKg).toFixed(1)+' T · Cumplimiento: '+(totalOC>0?Math.round(totalKg/totalOC*100):0)+'%';
+  dc('chartVolumen');
+  charts['chartVolumen']=new Chart(document.getElementById('chartVolumen'),{
+    data:{labels:labels,datasets:[
+      {type:'bar',label:'Kg Programado (T)',data:kgOC,backgroundColor:'#cbd5e1',borderRadius:4},
+      {type:'bar',label:'Kg Cargado (T)',data:kg,backgroundColor:'#2563eb',borderRadius:4}
+    ]},
+    options:{responsive:true,plugins:{legend:{display:true,position:'top',labels:{font:{size:10}}},
+      datalabels:{display:false},
+      tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.raw+' T';}}}},
+      scales:{x:{ticks:{font:{size:9},color:'#64748b',maxRotation:40},grid:{display:false}},
+        y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}
+  });
+}
+
+/* ---------- NIVEL 3: Rendimiento y tiempos ---------- */
+function renderRendimientoDia(){
+  var rows=filteredMetrics.filter(function(m){return m.fecha&&m.isCargado;});
+  var buckets={};
+  rows.forEach(function(m){
+    var k=m.fecha.toISOString().slice(0,10);
+    if(!buckets[k]) buckets[k]={kg:0,min:0,sortKey:m.fecha.getTime(),tiempos:[]};
+    buckets[k].kg+=m.kg; buckets[k].min+=(m.minutos||0);
+    if(m.minutos!==null) buckets[k].tiempos.push(m.minutos);
+  });
+  var keys=Object.keys(buckets).sort(function(a,b){return buckets[a].sortKey-buckets[b].sortKey;});
+  var labels=keys.map(function(k){return k.slice(5);});
+  var kgMinArr=keys.map(function(k){return buckets[k].min>0?parseFloat((buckets[k].kg/buckets[k].min).toFixed(1)):null;});
+  var kgHoraArr=kgMinArr.map(function(v){return v!==null?parseFloat((v*60).toFixed(0)):null;});
+  var tiempoArr=keys.map(function(k){var t=buckets[k].tiempos;return t.length?Math.round(avg(t)):null;});
+
+  dc('chartKgMinDia');
+  charts['chartKgMinDia']=new Chart(document.getElementById('chartKgMinDia'),{type:'line',data:{labels:labels,datasets:[{data:kgMinArr,borderColor:'#2563eb',backgroundColor:'#2563eb',tension:.3,pointRadius:2,borderWidth:2}]},
+    options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:false},tooltip:{callbacks:{label:function(c){return c.raw+' Kg/Min';}}}},
+      scales:{x:{ticks:{font:{size:8},color:'#64748b',maxRotation:60},grid:{display:false}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}});
+
+  dc('chartKgHoraDia');
+  charts['chartKgHoraDia']=new Chart(document.getElementById('chartKgHoraDia'),{type:'line',data:{labels:labels,datasets:[{data:kgHoraArr,borderColor:'#16a34a',backgroundColor:'#16a34a',tension:.3,pointRadius:2,borderWidth:2}]},
+    options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:false},tooltip:{callbacks:{label:function(c){return c.raw+' Kg/Hora';}}}},
+      scales:{x:{ticks:{font:{size:8},color:'#64748b',maxRotation:60},grid:{display:false}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}});
+
+  dc('chartTiempoDia');
+  charts['chartTiempoDia']=new Chart(document.getElementById('chartTiempoDia'),{type:'bar',data:{labels:labels,datasets:[{data:tiempoArr,backgroundColor:'#f59e0b',borderRadius:3}]},
+    options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:false},tooltip:{callbacks:{label:function(c){return minToHM(c.raw)+' min';}}}},
+      scales:{x:{ticks:{font:{size:8},color:'#64748b',maxRotation:60},grid:{display:false}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}});
+}
+
+function renderDistribucion(){
+  var tiempos=filteredMetrics.filter(function(m){return m.isCargado&&m.minutos!==null;}).map(function(m){return m.minutos;});
+  var bins=[[0,30],[30,60],[60,90],[90,120],[120,150],[150,180],[180,99999]];
+  var labels=['0-30','30-60','60-90','90-120','120-150','150-180','+180'];
+  var counts=bins.map(function(b){return tiempos.filter(function(t){return t>=b[0]&&t<b[1];}).length;});
+  dc('chartDistribucion');
+  charts['chartDistribucion']=new Chart(document.getElementById('chartDistribucion'),{type:'bar',data:{labels:labels,datasets:[{data:counts,backgroundColor:'#7c3aed',borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v:'';}},tooltip:{enabled:true}},
+      scales:{x:{title:{display:true,text:'Minutos de cargue',font:{size:9}},ticks:{font:{size:9},color:'#64748b'},grid:{display:false}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}});
+  var stats=[
+    {l:'Promedio',v:minToHM(avg(tiempos))},
+    {l:'Mediana',v:minToHM(percentile(tiempos,50))},
+    {l:'Mínimo',v:tiempos.length?minToHM(Math.min.apply(null,tiempos)):'—'},
+    {l:'Máximo',v:tiempos.length?minToHM(Math.max.apply(null,tiempos)):'—'},
+    {l:'P90',v:tiempos.length>=10?minToHM(percentile(tiempos,90)):'N/D'}
+  ];
+  document.getElementById('statsCargue').innerHTML=stats.map(function(s){return '<div class="stat-chip"><div class="sv">'+s.v+'</div><div class="sl">'+s.l+'</div></div>';}).join('');
+}
+
+/* ---------- Agrupador genérico por campo ---------- */
+function groupBy(rows,keyFn){
+  var g={};
+  rows.forEach(function(m){
+    var k=keyFn(m); if(!k) return;
+    if(!g[k]) g[k]={key:k,rows:[]};
+    g[k].rows.push(m);
+  });
+  return Object.keys(g).map(function(k){return g[k];});
+}
+function statsForGroup(rows){
+  var cargados=rows.filter(function(m){return m.isCargado;});
+  var kg=sum(rows.map(function(m){return m.kg;}));
+  var kgOC=sum(rows.map(function(m){return m.kgOC;}));
+  var min=sum(cargados.map(function(m){return m.minutos||0;}));
+  var kgMinGlobal=min>0?(kg/min):null;
+  var tiempoProm=avg(cargados.map(function(m){return m.minutos;}));
+  var personas=sum(rows.map(function(m){return m.personas;}));
+  return {n:rows.length,kg:kg,kgOC:kgOC,cumpl:kgOC>0?(kg/kgOC*100):null,minutos:min,kgMin:kgMinGlobal,kgHora:kgMinGlobal!==null?kgMinGlobal*60:null,tiempoProm:tiempoProm,personas:personas,vehiculos:[...new Set(rows.map(function(m){return m.placa;}).filter(Boolean))].length};
+}
+
+/* ---------- Ranking de Cuadrillas ---------- */
+function renderRankingCuadrillas(){
+  var groups=groupBy(filteredMetrics,function(m){return m.cuadrilla;});
+  var data=groups.map(function(g){return Object.assign({nombre:g.key},statsForGroup(g.rows));});
+  data.sort(function(a,b){return (b.kgMin||0)-(a.kgMin||0);});
+  var medals=['🥇','🥈','🥉'];
+  var html='<thead><tr><th class="left">Cuadrilla</th><th>Despachos</th><th>Kg Cargados</th><th>Minutos</th><th>Kg/Min</th><th>Kg/Hora</th><th>Tiempo Prom.</th><th>Kg/Persona</th><th>Cumpl.</th></tr></thead><tbody>';
+  html+=data.map(function(d,i){
+    var kgPersona=d.personas>0?(d.kg/d.personas):null;
+    return '<tr><td class="left">'+(medals[i]||'')+d.nombre+'</td><td>'+d.n+'</td><td>'+fmtN(d.kg)+'</td><td>'+fmtN(d.minutos)+'</td><td><strong>'+(d.kgMin!==null?d.kgMin.toFixed(1):'—')+'</strong></td><td>'+(d.kgHora!==null?fmtN(d.kgHora):'—')+'</td><td>'+minToHM(d.tiempoProm)+'</td><td>'+(kgPersona!==null?fmtN(kgPersona):'—')+'</td><td>'+(d.cumpl!==null?d.cumpl.toFixed(0)+'%':'—')+'</td></tr>';
+  }).join('');
+  html+='</tbody>';
+  document.getElementById('tblCuadrillas').innerHTML = data.length?html:'<tbody><tr><td class="empty" colspan="9">Sin datos para este período/filtro</td></tr></tbody>';
+}
+
+/* ---------- Ranking de Clientes ---------- */
+document.getElementById('segCliente').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#segCliente button').forEach(function(x){x.classList.remove('active');});
+  b.classList.add('active'); clienteMetric=b.dataset.m; renderRankingClientes();
+});
+function renderRankingClientes(){
+  var groups=groupBy(filteredMetrics,function(m){return m.cliente;});
+  var data=groups.map(function(g){return Object.assign({nombre:g.key},statsForGroup(g.rows));});
+  var sortFn={
+    kg:function(a,b){return b.kg-a.kg;},
+    tiempo:function(a,b){return (b.tiempoProm||0)-(a.tiempoProm||0);},
+    rend:function(a,b){return (b.kgMin||0)-(a.kgMin||0);},
+    cumpl:function(a,b){return (a.cumpl===null?999:a.cumpl)-(b.cumpl===null?999:b.cumpl);}
+  }[clienteMetric];
+  data.sort(sortFn);
+  data=data.slice(0,15);
+  var html='<thead><tr><th class="left">Cliente</th><th>Kg OC</th><th>Kg Cargados</th><th>Cumpl.</th><th>Despachos</th><th>Tiempo Prom.</th><th>Kg/Min</th><th>Vehículos</th></tr></thead><tbody>';
+  html+=data.map(function(d){
+    var badge=d.cumpl===null?'':(d.cumpl>=OBJETIVO_CUMPLIMIENTO?'<span class="badge badge-ok">'+d.cumpl.toFixed(0)+'%</span>':(d.cumpl>=OBJETIVO_CUMPLIMIENTO*0.8?'<span class="badge badge-warn">'+d.cumpl.toFixed(0)+'%</span>':'<span class="badge badge-bad">'+d.cumpl.toFixed(0)+'%</span>'));
+    return '<tr><td class="left">'+d.nombre+'</td><td>'+fmtN(d.kgOC)+'</td><td>'+fmtN(d.kg)+'</td><td>'+badge+'</td><td>'+d.n+'</td><td>'+minToHM(d.tiempoProm)+'</td><td>'+(d.kgMin!==null?d.kgMin.toFixed(1):'—')+'</td><td>'+d.vehiculos+'</td></tr>';
+  }).join('');
+  html+='</tbody>';
+  document.getElementById('tblClientes').innerHTML = data.length?html:'<tbody><tr><td class="empty" colspan="8">Sin datos</td></tr></tbody>';
+}
+
+/* ---------- Ranking de Destinos ---------- */
+function renderRankingDestinos(){
+  var groups=groupBy(filteredMetrics,function(m){return m.destino||'(Sin destino)';});
+  var data=groups.map(function(g){return Object.assign({nombre:g.key},statsForGroup(g.rows));});
+  data.sort(function(a,b){return b.kg-a.kg;});
+  data=data.slice(0,15);
+  var html='<thead><tr><th class="left">Destino</th><th>Kg Cargados</th><th>Cumpl.</th><th>Despachos</th><th>Tiempo Prom.</th><th>Kg/Min</th></tr></thead><tbody>';
+  html+=data.map(function(d){
+    return '<tr><td class="left">'+d.nombre+'</td><td>'+fmtN(d.kg)+'</td><td>'+(d.cumpl!==null?d.cumpl.toFixed(0)+'%':'—')+'</td><td>'+d.n+'</td><td>'+minToHM(d.tiempoProm)+'</td><td>'+(d.kgMin!==null?d.kgMin.toFixed(1):'—')+'</td></tr>';
+  }).join('');
+  html+='</tbody>';
+  document.getElementById('tblDestinos').innerHTML = data.length?html:'<tbody><tr><td class="empty" colspan="6">Sin datos</td></tr></tbody>';
+}
+
+/* ---------- Ranking de Vehículos ---------- */
+function renderRankingVehiculos(){
+  var groups=groupBy(filteredMetrics,function(m){return m.placa;});
+  var data=groups.map(function(g){
+    var s=statsForGroup(g.rows);
+    return {placa:g.key,n:g.rows.length,kg:s.kg,tiempoProm:s.tiempoProm,kgMin:s.kgMin,
+      cliente:g.rows[g.rows.length-1].cliente,destino:g.rows[g.rows.length-1].destino,
+      tTotal:avg(g.rows.map(function(m){return m.tTotal;}))};
+  });
+  data.sort(function(a,b){return b.n-a.n;});
+  data=data.slice(0,15);
+  var html='<thead><tr><th class="left">Placa</th><th>Viajes</th><th>Kg Cargados</th><th>Tiempo Cargue</th><th>Tiempo Total</th><th>Kg/Min</th></tr></thead><tbody>';
+  html+=data.map(function(d){
+    return '<tr><td class="left">'+d.placa+'</td><td>'+d.n+'</td><td>'+fmtN(d.kg)+'</td><td>'+minToHM(d.tiempoProm)+'</td><td>'+minToHM(d.tTotal)+'</td><td>'+(d.kgMin!==null?d.kgMin.toFixed(1):'—')+'</td></tr>';
+  }).join('');
+  html+='</tbody>';
+  document.getElementById('tblVehiculos').innerHTML = data.length?html:'<tbody><tr><td class="empty" colspan="6">Sin datos</td></tr></tbody>';
+}
+
+/* ---------- Ciclo del vehículo ---------- */
+function renderCiclo(){
+  var rows=filteredMetrics.filter(function(m){return m.isCargado;});
+  var etapas=[
+    {l:'Espera (llegada→inicio)',v:avg(rows.map(function(m){return m.espera;}))},
+    {l:'Cargue (inicio→fin)',v:avg(rows.map(function(m){return m.tCargue;}))},
+    {l:'Post-cargue (fin→salida)',v:avg(rows.map(function(m){return m.tPost;}))},
+    {l:'Total (llegada→salida)',v:avg(rows.map(function(m){return m.tTotal;}))}
+  ];
+  dc('chartCiclo');
+  charts['chartCiclo']=new Chart(document.getElementById('chartCiclo'),{type:'bar',
+    data:{labels:etapas.map(function(e){return e.l;}),datasets:[{data:etapas.map(function(e){return e.v!==null?Math.round(e.v):0;}),backgroundColor:['#0ea5e9','#2563eb','#7c3aed','#1e293b'],borderRadius:4}]},
+    options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return minToHM(v);}},tooltip:{callbacks:{label:function(c){return minToHM(c.raw);}}}},
+      scales:{x:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}}}}});
+}
+
+/* ---------- Canastillas ---------- */
+function renderCanastillas(){
+  var rows=filteredMetrics;
+  var enc=sum(rows.map(function(m){return m.canEnc;}));
+  var gra=sum(rows.map(function(m){return m.canGra;}));
+  var peq=sum(rows.map(function(m){return m.canPeq;}));
+  var total=enc+gra+peq;
+  var kgTotal=sum(rows.map(function(m){return m.kg;}));
+  document.getElementById('kpiCanastillas').innerHTML=[
+    {v:fmtN(enc),l:'Encajables'},{v:fmtN(gra),l:'Grandes'},{v:fmtN(peq),l:'Pequeñas'}
+  ].map(function(x){return '<div class="kpi" style="padding:10px"><div class="v" style="font-size:1.2rem">'+x.v+'</div><div class="l">'+x.l+'</div></div>';}).join('');
+  dc('chartCanastillas');
+  charts['chartCanastillas']=new Chart(document.getElementById('chartCanastillas'),{type:'doughnut',
+    data:{labels:['Encajables','Grandes','Pequeñas'],datasets:[{data:[enc,gra,peq],backgroundColor:['#2563eb','#f59e0b','#16a34a'],borderWidth:0}]},
+    options:{responsive:true,cutout:'62%',plugins:{legend:{display:false},datalabels:{display:true,color:'#fff',font:{size:9,weight:'bold'},formatter:function(v){return v>0?fmtN(v):'';}}}}});
+  document.getElementById('legendCanastillas').innerHTML=[
+    ['#2563eb','Encajables',enc],['#f59e0b','Grandes',gra],['#16a34a','Pequeñas',peq]
+  ].map(function(x){return '<div class="legend-item"><div class="legend-dot" style="background:'+x[0]+'"></div><span class="legend-label">'+x[1]+'</span><span class="legend-val">'+fmtN(x[2])+'</span></div>';}).join('')
+   + '<div class="legend-item"><span class="legend-label">Kg por canastilla</span><span class="legend-val">'+(total>0?(kgTotal/total).toFixed(1):'—')+'</span></div>';
+}
+
+/* ---------- Personal ---------- */
+function renderPersonal(){
+  var groups=groupBy(filteredMetrics,function(m){return m.cuadrilla;});
+  var data=groups.map(function(g){
+    var kg=sum(g.rows.map(function(m){return m.kg;}));
+    var personas=sum(g.rows.map(function(m){return m.personas;}));
+    return {nombre:g.key,kgPersona:personas>0?(kg/personas):0};
+  }).sort(function(a,b){return b.kgPersona-a.kgPersona;});
+  dc('chartPersonal');
+  charts['chartPersonal']=new Chart(document.getElementById('chartPersonal'),{type:'bar',
+    data:{labels:data.map(function(d){return d.nombre;}),datasets:[{data:data.map(function(d){return Math.round(d.kgPersona);}),backgroundColor:'#818cf8',borderRadius:4}]},
+    options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?fmtN(v)+' kg':'';}}},
+      scales:{x:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}}}}});
+}
+
+/* ---------- Heatmap Día x Hora ---------- */
+document.getElementById('segHeat').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#segHeat button').forEach(function(x){x.classList.remove('active');});
+  b.classList.add('active'); heatMetric=b.dataset.h; renderHeatmap();
+});
+var DIAS_SEM=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+function heatColor(v,max){
+  if(!v||!max) return '#f1f5f9';
+  var pct=Math.min(1,v/max);
+  var r=Math.round(255-(255-37)*pct), g=Math.round(255-(255-99)*pct), b=Math.round(255-(255-235)*pct);
+  return 'rgb('+r+','+g+','+b+')';
+}
+function renderHeatmap(){
+  var rows=filteredMetrics.filter(function(m){return m.fecha&&m.iniMin!==null;});
+  var grid={};
+  rows.forEach(function(m){
+    var dia=m.fecha.getDay(), hora=Math.floor(m.iniMin/60);
+    var k=dia+'-'+hora;
+    if(!grid[k]) grid[k]={n:0,kg:0,kgMinSum:0,kgMinN:0,tiempoSum:0,tiempoN:0};
+    grid[k].n++; grid[k].kg+=m.kg;
+    if(m.kgMin!==null){grid[k].kgMinSum+=m.kgMin;grid[k].kgMinN++;}
+    if(m.minutos!==null){grid[k].tiempoSum+=m.minutos;grid[k].tiempoN++;}
+  });
+  function valFor(k){
+    var c=grid[k]; if(!c) return 0;
+    if(heatMetric==='desp') return c.n;
+    if(heatMetric==='kg') return Math.round(c.kg);
+    if(heatMetric==='kgmin') return c.kgMinN?parseFloat((c.kgMinSum/c.kgMinN).toFixed(1)):0;
+    return c.tiempoN?Math.round(c.tiempoSum/c.tiempoN):0;
+  }
+  var horas=[]; for(var h=4;h<24;h++) horas.push(h);
+  var maxV=0;
+  for(var d=0;d<7;d++) horas.forEach(function(h){ var v=valFor(d+'-'+h); if(v>maxV) maxV=v; });
+  var html='<thead><tr><th></th>'+horas.map(function(h){return '<th>'+h+'h</th>';}).join('')+'</tr></thead><tbody>';
+  for(var d=0;d<7;d++){
+    html+='<tr><th style="text-align:left;padding-left:8px">'+DIAS_SEM[d]+'</th>';
+    horas.forEach(function(h){
+      var v=valFor(d+'-'+h);
+      html+='<td style="background:'+heatColor(v,maxV)+'" title="'+DIAS_SEM[d]+' '+h+'h: '+v+'">'+(v>0?v:'')+'</td>';
+    });
+    html+='</tr>';
+  }
+  html+='</tbody>';
+  document.getElementById('heatTable').innerHTML=html;
+}
+
+/* ---------- Alertas operativas ---------- */
+function renderAlertas(){
+  var rows=filteredMetrics;
+  var cargados=rows.filter(function(m){return m.isCargado;});
+  var minutos=cargados.map(function(m){return m.minutos;}).filter(function(x){return x!==null;});
+  var esperas=cargados.map(function(m){return m.espera;}).filter(function(x){return x!==null;});
+  var kgMins=cargados.map(function(m){return m.kgMin;}).filter(function(x){return x!==null;});
+  var maxCargue = MAX_TIEMPO_CARGUE!==null?MAX_TIEMPO_CARGUE:(percentile(minutos,75)||120);
+  var maxEspera = MAX_TIEMPO_ESPERA!==null?MAX_TIEMPO_ESPERA:(percentile(esperas,75)||90);
+  var objRend = OBJETIVO_RENDIMIENTO!==null?OBJETIVO_RENDIMIENTO:(percentile(kgMins,25)||30);
+
+  var gruposAlertas=[
+    {titulo:'Cargues demasiado largos',crit:false,items:cargados.filter(function(m){return m.minutos!==null&&m.minutos>maxCargue;}),detalle:function(m){return 'Duró '+minToHM(m.minutos)+' (umbral: '+minToHM(maxCargue)+')';}},
+    {titulo:'Bajo rendimiento',crit:false,items:cargados.filter(function(m){return m.kgMin!==null&&m.kgMin<objRend;}),detalle:function(m){return m.kgMin.toFixed(1)+' Kg/Min (objetivo: '+objRend.toFixed(1)+')';}},
+    {titulo:'Bajo cumplimiento (< '+OBJETIVO_CUMPLIMIENTO+'%)',crit:true,items:rows.filter(function(m){return m.pctCumpl!==null&&m.pctCumpl<OBJETIVO_CUMPLIMIENTO;}),detalle:function(m){return m.pctCumpl.toFixed(0)+'% cumplido';}},
+    {titulo:'Espera excesiva',crit:false,items:cargados.filter(function(m){return m.espera!==null&&m.espera>maxEspera;}),detalle:function(m){return minToHM(m.espera)+' esperando (umbral: '+minToHM(maxEspera)+')';}},
+    {titulo:'Registros incompletos',crit:true,items:rows.filter(function(m){return detectAlerts(m).length>0;}),detalle:function(m){return detectAlerts(m).join(', ');}},
+    {titulo:'Datos inconsistentes',crit:true,items:rows.filter(function(m){var a=detectAlerts(m);return a.some(function(x){return x.indexOf('antes')>=0||x.indexOf('superan')>=0||x.indexOf('inválido')>=0;});}),detalle:function(m){return detectAlerts(m).filter(function(x){return x.indexOf('antes')>=0||x.indexOf('superan')>=0||x.indexOf('inválido')>=0;}).join(', ');}}
+  ];
+  document.getElementById('alertGrid').innerHTML=gruposAlertas.map(function(g,gi){
+    var pct=rows.length?Math.round(g.items.length/rows.length*100):0;
+    return '<div>'
+      +'<div class="alert-card '+(g.crit?'crit':'warn')+'" onclick="toggleAlert('+gi+')">'
+      +'<div class="ac-n">'+g.items.length+'</div>'
+      +'<div class="ac-l">'+g.titulo+'<br><span style="font-weight:400;color:#94a3b8">'+pct+'% del total</span></div>'
+      +'</div>'
+      +'<div class="alert-detail" id="alertDetail'+gi+'">'+(g.items.length?g.items.slice(0,50).map(function(m){
+        return '<div class="alert-row"><b>'+(m.placa||m.oc||'—')+'</b><span>'+m.cliente+' · '+g.detalle(m)+'</span></div>';
+      }).join(''):'<div class="empty">Sin registros</div>')+(g.items.length>50?'<div class="empty">... y '+(g.items.length-50)+' más</div>':'')+'</div>'
+      +'</div>';
+  }).join('');
+}
+function toggleAlert(i){ document.getElementById('alertDetail'+i).classList.toggle('open'); }
+
+/* ---------- NIVEL 5: Tabla operativa detallada ---------- */
+var DETALLE_COLS=[
+  {k:'fechaStr',l:'Fecha',t:'txt'},{k:'oc',l:'OC',t:'txt'},{k:'remision',l:'Remisión',t:'txt'},
+  {k:'cliente',l:'Cliente',t:'txt'},{k:'destino',l:'Destino',t:'txt'},{k:'placa',l:'Placa',t:'txt'},
+  {k:'kgOC',l:'Kg OC',t:'num'},{k:'kg',l:'Kg Cargados',t:'num'},{k:'pctCumpl',l:'Cumpl.',t:'pct'},
+  {k:'citaMin',l:'Cita',t:'hora'},{k:'llegadaMin',l:'Llegada',t:'hora'},{k:'iniMin',l:'Inicio',t:'hora'},
+  {k:'finMin',l:'Fin',t:'hora'},{k:'salidaMin',l:'Salida',t:'hora'},{k:'minutos',l:'Min. Cargue',t:'num'},
+  {k:'kgMin',l:'Kg/Min',t:'dec'},{k:'cuadrilla',l:'Cuadrilla',t:'txt'},{k:'personas',l:'Personas',t:'num'},
+  {k:'status',l:'Status',t:'txt'}
+];
+document.getElementById('tblDetalle').addEventListener('click',function(e){
+  var th=e.target.closest('th[data-k]'); if(!th) return;
+  var k=th.dataset.k;
+  if(detalleSortCol===k) detalleSortDir*=-1; else { detalleSortCol=k; detalleSortDir=1; }
+  renderDetalle();
+});
+function fmtCell(m,col){
+  var v=m[col.k];
+  if(col.t==='hora') return v!==null?minToHM(v):'—';
+  if(col.t==='pct') return v!==null?v.toFixed(0)+'%':'—';
+  if(col.t==='dec') return v!==null?v.toFixed(1):'—';
+  if(col.t==='num') return v!==null&&v!==undefined?fmtN(v):'—';
+  return v||'—';
+}
+function renderDetalle(){
+  var q=normStr(document.getElementById('dSearch').value);
+  var rows=filteredMetrics.filter(function(m){
+    if(!q) return true;
+    return normStr(m.oc+' '+m.cliente+' '+m.placa+' '+m.destino+' '+m.remision).indexOf(q)>=0;
+  });
+  rows=rows.slice().sort(function(a,b){
+    var va=a[detalleSortCol], vb=b[detalleSortCol];
+    if(detalleSortCol==='fechaStr'){ va=a.fecha?a.fecha.getTime():0; vb=b.fecha?b.fecha.getTime():0; }
+    if(va===null||va===undefined) va=-Infinity; if(vb===null||vb===undefined) vb=-Infinity;
+    if(typeof va==='string') return detalleSortDir*va.localeCompare(vb);
+    return detalleSortDir*((va)-(vb));
+  });
+  var totalPages=Math.max(1,Math.ceil(rows.length/detallePageSize));
+  if(detallePage>totalPages) detallePage=totalPages;
+  var pageRows=rows.slice((detallePage-1)*detallePageSize, detallePage*detallePageSize);
+
+  var thead='<thead><tr>'+DETALLE_COLS.map(function(c){
+    var arrow = detalleSortCol===c.k ? (detalleSortDir===1?' ▲':' ▼') : '';
+    return '<th data-k="'+c.k+'" class="'+(c.t==='txt'?'left':'')+'">'+c.l+arrow+'</th>';
+  }).join('')+'</tr></thead>';
+  var tbody='<tbody>'+(pageRows.length?pageRows.map(function(m){
+    var cumplCell = m.pctCumpl===null?'—':(m.pctCumpl>=OBJETIVO_CUMPLIMIENTO?'<span class="badge badge-ok">'+m.pctCumpl.toFixed(0)+'%</span>':(m.pctCumpl>=OBJETIVO_CUMPLIMIENTO*0.8?'<span class="badge badge-warn">'+m.pctCumpl.toFixed(0)+'%</span>':'<span class="badge badge-bad">'+m.pctCumpl.toFixed(0)+'%</span>'));
+    return '<tr>'+DETALLE_COLS.map(function(c){
+      if(c.k==='pctCumpl') return '<td>'+cumplCell+'</td>';
+      return '<td class="'+(c.t==='txt'?'left':'')+'">'+fmtCell(m,c)+'</td>';
+    }).join('')+'</tr>';
+  }).join(''):'<tr><td colspan="'+DETALLE_COLS.length+'" class="empty">Sin resultados</td></tr>')+'</tbody>';
+
+  document.getElementById('tblDetalle').innerHTML=thead+tbody;
+  document.getElementById('pager').innerHTML =
+    '<span>'+rows.length.toLocaleString('es-CO')+' registros · Página '+detallePage+' de '+totalPages+'</span>'
+    +'<button '+(detallePage<=1?'disabled':'')+' onclick="detallePage--;renderDetalle()">‹ Anterior</button>'
+    +'<button '+(detallePage>=totalPages?'disabled':'')+' onclick="detallePage++;renderDetalle()">Siguiente ›</button>';
+}
+function exportCSV(){
+  var rows=filteredMetrics;
+  var header=DETALLE_COLS.map(function(c){return c.l;}).join(',');
+  var lines=rows.map(function(m){return DETALLE_COLS.map(function(c){return '"'+(fmtCell(m,c)+'').replace(/"/g,'""')+'"';}).join(',');});
+  var csv=header+'\n'+lines.join('\n');
+  var blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download='detalle_despachos_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
