@@ -330,6 +330,19 @@ function diffMinutesSafe(a,b){ if(a===null||b===null) return null; var d=b-a; if
 function percentile(arr,p){ var v=arr.filter(function(x){return x!==null&&!isNaN(x);}).slice().sort(function(a,b){return a-b;}); if(!v.length) return null; var idx=(p/100)*(v.length-1); var lo=Math.floor(idx),hi=Math.ceil(idx); if(lo===hi) return v[lo]; return v[lo]+(v[hi]-v[lo])*(idx-lo); }
 function avg(arr){var v=arr.filter(function(x){return x!==null&&x!==undefined&&!isNaN(x);});if(!v.length)return null;return v.reduce(function(a,b){return a+b;},0)/v.length;}
 function sum(arr){return arr.reduce(function(a,b){return a+(b||0);},0);}
+/* Personas involucradas = suma del tamaño de cada cuadrilla, contado UNA
+   sola vez por cuadrilla y por día (no se multiplica por cada despacho que
+   esa misma cuadrilla haya hecho ese día). */
+function personasInvolucradas(rows){
+  var map={};
+  rows.forEach(function(m){
+    if(!m.fecha) return;
+    var key=m.cuadrilla+'|'+m.fecha.toISOString().slice(0,10);
+    var v=m.personas||0;
+    if(!(key in map)||v>map[key]) map[key]=v;
+  });
+  return sum(Object.keys(map).map(function(k){return map[k];}));
+}
 
 function parseCSV(txt){
   var lines=txt.trim().split('\n');
@@ -610,7 +623,7 @@ function kpiSet(rows){
   var minutosTot=sum(cargados.map(function(m){return m.minutos||0;}));
   var rendGlobal=minutosTot>0?(kgCargado/minutosTot):null; // SUM(kg)/SUM(min), no promedio simple
   var tiempoProm=avg(cargados.map(function(m){return m.minutos;}));
-  var personas=sum(rows.map(function(m){return m.personas;}));
+  var personas=personasInvolucradas(rows);
   return {kgCargado:kgCargado,kgProgramado:kgProgramado,cumpl:cumpl,despachos:despachos,vehiculos:vehiculos,rendGlobal:rendGlobal,tiempoProm:tiempoProm,personas:personas};
 }
 function deltaHtml(cur,prev,invert){
@@ -751,7 +764,7 @@ function statsForGroup(rows){
   var min=sum(cargados.map(function(m){return m.minutos||0;}));
   var kgMinGlobal=min>0?(kg/min):null;
   var tiempoProm=avg(cargados.map(function(m){return m.minutos;}));
-  var personas=sum(rows.map(function(m){return m.personas;}));
+  var personas=personasInvolucradas(rows);
   return {n:rows.length,kg:kg,kgOC:kgOC,cumpl:kgOC>0?(kg/kgOC*100):null,minutos:min,kgMin:kgMinGlobal,kgHora:kgMinGlobal!==null?kgMinGlobal*60:null,tiempoProm:tiempoProm,personas:personas,vehiculos:[...new Set(rows.map(function(m){return m.placa;}).filter(Boolean))].length};
 }
 
@@ -871,7 +884,7 @@ function renderPersonal(){
   var groups=groupBy(filteredMetrics,function(m){return m.cuadrilla;});
   var data=groups.map(function(g){
     var kg=sum(g.rows.map(function(m){return m.kg;}));
-    var personas=sum(g.rows.map(function(m){return m.personas;}));
+    var personas=personasInvolucradas(g.rows);
     return {nombre:g.key,kgPersona:personas>0?(kg/personas):0};
   }).sort(function(a,b){return b.kgPersona-a.kgPersona;});
   dc('chartPersonal');
