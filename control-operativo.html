@@ -145,6 +145,7 @@ table.rtable tbody tr:hover{background:#f8fafc}
     </div>
     <div class="hdr-right">
       <span class="hdr-badge" id="lastUpdate">—</span>
+      <button id="retryBtn" onclick="manualRetry()" style="display:none;background:#dc2626;border:none;color:#fff;padding:7px 14px;border-radius:7px;font-size:.76rem;font-weight:700;cursor:pointer">🔄 Reintentar</button>
       <a class="hdr-link alt" href="index.html">← Tablero en vivo</a>
       <a class="hdr-link alt" href="resultados.html">📊 Resultados semanales</a>
     </div>
@@ -408,19 +409,36 @@ function detectAlerts(m){
 }
 
 /* ---------- Carga de datos (misma conexión existente) ---------- */
+var retryCount=0, MAX_AUTO_RETRIES=3;
 async function fetchData(){
   try{
     var res=await fetch(CSV_URL+'&t='+Date.now());
     if(!res.ok) throw new Error('HTTP '+res.status);
     var txt=await res.text();
+    if(!txt||txt.trim().length===0) throw new Error('Respuesta vacía');
     allData=parseCSV(txt);
     allMetrics=allData.map(metricsForRow);
+    retryCount=0;
+    document.getElementById('retryBtn').style.display='none';
     document.getElementById('lastUpdate').textContent='🟢 '+new Date().toLocaleTimeString('es-CO');
     buildFilters();
     setPeriod('30d');
   }catch(e){
-    document.getElementById('lastUpdate').textContent='🔴 Error: '+e.message;
+    retryCount++;
+    if(retryCount<=MAX_AUTO_RETRIES){
+      document.getElementById('lastUpdate').textContent='⏳ Reintentando ('+retryCount+'/'+MAX_AUTO_RETRIES+')...';
+      setTimeout(fetchData, 1800*retryCount);
+    } else {
+      document.getElementById('lastUpdate').textContent='🔴 Error: '+e.message;
+      document.getElementById('retryBtn').style.display='inline-block';
+    }
   }
+}
+function manualRetry(){
+  retryCount=0;
+  document.getElementById('retryBtn').style.display='none';
+  document.getElementById('lastUpdate').textContent='⏳ Reintentando...';
+  fetchData();
 }
 
 /* ---------- Selector de período ---------- */
