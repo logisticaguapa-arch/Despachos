@@ -207,8 +207,9 @@ tbody tr:hover{background:#f8fafc}
       <canvas id="chartCitasDistHist" height="180"></canvas>
     </div>
     <div class="card">
-      <div class="card-title">Clientes con más incumplimientos</div>
-      <div style="overflow-x:auto"><table><thead><tr><th class="left">Cliente</th><th>Citas</th><th>% Cumpl.</th><th>Retraso Prom.</th></tr></thead><tbody id="tblCitasClienteHist"></tbody></table></div>
+      <div class="card-title">Conductores/Placas con más incumplimientos</div>
+      <div class="card-sub" style="margin-bottom:8px">Con ellos se aplican los correctivos — el cliente final no controla la hora de llegada</div>
+      <div style="overflow-x:auto"><table><thead><tr><th class="left">Conductor</th><th class="left">Placa</th><th>Citas</th><th>% Cumpl.</th><th>Retraso Prom.</th></tr></thead><tbody id="tblCitasClienteHist"></tbody></table></div>
     </div>
   </div>
 
@@ -412,24 +413,26 @@ function renderCitasDetalle(){
     options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v:'';}}},
       scales:{x:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}});
 
-  var porCliente={};
+  var porConductor={};
   rows.forEach(function(r){
-    var cl=(r[C.CLIENTE]||'Sin cliente').trim()||'Sin cliente';
-    if(!porCliente[cl]) porCliente[cl]={n:0,pcts:[],retrasos:[]};
-    porCliente[cl].n++;
-    porCliente[cl].pcts.push(citaPctForRow(r));
+    var cond=(r[C.CONDUCTOR]||'Sin conductor').trim()||'Sin conductor';
+    var placa=(r[C.PLACAS]||'Sin placa').trim()||'Sin placa';
+    var key=cond+'|'+placa;
+    if(!porConductor[key]) porConductor[key]={conductor:cond,placa:placa,n:0,pcts:[],retrasos:[]};
+    porConductor[key].n++;
+    porConductor[key].pcts.push(citaPctForRow(r));
     var c=timeToMin(r[C.H_CITA]),ll=timeToMin(r[C.H_LLE]);
-    if(ll!==null&&ll>c) porCliente[cl].retrasos.push(ll-c);
+    if(ll!==null&&ll>c) porConductor[key].retrasos.push(ll-c);
   });
-  var dataCli=Object.keys(porCliente).map(function(cl){
-    var d=porCliente[cl];
-    return {nombre:cl,n:d.n,pct:avg(d.pcts),retraso:d.retrasos.length?avg(d.retrasos):null};
+  var dataCli=Object.keys(porConductor).map(function(k){
+    var d=porConductor[k];
+    return {conductor:d.conductor,placa:d.placa,n:d.n,pct:avg(d.pcts),retraso:d.retrasos.length?avg(d.retrasos):null};
   }).filter(function(d){return d.n>=2;});
   dataCli.sort(function(a,b){return (a.pct||0)-(b.pct||0);});
   dataCli=dataCli.slice(0,15);
   document.getElementById('tblCitasClienteHist').innerHTML = dataCli.length ? dataCli.map(function(d){
-    return '<tr><td class="left">'+d.nombre+'</td><td>'+d.n+'</td><td>'+Math.round(d.pct)+'%</td><td>'+(d.retraso!==null?Math.round(d.retraso)+' min':'—')+'</td></tr>';
-  }).join('') : '<tr><td class="empty" colspan="4">Sin suficientes datos</td></tr>';
+    return '<tr><td class="left">'+d.conductor+'</td><td class="left">'+d.placa+'</td><td>'+d.n+'</td><td>'+Math.round(d.pct)+'%</td><td>'+(d.retraso!==null?Math.round(d.retraso)+' min':'—')+'</td></tr>';
+  }).join('') : '<tr><td class="empty" colspan="5">Sin suficientes datos</td></tr>';
 }
 function citaPctForRow(r){
   var c=timeToMin(r[C.H_CITA]), ll=timeToMin(r[C.H_LLE]);
