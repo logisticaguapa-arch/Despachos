@@ -973,9 +973,10 @@ function renderMuelles(){
       {type:'bar',label:'Kg Cargados (T)',data:kgVals,backgroundColor:'#2563eb',borderRadius:4,yAxisID:'y'},
       {type:'line',label:'% Utilización diaria (prom.)',data:pctVals,borderColor:'#f59e0b',backgroundColor:'#f59e0b',yAxisID:'y1',tension:.3,pointRadius:4,borderWidth:2}
     ]},
-    options:{responsive:true,plugins:{legend:{display:true,position:'top',labels:{font:{size:10}}},
-      datalabels:{display:false},
-      tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.raw+(c.dataset.yAxisID==='y1'?'%':' T');}}}},
+    options:{responsive:true,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:true,position:'top',labels:{font:{size:10}}},
+      datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v,ctx){ return ctx.dataset.yAxisID==='y1' ? v+'%' : v+'T'; }},
+      tooltip:{mode:'index',intersect:false,callbacks:{label:function(c){return c.dataset.label+': '+c.raw+(c.dataset.yAxisID==='y1'?'%':' T');}}}},
       scales:{
         x:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}},
         y:{position:'left',ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'},title:{display:true,text:'Toneladas',font:{size:9}}},
