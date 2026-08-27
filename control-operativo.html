@@ -203,6 +203,23 @@ table.rtable tbody tr:hover{background:#f8fafc}
   <!-- NIVEL 4 -->
   <div class="level-title"><span class="n">4</span>¿Dónde está el problema? — Cuadrillas, clientes, destinos y alertas</div>
 
+  <div class="level-title" style="margin-top:0"><span class="n">🗓️</span>Cumplimiento de Citas (llegada de los carros)</div>
+  <div class="kpi-grid" id="kpiCitas"></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">Distribución de puntualidad</div>
+      <canvas id="chartCitasDist" height="110"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">% Cumplimiento de Citas — tendencia diaria</div>
+      <canvas id="chartCitasTendencia" height="110"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title">Clientes con más incumplimientos de cita</div><div class="card-sub">Ordenado de peor a mejor cumplimiento — mínimo 2 citas en el período</div></div>
+    <div class="dtable-wrap"><table class="rtable" id="tblCitasCliente"></table></div>
+  </div>
+
   <div class="card">
     <div class="card-hdr"><div class="card-title">🏆 Ranking de Cuadrillas (por rendimiento Kg/Min)</div></div>
     <div class="dtable-wrap"><table class="rtable" id="tblCuadrillas"></table></div>
@@ -342,6 +359,17 @@ function personasInvolucradas(rows){
     if(!(key in map)||v>map[key]) map[key]=v;
   });
   return sum(Object.keys(map).map(function(k){return map[k];}));
+}
+/* % Cumplimiento de cita: 100% a tiempo, baja en línea recta hasta 0% a los
+   30 min tarde; 0% si nunca llegó. Misma fórmula usada en resultados.html. */
+var MAX_RETRASO_CITA_MIN=30;
+function citaCompliancePct(citaMin,llegadaMin){
+  if(citaMin===null) return null;
+  if(llegadaMin===null) return 0;
+  var retraso=llegadaMin-citaMin;
+  if(retraso<=0) return 100;
+  if(retraso>=MAX_RETRASO_CITA_MIN) return 0;
+  return Math.round(100*(1-retraso/MAX_RETRASO_CITA_MIN));
 }
 
 function parseCSV(txt){
@@ -600,6 +628,7 @@ function render(){
   renderRendimientoDia();
   renderDistribucion();
   renderRankingCuadrillas();
+  renderCitas();
   renderRankingClientes();
   renderRankingDestinos();
   renderCiclo();
@@ -781,6 +810,74 @@ function renderRankingCuadrillas(){
   }).join('');
   html+='</tbody>';
   document.getElementById('tblCuadrillas').innerHTML = data.length?html:'<tbody><tr><td class="empty" colspan="9">Sin datos para este período/filtro</td></tr></tbody>';
+}
+
+/* ---------- Cumplimiento de Citas — detalle ---------- */
+function renderCitas(){
+  var rows=filteredMetrics.filter(function(m){return m.citaMin!==null;});
+  var pcts=rows.map(function(m){return citaCompliancePct(m.citaMin,m.llegadaMin);});
+
+  // KPIs
+  var aTiempo=rows.filter(function(m){return m.llegadaMin!==null&&m.llegadaMin<=m.citaMin;}).length;
+  var tarde=rows.filter(function(m){return m.llegadaMin!==null&&m.llegadaMin>m.citaMin;}).length;
+  var noLlego=rows.filter(function(m){return m.llegadaMin===null;}).length;
+  document.getElementById('kpiCitas').innerHTML=[
+    {v:pcts.length?Math.round(avg(pcts))+'%':'—',l:'📅 Cumplimiento Promedio'},
+    {v:aTiempo,l:'✅ Llegaron a Tiempo'},
+    {v:tarde,l:'⏰ Llegaron Tarde'},
+    {v:noLlego,l:'🚫 Nunca se Presentaron'}
+  ].map(function(x){return '<div class="kpi"><div class="v">'+x.v+'</div><div class="l">'+x.l+'</div></div>';}).join('');
+
+  // Distribución de puntualidad
+  var buckets=[
+    {l:'A tiempo',test:function(m){return m.llegadaMin!==null&&m.llegadaMin<=m.citaMin;},c:'#16a34a'},
+    {l:'1-15 min tarde',test:function(m){return m.llegadaMin!==null&&(m.llegadaMin-m.citaMin)>0&&(m.llegadaMin-m.citaMin)<=15;},c:'#84cc16'},
+    {l:'16-29 min tarde',test:function(m){return m.llegadaMin!==null&&(m.llegadaMin-m.citaMin)>15&&(m.llegadaMin-m.citaMin)<30;},c:'#f59e0b'},
+    {l:'30+ min tarde',test:function(m){return m.llegadaMin!==null&&(m.llegadaMin-m.citaMin)>=30;},c:'#ea580c'},
+    {l:'Nunca llegó',test:function(m){return m.llegadaMin===null;},c:'#dc2626'}
+  ];
+  var counts=buckets.map(function(b){return rows.filter(b.test).length;});
+  dc('chartCitasDist');
+  charts['chartCitasDist']=new Chart(document.getElementById('chartCitasDist'),{type:'bar',
+    data:{labels:buckets.map(function(b){return b.l;}),datasets:[{data:counts,backgroundColor:buckets.map(function(b){return b.c;}),borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v:'';}}},
+      scales:{x:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}});
+
+  // Tendencia diaria
+  var byDia={};
+  rows.forEach(function(m){
+    if(!m.fecha) return;
+    var k=m.fecha.toISOString().slice(0,10);
+    if(!byDia[k]) byDia[k]={pcts:[],sortKey:m.fecha.getTime()};
+    byDia[k].pcts.push(citaCompliancePct(m.citaMin,m.llegadaMin));
+  });
+  var diaKeys=Object.keys(byDia).sort(function(a,b){return byDia[a].sortKey-byDia[b].sortKey;});
+  var diaLabels=diaKeys.map(function(k){return k.slice(5);});
+  var diaVals=diaKeys.map(function(k){return Math.round(avg(byDia[k].pcts));});
+  dc('chartCitasTendencia');
+  charts['chartCitasTendencia']=new Chart(document.getElementById('chartCitasTendencia'),{type:'line',
+    data:{labels:diaLabels,datasets:[{data:diaVals,borderColor:'#0d9488',backgroundColor:'#0d9488',tension:.3,pointRadius:2,borderWidth:2}]},
+    options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:false},tooltip:{callbacks:{label:function(c){return c.raw+'%';}}}},
+      scales:{x:{ticks:{font:{size:8},color:'#64748b',maxRotation:60},grid:{display:false}},
+        y:{min:0,max:100,ticks:{font:{size:9},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'}}}}});
+
+  // Ranking por cliente (peor a mejor)
+  var byCliente=groupBy(rows,function(m){return m.cliente;});
+  var dataCli=byCliente.map(function(g){
+    var ps=g.rows.map(function(m){return citaCompliancePct(m.citaMin,m.llegadaMin);});
+    var retrasos=g.rows.filter(function(m){return m.llegadaMin!==null&&m.llegadaMin>m.citaMin;}).map(function(m){return m.llegadaMin-m.citaMin;});
+    var noShow=g.rows.filter(function(m){return m.llegadaMin===null;}).length;
+    return {nombre:g.key,n:g.rows.length,pct:avg(ps),retrasoProm:retrasos.length?avg(retrasos):null,noShow:noShow};
+  }).filter(function(d){return d.n>=2;});
+  dataCli.sort(function(a,b){return (a.pct||0)-(b.pct||0);});
+  dataCli=dataCli.slice(0,15);
+  var htmlCli='<thead><tr><th class="left">Cliente</th><th>Citas</th><th>% Cumpl.</th><th>Retraso Prom.</th><th>No se presentó</th></tr></thead><tbody>';
+  htmlCli+=dataCli.map(function(d){
+    var badge=d.pct>=80?'<span class="badge badge-ok">'+d.pct.toFixed(0)+'%</span>':(d.pct>=50?'<span class="badge badge-warn">'+d.pct.toFixed(0)+'%</span>':'<span class="badge badge-bad">'+d.pct.toFixed(0)+'%</span>');
+    return '<tr><td class="left">'+d.nombre+'</td><td>'+d.n+'</td><td>'+badge+'</td><td>'+(d.retrasoProm!==null?Math.round(d.retrasoProm)+' min':'—')+'</td><td>'+d.noShow+'</td></tr>';
+  }).join('');
+  htmlCli+='</tbody>';
+  document.getElementById('tblCitasCliente').innerHTML = dataCli.length?htmlCli:'<tbody><tr><td class="empty" colspan="5">Sin suficientes datos (mínimo 2 citas por cliente)</td></tr></tbody>';
 }
 
 /* ---------- Ranking de Clientes ---------- */
