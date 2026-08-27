@@ -198,6 +198,20 @@ tbody tr:hover{background:#f8fafc}
     </div>
   </div>
 
+  <!-- Análisis detallado de Cumplimiento de Citas (histórico completo, siempre visible) -->
+  <div class="section-title">🗓️ Análisis Detallado de Cumplimiento de Citas</div>
+  <div class="kpi-row" id="kpiCitasDetalle" style="grid-template-columns:repeat(4,1fr)"></div>
+  <div class="metric-grid">
+    <div class="card">
+      <div class="card-title">Distribución de puntualidad (histórico)</div>
+      <canvas id="chartCitasDistHist" height="180"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Clientes con más incumplimientos</div>
+      <div style="overflow-x:auto"><table><thead><tr><th class="left">Cliente</th><th>Citas</th><th>% Cumpl.</th><th>Retraso Prom.</th></tr></thead><tbody id="tblCitasClienteHist"></tbody></table></div>
+    </div>
+  </div>
+
 </div>
 </div>
 
@@ -301,6 +315,7 @@ async function fetchData(){
     hideError();
     document.getElementById('lastUpdate').textContent='🟢 '+new Date().toLocaleTimeString('es-CO');
     renderGlobal();
+    renderCitasDetalle();
     setTab(currentTab);
   }catch(e){
     retryCount++;
@@ -367,6 +382,63 @@ function renderGlobal(){
     citaPctsG.push(citaCompliancePct(cita,lleg));
   });
   document.getElementById('gPctCitas').textContent = citaPctsG.length ? Math.round(avg(citaPctsG))+'%' : '—';
+}
+
+/* ---------- Análisis detallado de Cumplimiento de Citas (todo el histórico) ---------- */
+function renderCitasDetalle(){
+  var rows=allData.filter(function(r){return timeToMin(r[C.H_CITA])!==null;});
+  var buckets=[
+    {l:'A tiempo',test:function(r){var c=timeToMin(r[C.H_CITA]),ll=timeToMin(r[C.H_LLE]);return ll!==null&&ll<=c;},c:'#16a34a'},
+    {l:'1-15 min tarde',test:function(r){var c=timeToMin(r[C.H_CITA]),ll=timeToMin(r[C.H_LLE]);return ll!==null&&(ll-c)>0&&(ll-c)<=15;},c:'#84cc16'},
+    {l:'16-29 min tarde',test:function(r){var c=timeToMin(r[C.H_CITA]),ll=timeToMin(r[C.H_LLE]);return ll!==null&&(ll-c)>15&&(ll-c)<30;},c:'#f59e0b'},
+    {l:'30+ min tarde',test:function(r){var c=timeToMin(r[C.H_CITA]),ll=timeToMin(r[C.H_LLE]);return ll!==null&&(ll-c)>=30;},c:'#ea580c'},
+    {l:'Nunca llegó',test:function(r){return timeToMin(r[C.H_LLE])===null;},c:'#dc2626'}
+  ];
+  var counts=buckets.map(function(b){return rows.filter(b.test).length;});
+  var pcts=rows.map(function(r){return citaPctForRow(r);});
+  var aTiempo=counts[0], tarde=counts[1]+counts[2]+counts[3], noLlego=counts[4];
+
+  document.getElementById('kpiCitasDetalle').innerHTML=[
+    {v:pcts.length?Math.round(avg(pcts))+'%':'—',l:'📅 Cumplimiento Promedio'},
+    {v:aTiempo,l:'✅ A Tiempo'},
+    {v:tarde,l:'⏰ Tarde'},
+    {v:noLlego,l:'🚫 Nunca se Presentó'}
+  ].map(function(x){return '<div class="kpi c9"><div class="v">'+x.v+'</div><div class="l">'+x.l+'</div></div>';}).join('');
+
+  var chartId='chartCitasDistHist';
+  if(charts[chartId]) charts[chartId].destroy();
+  charts[chartId]=new Chart(document.getElementById(chartId),{type:'bar',
+    data:{labels:buckets.map(function(b){return b.l;}),datasets:[{data:counts,backgroundColor:buckets.map(function(b){return b.c;}),borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:9,weight:'bold'},formatter:function(v){return v>0?v:'';}}},
+      scales:{x:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}},y:{ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'}}}}});
+
+  var porCliente={};
+  rows.forEach(function(r){
+    var cl=(r[C.CLIENTE]||'Sin cliente').trim()||'Sin cliente';
+    if(!porCliente[cl]) porCliente[cl]={n:0,pcts:[],retrasos:[]};
+    porCliente[cl].n++;
+    porCliente[cl].pcts.push(citaPctForRow(r));
+    var c=timeToMin(r[C.H_CITA]),ll=timeToMin(r[C.H_LLE]);
+    if(ll!==null&&ll>c) porCliente[cl].retrasos.push(ll-c);
+  });
+  var dataCli=Object.keys(porCliente).map(function(cl){
+    var d=porCliente[cl];
+    return {nombre:cl,n:d.n,pct:avg(d.pcts),retraso:d.retrasos.length?avg(d.retrasos):null};
+  }).filter(function(d){return d.n>=2;});
+  dataCli.sort(function(a,b){return (a.pct||0)-(b.pct||0);});
+  dataCli=dataCli.slice(0,15);
+  document.getElementById('tblCitasClienteHist').innerHTML = dataCli.length ? dataCli.map(function(d){
+    return '<tr><td class="left">'+d.nombre+'</td><td>'+d.n+'</td><td>'+Math.round(d.pct)+'%</td><td>'+(d.retraso!==null?Math.round(d.retraso)+' min':'—')+'</td></tr>';
+  }).join('') : '<tr><td class="empty" colspan="4">Sin suficientes datos</td></tr>';
+}
+function citaPctForRow(r){
+  var c=timeToMin(r[C.H_CITA]), ll=timeToMin(r[C.H_LLE]);
+  if(c===null) return null;
+  if(ll===null) return 0;
+  var retraso=ll-c;
+  if(retraso<=0) return 100;
+  if(retraso>=30) return 0;
+  return Math.round(100*(1-retraso/30));
 }
 
 /* ===== Semana ISO (número de semana dentro del año) ===== */
