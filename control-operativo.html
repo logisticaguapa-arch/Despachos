@@ -244,6 +244,13 @@ table.rtable tbody tr:hover{background:#f8fafc}
     </div>
   </div>
 
+  <div class="card">
+    <div class="card-hdr">
+      <div><div class="card-title">🚪 Utilización de Muelles</div><div class="card-sub">Kg cargados por muelle y % que representa del total despachado cada día (promedio del período)</div></div>
+    </div>
+    <canvas id="chartMuelles" height="80"></canvas>
+  </div>
+
   <div class="grid2">
     <div class="card">
       <div class="card-title">🔄 Ciclo del Vehículo — tiempos promedio por etapa</div>
@@ -631,6 +638,7 @@ function render(){
   renderCitas();
   renderRankingClientes();
   renderRankingDestinos();
+  renderMuelles();
   renderCiclo();
   renderRankingVehiculos();
   renderCanastillas();
@@ -919,6 +927,61 @@ function renderRankingDestinos(){
   }).join('');
   html+='</tbody>';
   document.getElementById('tblDestinos').innerHTML = data.length?html:'<tbody><tr><td class="empty" colspan="6">Sin datos</td></tr></tbody>';
+}
+
+/* ---------- Utilización de Muelles ----------
+   Kg cargados por muelle = suma directa de la Columna F (kg cargados) de las
+   filas de ese muelle.
+   % de utilización = para cada día del período, qué porcentaje de los kilos
+   cargados TOTALES de ese día pasaron por ese muelle, promediado entre todos
+   los días del período (no es solo la participación acumulada, refleja el
+   uso relativo día a día). */
+function renderMuelles(){
+  var rows=filteredMetrics.filter(function(m){return m.isCargado&&m.muelle;});
+  if(!rows.length){ dc('chartMuelles'); return; }
+
+  var porDia={};
+  rows.forEach(function(m){
+    if(!m.fecha) return;
+    var dk=m.fecha.toISOString().slice(0,10);
+    if(!porDia[dk]) porDia[dk]={total:0,muelles:{}};
+    porDia[dk].total+=m.kg;
+    porDia[dk].muelles[m.muelle]=(porDia[dk].muelles[m.muelle]||0)+m.kg;
+  });
+  var diasKeys=Object.keys(porDia);
+
+  var porMuelle=groupBy(rows,function(m){return m.muelle;});
+  var nombres=porMuelle.map(function(g){return g.key;});
+  var kgTot=nombres.map(function(nm){return sum(porMuelle.find(function(g){return g.key===nm;}).rows.map(function(m){return m.kg;}));});
+  var pctProm=nombres.map(function(nm){
+    var pcts=diasKeys.map(function(dk){
+      var d=porDia[dk];
+      if(d.total<=0) return null;
+      return (d.muelles[nm]||0)/d.total*100;
+    }).filter(function(x){return x!==null;});
+    return pcts.length?avg(pcts):0;
+  });
+
+  var idx=nombres.map(function(_,i){return i;}).sort(function(a,b){return kgTot[b]-kgTot[a];});
+  var labels=idx.map(function(i){return nombres[i];});
+  var kgVals=idx.map(function(i){return parseFloat((kgTot[i]/1000).toFixed(2));});
+  var pctVals=idx.map(function(i){return Math.round(pctProm[i]);});
+
+  dc('chartMuelles');
+  charts['chartMuelles']=new Chart(document.getElementById('chartMuelles'),{
+    data:{labels:labels,datasets:[
+      {type:'bar',label:'Kg Cargados (T)',data:kgVals,backgroundColor:'#2563eb',borderRadius:4,yAxisID:'y'},
+      {type:'line',label:'% Utilización diaria (prom.)',data:pctVals,borderColor:'#f59e0b',backgroundColor:'#f59e0b',yAxisID:'y1',tension:.3,pointRadius:4,borderWidth:2}
+    ]},
+    options:{responsive:true,plugins:{legend:{display:true,position:'top',labels:{font:{size:10}}},
+      datalabels:{display:false},
+      tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.raw+(c.dataset.yAxisID==='y1'?'%':' T');}}}},
+      scales:{
+        x:{ticks:{font:{size:9},color:'#64748b'},grid:{display:false}},
+        y:{position:'left',ticks:{font:{size:9},color:'#64748b'},grid:{color:'#f1f5f9'},title:{display:true,text:'Toneladas',font:{size:9}}},
+        y1:{position:'right',min:0,max:100,ticks:{font:{size:9},color:'#64748b',callback:function(v){return v+'%';}},grid:{display:false},title:{display:true,text:'% Utilización',font:{size:9}}}
+      }}
+  });
 }
 
 /* ---------- Ranking de Vehículos ---------- */
