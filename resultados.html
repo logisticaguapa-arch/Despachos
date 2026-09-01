@@ -113,7 +113,27 @@ tbody tr:hover{background:#f8fafc}
     ℹ️ Los kilos se toman siempre de la Columna F (KG CARGADOS). El indicador Kg/Min se calcula aquí como Columna F ÷ minutos de cargue — no se lee directamente de la columna ya calculada en la hoja.
   </div>
 
-  <div class="section-title">📈 Indicadores Históricos (todo el período disponible)</div>
+  <div class="tabs" style="flex-wrap:wrap;gap:10px;padding:10px 12px">
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:.62rem;color:#94a3b8;font-weight:700;text-transform:uppercase">Año</label>
+      <select id="fAno" onchange="applyDateFilters()" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:.78rem"><option value="">Todos</option></select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:.62rem;color:#94a3b8;font-weight:700;text-transform:uppercase">Mes</label>
+      <select id="fMes" onchange="applyDateFilters()" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:.78rem"><option value="">Todos</option></select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:.62rem;color:#94a3b8;font-weight:700;text-transform:uppercase">Semana</label>
+      <select id="fSemana" onchange="applyDateFilters()" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:.78rem"><option value="">Todas</option></select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label style="font-size:.62rem;color:#94a3b8;font-weight:700;text-transform:uppercase">Fecha exacta</label>
+      <select id="fFechaExacta" onchange="applyDateFilters()" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:.78rem"><option value="">Todas</option></select>
+    </div>
+    <button class="tab-btn" style="align-self:flex-end;background:#fff1f2;color:#dc2626" onclick="clearDateFilters()">✖ Limpiar</button>
+  </div>
+
+  <div class="section-title">📈 Indicadores Históricos (según filtros seleccionados)</div>
   <div class="kpi-row" id="kpiGlobal">
     <div class="kpi c1"><div class="v" id="gTotal">—</div><div class="l">🚛 Total Vehículos</div></div>
     <div class="kpi c2"><div class="v" id="gKg">—</div><div class="l">📦 Kg Cargados (Ton)</div></div>
@@ -242,7 +262,8 @@ if(sessionStorage.getItem('resultadosUnlocked')==='1'){ unlock(); }
 /* ===== Mismo CSV y mapeo de columnas que el tablero de Despachos ===== */
 var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
 var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8,H_OC:9,H_CITA:10,H_LLE:11,H_SALIDA:12,H_INI:13,H_FIN:14,STATUS:15,OBS:16,HS:17,MIN:18,KGMIN:19,EMP:20,MUE:21,CUA:22,PER:23,CONDUCTOR:24,CC_COND:25,TEL_COND:26,CAN_ENCAJABLES:27,CAN_GRANDES:28,CAN_PEQUENAS:29};
-var allData=[], charts={}, currentTab='semana', retryCount=0, MAX_AUTO_RETRIES=3;
+var allData=[], filteredData=[], charts={}, currentTab='semana', retryCount=0, MAX_AUTO_RETRIES=3;
+var dateFiltros={ano:'',mes:'',semana:'',fecha:''};
 
 /* ===== Umbral mínimo de seguridad =====
 Los kilos siempre se toman de la Columna F (KG CARGADOS). El Kg/Min NO se lee
@@ -305,6 +326,56 @@ function manualRetry(){
   fetchData();
 }
 
+/* ---------- Filtros de Fecha/Mes/Semana/Año ---------- */
+function buildDateFilters(){
+  var anos=[], meses=[], semanas=[], fechas=[];
+  var anoSet={}, mesSet={}, semSet={}, fechaSet={};
+  allData.forEach(function(r){
+    var fecha=parseFecha(r[C.FECHA]);
+    if(!fecha) return;
+    var yr=fecha.getFullYear(), mo=fecha.getMonth(), wk=getISOWeek(fecha);
+    if(!anoSet[yr]){anoSet[yr]=1;anos.push(yr);}
+    if(!mesSet[mo]){mesSet[mo]=1;meses.push(mo);}
+    if(!semSet[wk]){semSet[wk]=1;semanas.push(wk);}
+    var fStr=(r[C.FECHA]||'').trim();
+    if(fStr&&!fechaSet[fStr]){fechaSet[fStr]=1;fechas.push({str:fStr,t:fecha.getTime()});}
+  });
+  anos.sort(function(a,b){return b-a;});
+  meses.sort(function(a,b){return a-b;});
+  semanas.sort(function(a,b){return a-b;});
+  fechas.sort(function(a,b){return b.t-a.t;});
+
+  document.getElementById('fAno').innerHTML='<option value="">Todos</option>'+anos.map(function(y){return '<option value="'+y+'">'+y+'</option>';}).join('');
+  document.getElementById('fMes').innerHTML='<option value="">Todos</option>'+meses.map(function(m){return '<option value="'+m+'">'+MESES[m]+'</option>';}).join('');
+  document.getElementById('fSemana').innerHTML='<option value="">Todas</option>'+semanas.map(function(w){return '<option value="'+w+'">Semana '+w+'</option>';}).join('');
+  document.getElementById('fFechaExacta').innerHTML='<option value="">Todas</option>'+fechas.map(function(f){return '<option value="'+f.str+'">'+f.str+'</option>';}).join('');
+}
+function applyDateFilters(){
+  dateFiltros.ano=document.getElementById('fAno').value;
+  dateFiltros.mes=document.getElementById('fMes').value;
+  dateFiltros.semana=document.getElementById('fSemana').value;
+  dateFiltros.fecha=document.getElementById('fFechaExacta').value;
+  filteredData=allData.filter(function(r){
+    var fecha=parseFecha(r[C.FECHA]);
+    if(!fecha) return false;
+    if(dateFiltros.ano!==''&&fecha.getFullYear()!==parseInt(dateFiltros.ano)) return false;
+    if(dateFiltros.mes!==''&&fecha.getMonth()!==parseInt(dateFiltros.mes)) return false;
+    if(dateFiltros.semana!==''&&getISOWeek(fecha)!==parseInt(dateFiltros.semana)) return false;
+    if(dateFiltros.fecha!==''&&(r[C.FECHA]||'').trim()!==dateFiltros.fecha) return false;
+    return true;
+  });
+  renderGlobal();
+  renderCitasDetalle();
+  setTab(currentTab);
+}
+function clearDateFilters(){
+  document.getElementById('fAno').value='';
+  document.getElementById('fMes').value='';
+  document.getElementById('fSemana').value='';
+  document.getElementById('fFechaExacta').value='';
+  applyDateFilters();
+}
+
 async function fetchData(){
   try{
     var res=await fetch(CSV_URL+'&t='+Date.now());
@@ -315,9 +386,8 @@ async function fetchData(){
     retryCount=0;
     hideError();
     document.getElementById('lastUpdate').textContent='🟢 '+new Date().toLocaleTimeString('es-CO');
-    renderGlobal();
-    renderCitasDetalle();
-    setTab(currentTab);
+    buildDateFilters();
+    applyDateFilters();
   }catch(e){
     retryCount++;
     if(retryCount<=MAX_AUTO_RETRIES){
@@ -359,12 +429,12 @@ function avg(arr){var v=arr.filter(function(x){return x!==null&&x!==undefined&&!
 function sum(arr){return arr.reduce(function(a,b){return a+b;},0);}
 
 function renderGlobal(){
-  var cargados=allData.filter(function(r){return isCargado(r[C.STATUS]);});
+  var cargados=filteredData.filter(function(r){return isCargado(r[C.STATUS]);});
   var m=cargados.map(metricsForRow);
   var kgTotal=sum(m.map(function(x){return x.kg;}));
-  var kgOCTotal=sum(allData.map(function(r){return toNum(r[C.KG_OC]);}));
+  var kgOCTotal=sum(filteredData.map(function(r){return toNum(r[C.KG_OC]);}));
   var pct=kgOCTotal>0?Math.round(kgTotal/kgOCTotal*100):0;
-  document.getElementById('gTotal').textContent=allData.length.toLocaleString('es-CO');
+  document.getElementById('gTotal').textContent=filteredData.length.toLocaleString('es-CO');
   document.getElementById('gKg').textContent=(kgTotal/1000).toFixed(1)+' T';
   document.getElementById('gPct').textContent=pct+'%';
   document.getElementById('gKlMin').textContent=(avg(m.map(function(x){return x.kgMin;}))||0).toFixed(1);
@@ -387,7 +457,7 @@ function renderGlobal(){
 
 /* ---------- Análisis detallado de Cumplimiento de Citas (todo el histórico) ---------- */
 function renderCitasDetalle(){
-  var rows=allData.filter(function(r){return timeToMin(r[C.H_CITA])!==null;});
+  var rows=filteredData.filter(function(r){return timeToMin(r[C.H_CITA])!==null;});
   var buckets=[
     {l:'A tiempo',test:function(r){var c=timeToMin(r[C.H_CITA]),ll=timeToMin(r[C.H_LLE]);return ll!==null&&ll<=c;},c:'#16a34a'},
     {l:'1-15 min tarde',test:function(r){var c=timeToMin(r[C.H_CITA]),ll=timeToMin(r[C.H_LLE]);return ll!==null&&(ll-c)>0&&(ll-c)<=15;},c:'#84cc16'},
@@ -456,7 +526,7 @@ var MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Se
 
 function buildBuckets(mode){
   var buckets={};
-  allData.forEach(function(r){
+  filteredData.forEach(function(r){
     var fecha=parseFecha(r[C.FECHA]);
     if(!fecha) return;
     var key,label,sortKey;
