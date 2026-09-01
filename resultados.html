@@ -528,7 +528,7 @@ function renderCitasDetalle(){
   if(charts[chartId]) charts[chartId].destroy();
   charts[chartId]=new Chart(document.getElementById(chartId),{type:'bar',
     data:{labels:buckets.map(function(b){return b.l;}),datasets:[{data:counts,backgroundColor:buckets.map(function(b){return b.c;}),borderRadius:4}]},
-    options:{responsive:true,plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:13,weight:'bold'},formatter:function(v){return v>0?v:'';}}},
+    options:{responsive:true,layout:{padding:{top:28}},plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:13,weight:'bold'},formatter:function(v){return v>0?v:'';}}},
       scales:{x:{ticks:{font:{size:12},color:'#64748b'},grid:{display:false}},y:{ticks:{font:{size:12},color:'#64748b'},grid:{color:'#f1f5f9'}}}}});
 
   var porPlaca={};
@@ -636,6 +636,11 @@ function computeBucketStats(bucket){
 function lineChart(canvasId, labels, data, opts){
   opts=opts||{};
   dc(canvasId);
+  var yScale = opts.yOptions ? Object.assign({},opts.yOptions) : {ticks:{font:{size:12},color:'#64748b'},grid:{color:'#f1f5f9'}};
+  if(opts.log){
+    yScale.type='logarithmic';
+    yScale.min=opts.logMin||0.5;
+  }
   charts[canvasId]=new Chart(document.getElementById(canvasId),{
     type:'line',
     data:{labels:labels,datasets:[{
@@ -649,6 +654,7 @@ function lineChart(canvasId, labels, data, opts){
     }]},
     options:{
       responsive:true,
+      layout:{padding:{top:28}},
       plugins:{
         legend:{display:false},
         datalabels:{display:true,align:'top',anchor:'end',color:'#374151',font:{size:13,weight:'bold'},formatter:opts.labelFormatter||function(v){return v;}},
@@ -656,7 +662,7 @@ function lineChart(canvasId, labels, data, opts){
       },
       scales:{
         x:{ticks:{font:{size:12},color:'#64748b'},grid:{display:false}},
-        y:opts.yOptions||{ticks:{font:{size:12},color:'#64748b'},grid:{color:'#f1f5f9'}}
+        y:yScale
       }
     }
   });
@@ -678,17 +684,17 @@ function renderSemanal(){
   if(!buckets.length) return;
   var labels=buckets.map(function(b){return b.label;});
 
-  lineChart('chartKlMin',labels,buckets.map(function(b){return b.klMin!==null?parseFloat(b.klMin.toFixed(1)):null;}),{color:'#1e6f8f'});
+  lineChart('chartKlMin',labels,buckets.map(function(b){return b.klMin!==null?parseFloat(b.klMin.toFixed(1)):null;}),{color:'#1e6f8f',log:true});
 
-  lineChart('chartTiempoTotal',labels,buckets.map(function(b){return b.tiempoTotal;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+  lineChart('chartTiempoTotal',labels,buckets.map(function(b){return b.tiempoTotal;}),{color:'#1e6f8f',log:true,labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
-  lineChart('chartKlHoraHombre',labels,buckets.map(function(b){return b.klHoraHombre!==null?Math.round(b.klHoraHombre):null;}),{color:'#1e6f8f'});
+  lineChart('chartKlHoraHombre',labels,buckets.map(function(b){return b.klHoraHombre!==null?Math.round(b.klHoraHombre):null;}),{color:'#1e6f8f',log:true});
 
-  lineChart('chartKlMinHombre',labels,buckets.map(function(b){return b.klMinHombre!==null?parseFloat(b.klMinHombre.toFixed(1)):null;}),{color:'#1e6f8f'});
+  lineChart('chartKlMinHombre',labels,buckets.map(function(b){return b.klMinHombre!==null?parseFloat(b.klMinHombre.toFixed(1)):null;}),{color:'#1e6f8f',log:true});
 
-  lineChart('chartCargueNeto',labels,buckets.map(function(b){return b.cargueNeto;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+  lineChart('chartCargueNeto',labels,buckets.map(function(b){return b.cargueNeto;}),{color:'#1e6f8f',log:true,labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
-  lineChart('chartEspera',labels,buckets.map(function(b){return b.espera;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+  lineChart('chartEspera',labels,buckets.map(function(b){return b.espera;}),{color:'#1e6f8f',log:true,labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
   lineChart('chartCitas',labels,buckets.map(function(b){return b.pctCitas;}),{color:'#0d9488',labelFormatter:function(v){return v!==null?v+'%':'';},tooltipFormatter:function(v){return v+'%';},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'},min:0,max:100}});
 
@@ -700,7 +706,7 @@ function renderSemanal(){
       {label:'CANASTA',data:buckets.map(function(b){return b.pctCanasta;}),borderColor:'#1e6f8f',backgroundColor:'#1e6f8f',tension:0.3,pointRadius:3,borderWidth:2},
       {label:'GRANEL',data:buckets.map(function(b){return b.pctGranel;}),borderColor:'#f97316',backgroundColor:'#f97316',tension:0.3,pointRadius:3,borderWidth:2}
     ]},
-    options:{responsive:true,plugins:{legend:{display:true,position:'right',labels:{font:{size:13}}},
+    options:{responsive:true,layout:{padding:{top:28}},plugins:{legend:{display:true,position:'right',labels:{font:{size:13}}},
       datalabels:{display:true,align:'top',anchor:'end',color:'#374151',font:{size:13,weight:'bold'},formatter:function(v){return v!==null?v+'%':'';}},
       tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.raw+'%';}}}},
       scales:{x:{ticks:{font:{size:12},color:'#64748b'},grid:{display:false}},
@@ -722,7 +728,7 @@ function renderMensual(){
   charts['chartMes']=new Chart(document.getElementById('chartMes'),{
     type:'bar',
     data:{labels:labels,datasets:[{label:'Ton Cargadas',data:data,backgroundColor:'#7c3aed',borderRadius:4}]},
-    options:{responsive:true,plugins:{legend:{display:false},
+    options:{responsive:true,layout:{padding:{top:28}},plugins:{legend:{display:false},
       datalabels:{display:true,anchor:'end',align:'top',color:'#374151',font:{size:13,weight:'bold'},formatter:function(v){return v>0?v+'T':'';}},
       tooltip:{callbacks:{label:function(c){return c.raw+' Ton';}}}},
       scales:{x:{ticks:{font:{size:12},color:'#64748b',maxRotation:35},grid:{display:false}},
