@@ -221,6 +221,20 @@ table.rtable tbody tr:hover{background:#f8fafc}
   </div>
 
   <div class="card">
+    <div class="card-hdr">
+      <div><div class="card-title">🚨 Placas Reincidentes</div><div class="card-sub" id="reincSub">3 o más incumplimientos de cita en el período seleccionado</div></div>
+    </div>
+    <div class="grid3" id="reincidenciaGrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr">
+      <div><div class="card-title">📋 Detalle de Incumplimientos de Cita</div><div class="card-sub">Cada evento de llegada tarde o no presentación — ordenado del más grave al más leve</div></div>
+    </div>
+    <div class="dtable-wrap"><table class="rtable" id="tblIncumplimientos"></table></div>
+  </div>
+
+  <div class="card">
     <div class="card-hdr"><div class="card-title">🏆 Ranking de Cuadrillas (por rendimiento Kg/Min)</div></div>
     <div class="dtable-wrap"><table class="rtable" id="tblCuadrillas"></table></div>
   </div>
@@ -636,6 +650,7 @@ function render(){
   renderDistribucion();
   renderRankingCuadrillas();
   renderCitas();
+  renderIncumplimientos();
   renderRankingClientes();
   renderRankingDestinos();
   renderMuelles();
@@ -887,6 +902,46 @@ function renderCitas(){
   }).join('');
   htmlCli+='</tbody>';
   document.getElementById('tblCitasCliente').innerHTML = dataCli.length?htmlCli:'<tbody><tr><td class="empty" colspan="5">Sin suficientes datos (mínimo 2 citas por placa)</td></tr></tbody>';
+}
+
+/* ---------- Detalle de incumplimientos + Reincidencia ----------
+   Reincidencia = una misma placa acumula REINCIDENCIA_MIN o más eventos de
+   incumplimiento (cualquier % < 100, incluye tarde y no presentado) dentro
+   del período/filtros seleccionados. */
+var REINCIDENCIA_MIN=3;
+function renderIncumplimientos(){
+  document.getElementById('reincSub').textContent=REINCIDENCIA_MIN+' o más incumplimientos de cita en el período seleccionado';
+  var rows=filteredMetrics.filter(function(m){return m.citaMin!==null;});
+  var eventos=rows.map(function(m){
+    var pct=citaCompliancePct(m.citaMin,m.llegadaMin);
+    var retraso = m.llegadaMin!==null ? (m.llegadaMin-m.citaMin) : null;
+    return {fecha:m.fecha,fechaStr:m.fechaStr,placa:m.placa||'Sin placa',cliente:m.cliente,citaMin:m.citaMin,llegadaMin:m.llegadaMin,retraso:retraso,pct:pct};
+  }).filter(function(e){return e.pct<100;});
+
+  var conteoPlaca={};
+  eventos.forEach(function(e){ conteoPlaca[e.placa]=(conteoPlaca[e.placa]||0)+1; });
+
+  eventos.sort(function(a,b){ if(a.pct!==b.pct) return a.pct-b.pct; return (b.fecha?b.fecha.getTime():0)-(a.fecha?a.fecha.getTime():0); });
+
+  var htmlEv='<thead><tr><th class="left">Fecha</th><th class="left">Placa</th><th class="left">Cliente</th><th>H.Cita</th><th>H.Llegada</th><th>Retraso</th><th>% Individual</th><th>Reincidencia</th></tr></thead><tbody>';
+  htmlEv += eventos.length ? eventos.slice(0,150).map(function(e){
+    var reinc = conteoPlaca[e.placa]>=REINCIDENCIA_MIN;
+    var retrasoTxt = e.retraso!==null ? e.retraso+' min' : 'No llegó';
+    var badge = e.pct>=50?'<span class="badge badge-warn">'+e.pct+'%</span>':'<span class="badge badge-bad">'+e.pct+'%</span>';
+    var reincBadge = reinc ? '<span class="badge badge-bad">⚠ '+conteoPlaca[e.placa]+'x</span>' : '—';
+    return '<tr'+(reinc?' style="background:#fff1f2"':'')+'><td class="left">'+e.fechaStr+'</td><td class="left">'+e.placa+'</td><td class="left">'+e.cliente+'</td><td>'+minToHM(e.citaMin)+'</td><td>'+(e.llegadaMin!==null?minToHM(e.llegadaMin):'—')+'</td><td>'+retrasoTxt+'</td><td>'+badge+'</td><td>'+reincBadge+'</td></tr>';
+  }).join('') : '<tr><td class="empty" colspan="8">Sin incumplimientos en este período 🎉</td></tr>';
+  htmlEv+='</tbody>';
+  document.getElementById('tblIncumplimientos').innerHTML=htmlEv;
+
+  var reincList=Object.keys(conteoPlaca).filter(function(p){return conteoPlaca[p]>=REINCIDENCIA_MIN;})
+    .map(function(p){
+      var evs=eventos.filter(function(e){return e.placa===p;});
+      return {placa:p,n:conteoPlaca[p],pctProm:avg(evs.map(function(e){return e.pct;}))};
+    }).sort(function(a,b){return b.n-a.n;});
+  document.getElementById('reincidenciaGrid').innerHTML = reincList.length ? reincList.map(function(r){
+    return '<div class="alert-card crit"><div class="ac-n">'+r.n+'x</div><div class="ac-l">Placa <strong>'+r.placa+'</strong><br><span style="font-weight:400;color:#94a3b8">% Cumpl. promedio: '+Math.round(r.pctProm)+'%</span></div></div>';
+  }).join('') : '<div class="empty" style="grid-column:1/-1">Sin placas reincidentes en este período ✅</div>';
 }
 
 /* ---------- Ranking de Clientes ---------- */
