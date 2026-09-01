@@ -684,17 +684,17 @@ function renderSemanal(){
   if(!buckets.length) return;
   var labels=buckets.map(function(b){return b.label;});
 
-  lineChart('chartKlMin',labels,buckets.map(function(b){return b.klMin!==null?parseFloat(b.klMin.toFixed(1)):null;}),{color:'#1e6f8f',log:true});
+  lineChart('chartKlMin',labels,buckets.map(function(b){return b.klMin!==null?parseFloat(b.klMin.toFixed(1)):null;}),{color:'#1e6f8f'});
 
-  lineChart('chartTiempoTotal',labels,buckets.map(function(b){return b.tiempoTotal;}),{color:'#1e6f8f',log:true,labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+  lineChart('chartTiempoTotal',labels,buckets.map(function(b){return b.tiempoTotal;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
-  lineChart('chartKlHoraHombre',labels,buckets.map(function(b){return b.klHoraHombre!==null?Math.round(b.klHoraHombre):null;}),{color:'#1e6f8f',log:true});
+  lineChart('chartKlHoraHombre',labels,buckets.map(function(b){return b.klHoraHombre!==null?Math.round(b.klHoraHombre):null;}),{color:'#1e6f8f'});
 
-  lineChart('chartKlMinHombre',labels,buckets.map(function(b){return b.klMinHombre!==null?parseFloat(b.klMinHombre.toFixed(1)):null;}),{color:'#1e6f8f',log:true});
+  lineChart('chartKlMinHombre',labels,buckets.map(function(b){return b.klMinHombre!==null?parseFloat(b.klMinHombre.toFixed(1)):null;}),{color:'#1e6f8f'});
 
-  lineChart('chartCargueNeto',labels,buckets.map(function(b){return b.cargueNeto;}),{color:'#1e6f8f',log:true,labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+  lineChart('chartCargueNeto',labels,buckets.map(function(b){return b.cargueNeto;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
-  lineChart('chartEspera',labels,buckets.map(function(b){return b.espera;}),{color:'#1e6f8f',log:true,labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+  lineChart('chartEspera',labels,buckets.map(function(b){return b.espera;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
   lineChart('chartCitas',labels,buckets.map(function(b){return b.pctCitas;}),{color:'#0d9488',labelFormatter:function(v){return v!==null?v+'%':'';},tooltipFormatter:function(v){return v+'%';},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'},min:0,max:100}});
 
