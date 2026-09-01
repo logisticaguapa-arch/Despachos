@@ -53,6 +53,18 @@ header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:10px 20px;displ
 
 .section-title{font-size:0.8rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.5px;display:flex;align-items:center;gap:8px;margin-top:4px}
 
+/* ===== Selector múltiple (msel) ===== */
+.msel{position:relative}
+.msel-btn{padding:6px 12px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;color:#1e293b;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:10px;min-width:110px;justify-content:space-between}
+.msel.open .msel-btn{border-color:#7c3aed}
+.msel-panel{display:none;position:absolute;top:calc(100% + 5px);left:0;z-index:60;background:#fff;border:1px solid #e2e8f0;border-radius:9px;box-shadow:0 10px 28px rgba(0,0,0,.14);padding:6px;min-width:190px;max-height:260px;overflow-y:auto}
+.msel.open .msel-panel{display:block}
+.msel-panel label{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;font-size:.78rem;font-weight:600;color:#1e293b;cursor:pointer}
+.msel-panel label:hover{background:#f1f5f9}
+.msel-panel input[type=checkbox]{width:15px;height:15px;accent-color:#7c3aed}
+.msel-actions{display:flex;gap:6px;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid #f1f5f9}
+.msel-actions button{flex:1;padding:5px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;color:#475569;font-size:.7rem;font-weight:700;cursor:pointer;font-family:inherit}
+
 /* ===== Tabs ===== */
 .tabs{display:flex;gap:8px;background:white;border-radius:10px;padding:6px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
 .tab-btn{flex:1;padding:9px;border:none;background:transparent;color:#64748b;font-weight:700;font-size:0.82rem;border-radius:7px;cursor:pointer;font-family:inherit}
@@ -116,19 +128,19 @@ tbody tr:hover{background:#f8fafc}
   <div class="tabs" style="flex-wrap:wrap;gap:10px;padding:10px 12px">
     <div style="display:flex;flex-direction:column;gap:3px">
       <label style="font-size:.62rem;color:#94a3b8;font-weight:700;text-transform:uppercase">Año</label>
-      <select id="fAno" onchange="applyDateFilters()" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:.78rem"><option value="">Todos</option></select>
+      <div class="msel" id="mAno"><button type="button" class="msel-btn" onclick="toggleMsel('mAno')"><span id="mAno-label">Todos</span><span>▾</span></button><div class="msel-panel" id="mAno-panel"></div></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:3px">
       <label style="font-size:.62rem;color:#94a3b8;font-weight:700;text-transform:uppercase">Mes</label>
-      <select id="fMes" onchange="applyDateFilters()" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:.78rem"><option value="">Todos</option></select>
+      <div class="msel" id="mMes"><button type="button" class="msel-btn" onclick="toggleMsel('mMes')"><span id="mMes-label">Todos</span><span>▾</span></button><div class="msel-panel" id="mMes-panel"></div></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:3px">
       <label style="font-size:.62rem;color:#94a3b8;font-weight:700;text-transform:uppercase">Semana</label>
-      <select id="fSemana" onchange="applyDateFilters()" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:.78rem"><option value="">Todas</option></select>
+      <div class="msel" id="mSemana"><button type="button" class="msel-btn" onclick="toggleMsel('mSemana')"><span id="mSemana-label">Todas</span><span>▾</span></button><div class="msel-panel" id="mSemana-panel"></div></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:3px">
       <label style="font-size:.62rem;color:#94a3b8;font-weight:700;text-transform:uppercase">Fecha exacta</label>
-      <select id="fFechaExacta" onchange="applyDateFilters()" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:.78rem"><option value="">Todas</option></select>
+      <div class="msel" id="mFecha"><button type="button" class="msel-btn" onclick="toggleMsel('mFecha')"><span id="mFecha-label">Todas</span><span>▾</span></button><div class="msel-panel" id="mFecha-panel"></div></div>
     </div>
     <button class="tab-btn" style="align-self:flex-end;background:#fff1f2;color:#dc2626" onclick="clearDateFilters()">✖ Limpiar</button>
   </div>
@@ -263,7 +275,7 @@ if(sessionStorage.getItem('resultadosUnlocked')==='1'){ unlock(); }
 var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
 var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8,H_OC:9,H_CITA:10,H_LLE:11,H_SALIDA:12,H_INI:13,H_FIN:14,STATUS:15,OBS:16,HS:17,MIN:18,KGMIN:19,EMP:20,MUE:21,CUA:22,PER:23,CONDUCTOR:24,CC_COND:25,TEL_COND:26,CAN_ENCAJABLES:27,CAN_GRANDES:28,CAN_PEQUENAS:29};
 var allData=[], filteredData=[], charts={}, currentTab='semana', retryCount=0, MAX_AUTO_RETRIES=3;
-var dateFiltros={ano:'',mes:'',semana:'',fecha:''};
+var dateFiltros={anos:[],meses:[],semanas:[],fechas:[]};
 
 /* ===== Umbral mínimo de seguridad =====
 Los kilos siempre se toman de la Columna F (KG CARGADOS). El Kg/Min NO se lee
@@ -326,10 +338,16 @@ function manualRetry(){
   fetchData();
 }
 
-/* ---------- Filtros de Fecha/Mes/Semana/Año ---------- */
+/* ---------- Filtros de Fecha/Mes/Semana/Año (selección múltiple) ---------- */
+var MSEL_RES_DEFS=[
+  {id:'mAno',key:'anos',placeholder:'Todos'},
+  {id:'mMes',key:'meses',placeholder:'Todos'},
+  {id:'mSemana',key:'semanas',placeholder:'Todas'},
+  {id:'mFecha',key:'fechas',placeholder:'Todas'}
+];
 function buildDateFilters(){
-  var anos=[], meses=[], semanas=[], fechas=[];
   var anoSet={}, mesSet={}, semSet={}, fechaSet={};
+  var anos=[], meses=[], semanas=[], fechas=[];
   allData.forEach(function(r){
     var fecha=parseFecha(r[C.FECHA]);
     if(!fecha) return;
@@ -345,23 +363,52 @@ function buildDateFilters(){
   semanas.sort(function(a,b){return a-b;});
   fechas.sort(function(a,b){return b.t-a.t;});
 
-  document.getElementById('fAno').innerHTML='<option value="">Todos</option>'+anos.map(function(y){return '<option value="'+y+'">'+y+'</option>';}).join('');
-  document.getElementById('fMes').innerHTML='<option value="">Todos</option>'+meses.map(function(m){return '<option value="'+m+'">'+MESES[m]+'</option>';}).join('');
-  document.getElementById('fSemana').innerHTML='<option value="">Todas</option>'+semanas.map(function(w){return '<option value="'+w+'">Semana '+w+'</option>';}).join('');
-  document.getElementById('fFechaExacta').innerHTML='<option value="">Todas</option>'+fechas.map(function(f){return '<option value="'+f.str+'">'+f.str+'</option>';}).join('');
+  fillMselRes('mAno','anos',anos.map(function(y){return {v:''+y,l:''+y};}));
+  fillMselRes('mMes','meses',meses.map(function(m){return {v:''+m,l:MESES[m]};}));
+  fillMselRes('mSemana','semanas',semanas.map(function(w){return {v:''+w,l:'Semana '+w};}));
+  fillMselRes('mFecha','fechas',fechas.map(function(f){return {v:f.str,l:f.str};}));
+}
+function fillMselRes(id,key,items){
+  var panel=document.getElementById(id+'-panel');
+  var html='<div class="msel-actions"><button type="button" onclick="mselResAll(\''+id+'\',\''+key+'\')">Todos</button><button type="button" onclick="mselResNone(\''+id+'\',\''+key+'\')">Ninguno</button></div>';
+  html+=items.map(function(it){
+    var checked=dateFiltros[key].includes(it.v)?'checked':'';
+    return '<label><input type="checkbox" value="'+it.v+'" '+checked+' onchange="onMselResChange(\''+id+'\',\''+key+'\',this)">'+it.l+'</label>';
+  }).join('');
+  panel.innerHTML=html;
+}
+function toggleMsel(id){
+  var el=document.getElementById(id), wasOpen=el.classList.contains('open');
+  document.querySelectorAll('.msel.open').forEach(function(m){m.classList.remove('open');});
+  if(!wasOpen) el.classList.add('open');
+}
+document.addEventListener('click',function(e){ if(!e.target.closest('.msel')) document.querySelectorAll('.msel.open').forEach(function(m){m.classList.remove('open');}); });
+function onMselResChange(id,key,cb){
+  if(cb.checked){ if(!dateFiltros[key].includes(cb.value)) dateFiltros[key].push(cb.value); }
+  else dateFiltros[key]=dateFiltros[key].filter(function(x){return x!==cb.value;});
+  updateMselResLabel(id,key); applyDateFilters();
+}
+function mselResAll(id,key){
+  document.querySelectorAll('#'+id+'-panel input[type=checkbox]').forEach(function(cb){cb.checked=true;if(!dateFiltros[key].includes(cb.value))dateFiltros[key].push(cb.value);});
+  updateMselResLabel(id,key); applyDateFilters();
+}
+function mselResNone(id,key){
+  document.querySelectorAll('#'+id+'-panel input[type=checkbox]').forEach(function(cb){cb.checked=false;});
+  dateFiltros[key]=[]; updateMselResLabel(id,key); applyDateFilters();
+}
+function updateMselResLabel(id,key){
+  var def=MSEL_RES_DEFS.find(function(d){return d.id===id;});
+  var n=dateFiltros[key].length;
+  document.getElementById(id+'-label').textContent = n===0?def.placeholder:(n+' seleccionado'+(n>1?'s':''));
 }
 function applyDateFilters(){
-  dateFiltros.ano=document.getElementById('fAno').value;
-  dateFiltros.mes=document.getElementById('fMes').value;
-  dateFiltros.semana=document.getElementById('fSemana').value;
-  dateFiltros.fecha=document.getElementById('fFechaExacta').value;
   filteredData=allData.filter(function(r){
     var fecha=parseFecha(r[C.FECHA]);
     if(!fecha) return false;
-    if(dateFiltros.ano!==''&&fecha.getFullYear()!==parseInt(dateFiltros.ano)) return false;
-    if(dateFiltros.mes!==''&&fecha.getMonth()!==parseInt(dateFiltros.mes)) return false;
-    if(dateFiltros.semana!==''&&getISOWeek(fecha)!==parseInt(dateFiltros.semana)) return false;
-    if(dateFiltros.fecha!==''&&(r[C.FECHA]||'').trim()!==dateFiltros.fecha) return false;
+    if(dateFiltros.anos.length&&!dateFiltros.anos.includes(''+fecha.getFullYear())) return false;
+    if(dateFiltros.meses.length&&!dateFiltros.meses.includes(''+fecha.getMonth())) return false;
+    if(dateFiltros.semanas.length&&!dateFiltros.semanas.includes(''+getISOWeek(fecha))) return false;
+    if(dateFiltros.fechas.length&&!dateFiltros.fechas.includes((r[C.FECHA]||'').trim())) return false;
     return true;
   });
   renderGlobal();
@@ -369,10 +416,11 @@ function applyDateFilters(){
   setTab(currentTab);
 }
 function clearDateFilters(){
-  document.getElementById('fAno').value='';
-  document.getElementById('fMes').value='';
-  document.getElementById('fSemana').value='';
-  document.getElementById('fFechaExacta').value='';
+  MSEL_RES_DEFS.forEach(function(def){
+    dateFiltros[def.key]=[];
+    document.querySelectorAll('#'+def.id+'-panel input[type=checkbox]').forEach(function(cb){cb.checked=false;});
+    updateMselResLabel(def.id,def.key);
+  });
   applyDateFilters();
 }
 
