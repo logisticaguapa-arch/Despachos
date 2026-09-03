@@ -642,29 +642,54 @@ function lineChart(canvasId, labels, data, opts){
     yScale.type='logarithmic';
     yScale.min=opts.logMin||0.5;
   }
-  charts[canvasId]=new Chart(document.getElementById(canvasId),{
+  var datasets=[{
     type:'line',
-    data:{labels:labels,datasets:[{
-      label:opts.label||'',
-      data:data,
-      borderColor:opts.color||'#1e6f8f',
-      backgroundColor:opts.color||'#1e6f8f',
-      tension:0.3,
-      pointRadius:3,
-      borderWidth:2
-    }]},
+    label:opts.label||'',
+    data:data,
+    borderColor:opts.color||'#1e6f8f',
+    backgroundColor:opts.color||'#1e6f8f',
+    tension:0.3,
+    pointRadius:3,
+    borderWidth:2,
+    yAxisID:'y',
+    order:1
+  }];
+  var scales={
+    x:{ticks:{font:{size:12},color:'#64748b'},grid:{display:false}},
+    y:yScale
+  };
+  if(opts.kgData){
+    datasets.push({
+      type:'bar',
+      label:'Kg Cargados (Ton)',
+      data:opts.kgData.map(function(v){return parseFloat((v/1000).toFixed(2));}),
+      backgroundColor:'#cbd5e1',
+      borderRadius:3,
+      yAxisID:'y1',
+      order:2,
+      datalabels:{display:false}
+    });
+    scales.y1={
+      position:'right',
+      ticks:{font:{size:11},color:'#94a3b8',callback:function(v){return v+'T';}},
+      grid:{display:false},
+      title:{display:true,text:'Kg Cargados (Ton)',font:{size:10},color:'#94a3b8'}
+    };
+  }
+  charts[canvasId]=new Chart(document.getElementById(canvasId),{
+    data:{labels:labels,datasets:datasets},
     options:{
       responsive:true,
       layout:{padding:{top:28}},
       plugins:{
-        legend:{display:false},
+        legend:{display:!!opts.kgData,position:'bottom',labels:{font:{size:11}}},
         datalabels:{display:true,align:'top',anchor:'end',color:'#374151',font:{size:13,weight:'bold'},formatter:opts.labelFormatter||function(v){return v;}},
-        tooltip:{callbacks:{label:function(c){return opts.tooltipFormatter?opts.tooltipFormatter(c.raw):c.raw;}}}
+        tooltip:{callbacks:{label:function(c){
+          if(c.dataset.type==='bar') return c.dataset.label+': '+c.raw+' T';
+          return opts.tooltipFormatter?opts.tooltipFormatter(c.raw):c.raw;
+        }}}
       },
-      scales:{
-        x:{ticks:{font:{size:12},color:'#64748b'},grid:{display:false}},
-        y:yScale
-      }
+      scales:scales
     }
   });
 }
@@ -685,19 +710,19 @@ function renderSemanal(){
   if(!buckets.length) return;
   var labels=buckets.map(function(b){return b.label;});
 
-  lineChart('chartKlMin',labels,buckets.map(function(b){return b.klMin!==null?parseFloat(b.klMin.toFixed(1)):null;}),{color:'#1e6f8f'});
+  lineChart('chartKlMin',labels,buckets.map(function(b){return b.klMin!==null?parseFloat(b.klMin.toFixed(1)):null;}),{color:'#1e6f8f',kgData:buckets.map(function(b){return b.kg;})});
 
-  lineChart('chartTiempoTotal',labels,buckets.map(function(b){return b.tiempoTotal;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+  lineChart('chartTiempoTotal',labels,buckets.map(function(b){return b.tiempoTotal;}),{color:'#1e6f8f',kgData:buckets.map(function(b){return b.kg;}),labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
-  lineChart('chartKlHoraHombre',labels,buckets.map(function(b){return b.klHoraHombre!==null?Math.round(b.klHoraHombre):null;}),{color:'#1e6f8f'});
+  lineChart('chartKlHoraHombre',labels,buckets.map(function(b){return b.klHoraHombre!==null?Math.round(b.klHoraHombre):null;}),{color:'#1e6f8f',kgData:buckets.map(function(b){return b.kg;})});
 
-  lineChart('chartKlMinHombre',labels,buckets.map(function(b){return b.klMinHombre!==null?parseFloat(b.klMinHombre.toFixed(1)):null;}),{color:'#1e6f8f'});
+  lineChart('chartKlMinHombre',labels,buckets.map(function(b){return b.klMinHombre!==null?parseFloat(b.klMinHombre.toFixed(1)):null;}),{color:'#1e6f8f',kgData:buckets.map(function(b){return b.kg;})});
 
-  lineChart('chartCargueNeto',labels,buckets.map(function(b){return b.cargueNeto;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+  lineChart('chartCargueNeto',labels,buckets.map(function(b){return b.cargueNeto;}),{color:'#1e6f8f',kgData:buckets.map(function(b){return b.kg;}),labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
-  lineChart('chartEspera',labels,buckets.map(function(b){return b.espera;}),{color:'#1e6f8f',labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
+  lineChart('chartEspera',labels,buckets.map(function(b){return b.espera;}),{color:'#1e6f8f',kgData:buckets.map(function(b){return b.kg;}),labelFormatter:function(v){return v!==null?minToHM(v):'';},tooltipFormatter:function(v){return minToHM(v);},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return minToHM(v);}},grid:{color:'#f1f5f9'}}});
 
-  lineChart('chartCitas',labels,buckets.map(function(b){return b.pctCitas;}),{color:'#0d9488',labelFormatter:function(v){return v!==null?v+'%':'';},tooltipFormatter:function(v){return v+'%';},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'},min:0,max:100}});
+  lineChart('chartCitas',labels,buckets.map(function(b){return b.pctCitas;}),{color:'#0d9488',kgData:buckets.map(function(b){return b.kg;}),labelFormatter:function(v){return v!==null?v+'%':'';},tooltipFormatter:function(v){return v+'%';},yOptions:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'},min:0,max:100}});
 
   // % Kg por Empaque (Canasta vs Granel)
   dc('chartEmpaque');
