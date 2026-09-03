@@ -115,10 +115,32 @@ table.rtable tbody tr:hover{background:#f8fafc}
 
 <div class="container">
 
+  <div class="section-title">🎯 OTIF — On Time In Full (a tiempo Y completo)</div>
+  <div class="card" style="background:linear-gradient(90deg,#fff7ed,#fff)">
+    <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+      <div style="text-align:center">
+        <div style="font-size:3rem;font-weight:800;color:#9a3412;line-height:1" id="kOTIF">—</div>
+        <div style="font-size:.7rem;color:#64748b;font-weight:700;text-transform:uppercase;margin-top:4px">OTIF Global</div>
+      </div>
+      <div style="flex:1;min-width:220px;font-size:.78rem;color:#78716c;line-height:1.5">
+        <strong>OTIF (%) = (Pedidos a tiempo Y completos ÷ Total de pedidos evaluados) × 100</strong><br>
+        "A tiempo" = columna Entrega a Tiempo = SI. "Completo" = Kg Cargados ≥ <span id="otifUmbralTxt">99</span>% de Kg OC.
+        Solo se evalúan pedidos con ambos datos disponibles (<span id="kOTIFTotal">0</span> de <span id="kOTIFUniverso">0</span> registros del filtro actual).
+      </div>
+      <div class="kpi-grid" style="flex:0 0 auto;grid-template-columns:repeat(4,1fr);gap:8px">
+        <div class="kpi c2" style="min-width:90px"><div class="v" id="kOTIFOk" style="font-size:1.1rem">—</div><div class="l">Cumple OTIF</div></div>
+        <div class="kpi c6" style="min-width:90px"><div class="v" id="kOTIFSoloTiempo" style="font-size:1.1rem">—</div><div class="l">A tiempo, incompleto</div></div>
+        <div class="kpi c6" style="min-width:90px"><div class="v" id="kOTIFSoloCompleto" style="font-size:1.1rem">—</div><div class="l">Completo, tarde</div></div>
+        <div class="kpi c6" style="min-width:90px"><div class="v" id="kOTIFNinguno" style="font-size:1.1rem">—</div><div class="l">Ninguno</div></div>
+      </div>
+    </div>
+  </div>
+
   <div class="section-title">📦 Cumplimiento de Kilos (Kg OC vs Kg Cargados)</div>
-  <div class="kpi-grid">
+  <div class="kpi-grid" style="grid-template-columns:repeat(7,1fr)">
     <div class="kpi c1"><div class="v" id="kKgOC">—</div><div class="l">Kg en OC (Ton)</div></div>
     <div class="kpi c2"><div class="v" id="kKgCargado">—</div><div class="l">Kg Cargados (Ton)</div></div>
+    <div class="kpi c6"><div class="v" id="kKgFaltante">—</div><div class="l">Kg Faltantes (Ton)</div></div>
     <div class="kpi c3"><div class="v" id="kPctCumpl">—</div><div class="l">% Cumplimiento Kilos</div></div>
     <div class="kpi c4"><div class="v" id="kPctATiempo">—</div><div class="l">% Entregas a Tiempo</div></div>
     <div class="kpi c5"><div class="v" id="kATiempo">—</div><div class="l">Entregas a Tiempo</div></div>
@@ -127,7 +149,7 @@ table.rtable tbody tr:hover{background:#f8fafc}
 
   <div class="grid2">
     <div class="card">
-      <div class="card-title">📈 % Entregas a Tiempo — tendencia semanal</div>
+      <div class="card-title">📈 % Entregas a Tiempo vs OTIF — tendencia semanal</div>
       <canvas id="chartTendencia" height="90"></canvas>
     </div>
     <div class="card">
@@ -136,15 +158,29 @@ table.rtable tbody tr:hover{background:#f8fafc}
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-title">⚠️ Causales Logísticas más frecuentes</div>
-    <div class="card-sub" style="margin-bottom:10px">Solo se cuentan los viajes marcados como "NO" en Entrega a Tiempo</div>
-    <canvas id="chartCausales" height="90"></canvas>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-title">⚠️ Causales Logísticas más frecuentes</div>
+      <div class="card-sub" style="margin-bottom:10px">Solo se cuentan los viajes marcados como "NO" en Entrega a Tiempo — color = área responsable</div>
+      <canvas id="chartCausales" height="140"></canvas>
+      <div class="donut-legend" id="legendAreas" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🏢 Incumplimientos por Área Responsable</div>
+      <div class="card-sub" style="margin-bottom:10px">Quién debe atender el correctivo</div>
+      <canvas id="chartAreas" height="140"></canvas>
+    </div>
   </div>
 
   <div class="card">
     <div class="card-title">🏷️ Cumplimiento por Categoría de Cliente</div>
     <div class="dtable-wrap"><table class="rtable" id="tblCategoria"></table></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📉 Clientes con más Kilos Faltantes (Kg OC no cargados)</div>
+    <div class="card-sub" style="margin-bottom:10px">Ordenado de mayor a menor diferencia — muestra dónde está la mayor brecha entre lo pedido y lo despachado</div>
+    <div class="dtable-wrap"><table class="rtable" id="tblKgFaltantes"></table></div>
   </div>
 
   <div class="section-title">🚚 Viajes NO entregados a tiempo — detalle y causal</div>
@@ -206,8 +242,56 @@ function categoriaDeCliente(cliente){
   return CLIENTE_CATEGORIA[k]||'SIN CATEGORÍA';
 }
 
+/* ===== Causal Logística -> Área Responsable (hoja CRITERIOS) =====
+Tomado directamente de lo que compartiste el 19/09/2026. Si agregas causales
+nuevas en la hoja, avisa para actualizar esta lista. */
+var CAUSAL_RESPONSABLE={
+'ATRIBUIBLE AL CONDUCTOR':'Logística','BLOQUEO DE VÍA POR ORDEN PÚBLICO':'Logística',
+'PEDIDO MONTADO TARDE':'Comercial','SALIDA TARDE POR FALTA DE FRUTA':'Cosecha',
+'VEHÍCULO VARADO':'Logística','MAL ESTADO EN LA VÍA':'Logística',
+'VEHÍCULO SINIESTRADO':'Logística','DAÑO EQUIPO EN PLANTA':'Empacadora',
+'DERRUMBE EN VÍA':'Logística','DEMORA POR PESAJE':'Logística',
+'ATRIBUIBLE A COMERCIAL':'Comercial','AFECTACIÓN POR CLIMA':'Logística',
+'PÉRDIDA TOTAL PEDIDO POR VARIACIÓN ESTIMADO':'Comercial','SALIDA TARDE POR LAVADO DE PLAGAS':'Calidad',
+'SALIDA TARDE POR CONTINGENCIA EN EMPAQUE':'Calidad','MAQUINARIA VARADA EN COSECHA':'Cosecha',
+'PROBLEMA DE VÍAS EN COSECHA':'Cosecha','SALIDA TARDE POR CAPACITACIÓN':'Logística',
+'ATRIBUIBLE AL CLIENTE':'Comercial','ATRIBUIBLE A DESPACHOS':'Logística',
+'FALTA DE FRUTA INVENTARIO':'Cosecha','FALTA DE FRUTA POR CALIDAD':'Calidad'
+};
+function areaResponsable(causal){
+  var k=(causal||'').trim().toUpperCase();
+  return CAUSAL_RESPONSABLE[k]||'Sin área asignada';
+}
+var AREA_COLORES={
+  'Logística':'#c2410c','Comercial':'#2563eb','Cosecha':'#16a34a',
+  'Empacadora':'#7c3aed','Calidad':'#0d9488','Sin área asignada':'#94a3b8'
+};
+
+/* ===== OTIF: On Time In Full =====
+"A tiempo": columna ENTREGA A TIEMPO = SI/NO.
+"Completo": Kg Cargados >= OTIF_COMPLETO_MIN% de Kg OC.
+Un pedido solo se evalúa si tiene AMBOS datos disponibles. */
+var OTIF_COMPLETO_MIN=99;
+function esATiempo(r){
+  var v=(r[C.ENTREGA_TIEMPO]||'').trim().toUpperCase();
+  if(v==='SI') return true;
+  if(v==='NO') return false;
+  return null;
+}
+function esCompleto(r){
+  var kgOC=toNum(r[C.KG_OC]);
+  if(kgOC<=0) return null;
+  var kg=toNum(r[C.CANT]);
+  return (kg/kgOC*100)>=OTIF_COMPLETO_MIN;
+}
+function esOTIF(r){
+  var t=esATiempo(r), c=esCompleto(r);
+  if(t===null||c===null) return null;
+  return t&&c;
+}
+
 var allData=[], filteredData=[], charts={}, retryCount=0, MAX_AUTO_RETRIES=3;
-var filtros={categorias:[],anos:[],meses:[],semanas:[],fechas:[]};
+var filtros={categorias:[],clientes:[],anos:[],meses:[],semanas:[],fechas:[]};
 
 function normStr(s){return(s||'').toLowerCase().trim();}
 function toNum(v){if(!v)return 0;var s=v.toString().replace(/"/g,'').replace('%','').trim();s=s.replace(/\./g,'').replace(',','.');return parseFloat(s)||0;}
@@ -273,6 +357,7 @@ async function fetchData(){
 /* ===== Filtros multi-selección ===== */
 var MSEL_DEFS=[
   {id:'fCat',key:'categorias',label:'Categoría Cliente'},
+  {id:'fCliente',key:'clientes',label:'Cliente'},
   {id:'fAno',key:'anos',label:'Año'},
   {id:'fMes',key:'meses',label:'Mes'},
   {id:'fSemana',key:'semanas',label:'Semana'},
@@ -284,11 +369,13 @@ function buildFilters(){
     return '<div class="msel" id="'+def.id+'"><span class="msel-lbl">'+def.label+'</span><button type="button" class="msel-btn" onclick="toggleMsel(\''+def.id+'\')"><span id="'+def.id+'-label">Todos</span><span>▾</span></button><div class="msel-panel" id="'+def.id+'-panel"></div></div>';
   }).join('') + '<button id="btnClearAll" onclick="clearAllFilters()">✖ Limpiar filtros</button>';
 
-  var catSet={},anoSet={},mesSet={},semSet={},fechaSet={};
-  var cats=[],anos=[],meses=[],semanas=[],fechas=[];
+  var catSet={},cliSet={},anoSet={},mesSet={},semSet={},fechaSet={};
+  var cats=[],clientes=[],anos=[],meses=[],semanas=[],fechas=[];
   allData.forEach(function(r){
     var cat=categoriaDeCliente(r[C.CLIENTE]);
     if(!catSet[cat]){catSet[cat]=1;cats.push(cat);}
+    var cli=(r[C.CLIENTE]||'').trim();
+    if(cli&&!cliSet[cli]){cliSet[cli]=1;clientes.push(cli);}
     var fecha=parseFecha(r[C.FECHA]);
     if(!fecha) return;
     var yr=fecha.getFullYear(), mo=fecha.getMonth(), wk=getISOWeek(fecha);
@@ -299,12 +386,14 @@ function buildFilters(){
     if(fStr&&!fechaSet[fStr]){fechaSet[fStr]=1;fechas.push({str:fStr,t:fecha.getTime()});}
   });
   cats.sort();
+  clientes.sort();
   anos.sort(function(a,b){return b-a;});
   meses.sort(function(a,b){return a-b;});
   semanas.sort(function(a,b){return a-b;});
   fechas.sort(function(a,b){return b.t-a.t;});
 
   fillMsel('fCat','categorias',cats.map(function(c){return {v:c,l:c};}));
+  fillMsel('fCliente','clientes',clientes.map(function(c){return {v:c,l:c};}));
   fillMsel('fAno','anos',anos.map(function(y){return {v:''+y,l:''+y};}));
   fillMsel('fMes','meses',meses.map(function(m){return {v:''+m,l:MESES[m]};}));
   fillMsel('fSemana','semanas',semanas.map(function(w){return {v:''+w,l:'Semana '+w};}));
@@ -354,6 +443,7 @@ function clearAllFilters(){
 function applyFilters(){
   filteredData=allData.filter(function(r){
     if(filtros.categorias.length&&!filtros.categorias.includes(categoriaDeCliente(r[C.CLIENTE]))) return false;
+    if(filtros.clientes.length&&!filtros.clientes.includes((r[C.CLIENTE]||'').trim())) return false;
     var fecha=parseFecha(r[C.FECHA]);
     if(filtros.anos.length||filtros.meses.length||filtros.semanas.length||filtros.fechas.length){
       if(!fecha) return false;
@@ -366,10 +456,13 @@ function applyFilters(){
   });
   document.getElementById('hdrMeta').textContent=filteredData.length.toLocaleString('es-CO')+' registros analizados';
   renderKPIs();
+  renderOTIF();
   renderTendencia();
   renderDonut();
   renderCausales();
+  renderAreas();
   renderCategoria();
+  renderKgFaltantes();
   renderDetalle();
 }
 
@@ -386,35 +479,60 @@ function renderKPIs(){
 
   document.getElementById('kKgOC').textContent=(kgOC/1000).toFixed(1)+' T';
   document.getElementById('kKgCargado').textContent=(kgCargado/1000).toFixed(1)+' T';
+  document.getElementById('kKgFaltante').textContent=((kgOC-kgCargado)/1000).toFixed(1)+' T';
   document.getElementById('kPctCumpl').textContent=pctCumpl!==null?pctCumpl.toFixed(0)+'%':'—';
   document.getElementById('kPctATiempo').textContent=pctATiempo!==null?pctATiempo+'%':'—';
   document.getElementById('kATiempo').textContent=aTiempo;
   document.getElementById('kTarde').textContent=tarde;
 }
 
+/* ===== OTIF: panel destacado ===== */
+function renderOTIF(){
+  document.getElementById('otifUmbralTxt').textContent=OTIF_COMPLETO_MIN;
+  var evaluables=filteredData.filter(function(r){return esATiempo(r)!==null&&esCompleto(r)!==null;});
+  var cumpleOTIF=evaluables.filter(function(r){return esATiempo(r)&&esCompleto(r);}).length;
+  var soloTiempo=evaluables.filter(function(r){return esATiempo(r)&&!esCompleto(r);}).length;
+  var soloCompleto=evaluables.filter(function(r){return !esATiempo(r)&&esCompleto(r);}).length;
+  var ninguno=evaluables.filter(function(r){return !esATiempo(r)&&!esCompleto(r);}).length;
+  var otif=evaluables.length?Math.round(cumpleOTIF/evaluables.length*100):null;
+
+  document.getElementById('kOTIF').textContent=otif!==null?otif+'%':'—';
+  document.getElementById('kOTIFTotal').textContent=evaluables.length;
+  document.getElementById('kOTIFUniverso').textContent=filteredData.length;
+  document.getElementById('kOTIFOk').textContent=cumpleOTIF;
+  document.getElementById('kOTIFSoloTiempo').textContent=soloTiempo;
+  document.getElementById('kOTIFSoloCompleto').textContent=soloCompleto;
+  document.getElementById('kOTIFNinguno').textContent=ninguno;
+}
+
 /* ===== Tendencia semanal % entregas a tiempo ===== */
 function renderTendencia(){
-  var rows=filteredData.filter(function(r){var v=(r[C.ENTREGA_TIEMPO]||'').trim().toUpperCase();return (v==='SI'||v==='NO')&&parseFecha(r[C.FECHA]);});
+  var rows=filteredData.filter(function(r){return esATiempo(r)!==null&&parseFecha(r[C.FECHA]);});
   var buckets={};
   rows.forEach(function(r){
     var fecha=parseFecha(r[C.FECHA]);
     var wk=getISOWeek(fecha), yr=fecha.getFullYear();
     var key=yr+'-'+wk;
-    if(!buckets[key]) buckets[key]={label:''+wk,sortKey:yr*100+wk,si:0,total:0};
+    if(!buckets[key]) buckets[key]={label:''+wk,sortKey:yr*100+wk,si:0,total:0,otifOk:0,otifTotal:0};
     buckets[key].total++;
-    if((r[C.ENTREGA_TIEMPO]||'').trim().toUpperCase()==='SI') buckets[key].si++;
+    if(esATiempo(r)) buckets[key].si++;
+    if(esCompleto(r)!==null){ buckets[key].otifTotal++; if(esATiempo(r)&&esCompleto(r)) buckets[key].otifOk++; }
   });
   var keys=Object.keys(buckets).sort(function(a,b){return buckets[a].sortKey-buckets[b].sortKey;});
   var labels=keys.map(function(k){return buckets[k].label;});
-  var data=keys.map(function(k){return Math.round(buckets[k].si/buckets[k].total*100);});
+  var dataTiempo=keys.map(function(k){return Math.round(buckets[k].si/buckets[k].total*100);});
+  var dataOTIF=keys.map(function(k){return buckets[k].otifTotal?Math.round(buckets[k].otifOk/buckets[k].otifTotal*100):null;});
   dc('chartTendencia');
   charts['chartTendencia']=new Chart(document.getElementById('chartTendencia'),{
     type:'line',
-    data:{labels:labels,datasets:[{data:data,borderColor:'#9a3412',backgroundColor:'#9a3412',tension:.3,pointRadius:3,borderWidth:2}]},
+    data:{labels:labels,datasets:[
+      {label:'% A Tiempo',data:dataTiempo,borderColor:'#0d9488',backgroundColor:'#0d9488',tension:.3,pointRadius:3,borderWidth:2},
+      {label:'% OTIF',data:dataOTIF,borderColor:'#9a3412',backgroundColor:'#9a3412',tension:.3,pointRadius:3,borderWidth:2,borderDash:[5,3]}
+    ]},
     options:{responsive:true,layout:{padding:{top:26}},
-      plugins:{legend:{display:false},
-        datalabels:{display:true,align:'top',anchor:'end',color:'#374151',font:{size:12,weight:'bold'},formatter:function(v){return v+'%';}},
-        tooltip:{callbacks:{label:function(c){return c.raw+'%';}}}},
+      plugins:{legend:{display:true,position:'top',labels:{font:{size:11}}},
+        datalabels:{display:true,align:'top',anchor:'end',color:'#374151',font:{size:11,weight:'bold'},formatter:function(v){return v!==null?v+'%':'';}},
+        tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.raw+'%';}}}},
       scales:{x:{ticks:{font:{size:11},color:'#64748b'},grid:{display:false}},
         y:{min:0,max:100,ticks:{font:{size:11},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'}}}}
   });
@@ -445,14 +563,39 @@ function renderCausales(){
   dc('chartCausales');
   charts['chartCausales']=new Chart(document.getElementById('chartCausales'),{
     type:'bar',
-    data:{labels:keys,datasets:[{data:keys.map(function(k){return counts[k];}),backgroundColor:'#c2410c',borderRadius:4}]},
+    data:{labels:keys,datasets:[{data:keys.map(function(k){return counts[k];}),backgroundColor:keys.map(function(k){return AREA_COLORES[areaResponsable(k)]||'#c2410c';}),borderRadius:4}]},
     options:{responsive:true,indexAxis:'y',layout:{padding:{right:30}},
-      plugins:{legend:{display:false},datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:12,weight:'bold'},formatter:function(v){return v;}}},
+      plugins:{legend:{display:false},
+        datalabels:{display:true,anchor:'end',align:'right',color:'#374151',font:{size:12,weight:'bold'},formatter:function(v){return v;}},
+        tooltip:{callbacks:{label:function(c){return c.raw+' viajes — Área: '+areaResponsable(c.label);}}}},
       scales:{x:{ticks:{font:{size:11},color:'#64748b'},grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:11},color:'#64748b'},grid:{display:false}}}}
   });
+  var areasEnUso=[...new Set(keys.map(areaResponsable))];
+  document.getElementById('legendAreas').innerHTML = areasEnUso.map(function(a){
+    return '<div class="legend-item"><div class="legend-dot" style="background:'+(AREA_COLORES[a]||'#94a3b8')+'"></div><span class="legend-label">'+a+'</span></div>';
+  }).join('');
   if(!keys.length){
     document.getElementById('chartCausales').parentElement.querySelector('canvas').style.display='none';
   }
+}
+
+/* ===== Incumplimientos por Área Responsable ===== */
+function renderAreas(){
+  var rows=filteredData.filter(function(r){return (r[C.ENTREGA_TIEMPO]||'').trim().toUpperCase()==='NO'&&(r[C.CAUSAL]||'').trim();});
+  var counts={};
+  rows.forEach(function(r){
+    var a=areaResponsable(r[C.CAUSAL]);
+    counts[a]=(counts[a]||0)+1;
+  });
+  var keys=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];});
+  dc('chartAreas');
+  charts['chartAreas']=new Chart(document.getElementById('chartAreas'),{
+    type:'doughnut',
+    data:{labels:keys,datasets:[{data:keys.map(function(k){return counts[k];}),backgroundColor:keys.map(function(k){return AREA_COLORES[k]||'#94a3b8';}),borderWidth:0}]},
+    options:{responsive:true,cutout:'58%',plugins:{legend:{display:true,position:'bottom',labels:{font:{size:12}}},
+      datalabels:{display:true,color:'#fff',font:{size:13,weight:'bold'},formatter:function(v){return v>0?v:'';}},
+      tooltip:{callbacks:{label:function(c){return c.label+': '+c.raw+' viajes';}}}}}
+  });
 }
 
 /* ===== Cumplimiento por Categoría de Cliente ===== */
@@ -460,24 +603,54 @@ function renderCategoria(){
   var grupos={};
   filteredData.forEach(function(r){
     var cat=categoriaDeCliente(r[C.CLIENTE]);
-    if(!grupos[cat]) grupos[cat]={kgOC:0,kg:0,si:0,total:0};
+    if(!grupos[cat]) grupos[cat]={kgOC:0,kg:0,si:0,total:0,otifOk:0,otifTotal:0};
     grupos[cat].kgOC+=toNum(r[C.KG_OC]);
     grupos[cat].kg+=toNum(r[C.CANT]);
     var v=(r[C.ENTREGA_TIEMPO]||'').trim().toUpperCase();
     if(v==='SI'||v==='NO'){ grupos[cat].total++; if(v==='SI') grupos[cat].si++; }
+    if(esATiempo(r)!==null&&esCompleto(r)!==null){ grupos[cat].otifTotal++; if(esATiempo(r)&&esCompleto(r)) grupos[cat].otifOk++; }
   });
   var cats=Object.keys(grupos).sort(function(a,b){return grupos[b].kg-grupos[a].kg;});
-  var html='<thead><tr><th class="left">Categoría</th><th>Kg OC</th><th>Kg Cargados</th><th>% Cumpl. Kilos</th><th>% A Tiempo</th><th>Entregas</th></tr></thead><tbody>';
+  var html='<thead><tr><th class="left">Categoría</th><th>Kg OC</th><th>Kg Cargados</th><th>% Cumpl. Kilos</th><th>% A Tiempo</th><th>% OTIF</th><th>Entregas</th></tr></thead><tbody>';
   html+=cats.map(function(cat){
     var g=grupos[cat];
     var pctK=g.kgOC>0?Math.round(g.kg/g.kgOC*100):null;
     var pctT=g.total>0?Math.round(g.si/g.total*100):null;
+    var pctOTIF=g.otifTotal>0?Math.round(g.otifOk/g.otifTotal*100):null;
     var badgeK=pctK===null?'—':(pctK>=95?'<span class="badge badge-ok">'+pctK+'%</span>':'<span class="badge badge-bad">'+pctK+'%</span>');
     var badgeT=pctT===null?'<span class="badge badge-neu">N/D</span>':(pctT>=90?'<span class="badge badge-ok">'+pctT+'%</span>':'<span class="badge badge-bad">'+pctT+'%</span>');
-    return '<tr><td class="left">'+cat+'</td><td>'+fmtN(g.kgOC)+'</td><td>'+fmtN(g.kg)+'</td><td>'+badgeK+'</td><td>'+badgeT+'</td><td>'+g.total+'</td></tr>';
+    var badgeOTIF=pctOTIF===null?'<span class="badge badge-neu">N/D</span>':(pctOTIF>=85?'<span class="badge badge-ok">'+pctOTIF+'%</span>':'<span class="badge badge-bad">'+pctOTIF+'%</span>');
+    return '<tr><td class="left">'+cat+'</td><td>'+fmtN(g.kgOC)+'</td><td>'+fmtN(g.kg)+'</td><td>'+badgeK+'</td><td>'+badgeT+'</td><td>'+badgeOTIF+'</td><td>'+g.total+'</td></tr>';
   }).join('');
   html+='</tbody>';
-  document.getElementById('tblCategoria').innerHTML = cats.length?html:'<tbody><tr><td class="empty" colspan="6">Sin datos</td></tr></tbody>';
+  document.getElementById('tblCategoria').innerHTML = cats.length?html:'<tbody><tr><td class="empty" colspan="7">Sin datos</td></tr></tbody>';
+}
+
+/* ===== Informe: Clientes con más Kilos Faltantes ===== */
+function renderKgFaltantes(){
+  var grupos={};
+  filteredData.forEach(function(r){
+    var cli=(r[C.CLIENTE]||'Sin cliente').trim()||'Sin cliente';
+    if(!grupos[cli]) grupos[cli]={kgOC:0,kg:0,n:0};
+    grupos[cli].kgOC+=toNum(r[C.KG_OC]);
+    grupos[cli].kg+=toNum(r[C.CANT]);
+    grupos[cli].n++;
+  });
+  var lista=Object.keys(grupos).map(function(cli){
+    var g=grupos[cli];
+    var faltante=g.kgOC-g.kg;
+    return {cliente:cli,categoria:categoriaDeCliente(cli),kgOC:g.kgOC,kg:g.kg,faltante:faltante,pct:g.kgOC>0?Math.round(g.kg/g.kgOC*100):null,n:g.n};
+  }).filter(function(d){return d.faltante>0.5;}); // solo clientes con brecha real
+  lista.sort(function(a,b){return b.faltante-a.faltante;});
+  lista=lista.slice(0,20);
+
+  var html='<thead><tr><th class="left">Cliente</th><th class="left">Categoría</th><th>OC</th><th>Kg OC</th><th>Kg Cargados</th><th>Kg Faltantes</th><th>% Cumpl.</th></tr></thead><tbody>';
+  html+=lista.length?lista.map(function(d){
+    var badge=d.pct===null?'—':(d.pct>=95?'<span class="badge badge-ok">'+d.pct+'%</span>':'<span class="badge badge-bad">'+d.pct+'%</span>');
+    return '<tr><td class="left">'+d.cliente+'</td><td class="left">'+d.categoria+'</td><td>'+d.n+'</td><td>'+fmtN(d.kgOC)+'</td><td>'+fmtN(d.kg)+'</td><td style="color:#dc2626;font-weight:800">'+fmtN(d.faltante)+'</td><td>'+badge+'</td></tr>';
+  }).join('') : '<tr><td colspan="7" class="empty">Sin brechas de kilos en este filtro 🎉</td></tr>';
+  html+='</tbody>';
+  document.getElementById('tblKgFaltantes').innerHTML=html;
 }
 
 /* ===== Detalle de viajes NO entregados a tiempo ===== */
@@ -493,10 +666,12 @@ function renderDetalle(){
     var fa=parseFecha(a[C.FECHA]), fb=parseFecha(b[C.FECHA]);
     return (fb?fb.getTime():0)-(fa?fa.getTime():0);
   });
-  var html='<thead><tr><th class="left">Fecha</th><th class="left">OC</th><th class="left">Cliente</th><th class="left">Categoría</th><th class="left">Placa</th><th class="left">Destino</th><th class="left">Fecha Llegada</th><th class="left">Hora Llegada</th><th class="left">Causal Logística</th></tr></thead><tbody>';
+  var html='<thead><tr><th class="left">Fecha</th><th class="left">OC</th><th class="left">Cliente</th><th class="left">Categoría</th><th class="left">Placa</th><th class="left">Destino</th><th class="left">Fecha Llegada</th><th class="left">Hora Llegada</th><th class="left">¿Completo?</th><th class="left">Causal Logística</th><th class="left">Área Responsable</th></tr></thead><tbody>';
   html+=rows.length?rows.slice(0,300).map(function(r){
-    return '<tr><td class="left">'+(r[C.FECHA]||'—')+'</td><td class="left">'+(r[C.OC]||'—')+'</td><td class="left">'+(r[C.CLIENTE]||'—')+'</td><td class="left">'+categoriaDeCliente(r[C.CLIENTE])+'</td><td class="left">'+(r[C.PLACAS]||'—')+'</td><td class="left">'+(r[C.DESTINO]||'—')+'</td><td class="left">'+(r[C.FECHA_LLEGADA_DEST]||'—')+'</td><td class="left">'+(r[C.HORA_LLEGADA_DEST]||'—')+'</td><td class="left">'+(r[C.CAUSAL]||'<span class="badge badge-neu">Sin causal registrada</span>')+'</td></tr>';
-  }).join('') : '<tr><td colspan="9" class="empty">Sin viajes tarde en este filtro 🎉</td></tr>';
+    var completo=esCompleto(r);
+    var badgeCompleto = completo===null?'<span class="badge badge-neu">N/D</span>':(completo?'<span class="badge badge-ok">Sí</span>':'<span class="badge badge-bad">No</span>');
+    return '<tr><td class="left">'+(r[C.FECHA]||'—')+'</td><td class="left">'+(r[C.OC]||'—')+'</td><td class="left">'+(r[C.CLIENTE]||'—')+'</td><td class="left">'+categoriaDeCliente(r[C.CLIENTE])+'</td><td class="left">'+(r[C.PLACAS]||'—')+'</td><td class="left">'+(r[C.DESTINO]||'—')+'</td><td class="left">'+(r[C.FECHA_LLEGADA_DEST]||'—')+'</td><td class="left">'+(r[C.HORA_LLEGADA_DEST]||'—')+'</td><td class="left">'+badgeCompleto+'</td><td class="left">'+(r[C.CAUSAL]||'<span class="badge badge-neu">Sin causal registrada</span>')+'</td><td class="left">'+(r[C.CAUSAL]?'<span class="badge" style="background:'+(AREA_COLORES[areaResponsable(r[C.CAUSAL])]||'#94a3b8')+'22;color:'+(AREA_COLORES[areaResponsable(r[C.CAUSAL])]||'#64748b')+'">'+areaResponsable(r[C.CAUSAL])+'</span>':'—')+'</td></tr>';
+  }).join('') : '<tr><td colspan="11" class="empty">Sin viajes tarde en este filtro 🎉</td></tr>';
   html+='</tbody>';
   document.getElementById('tblDetalle').innerHTML=html;
 }
