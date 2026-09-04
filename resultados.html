@@ -74,7 +74,8 @@ header{background:linear-gradient(90deg,#1B2A4A,#2d4a7a);padding:10px 20px;displ
 .card-title{font-size:0.78rem;font-weight:700;color:#374151;margin-bottom:10px;display:flex;align-items:center;gap:6px}
 .card-title::before{content:'';width:3px;height:13px;background:#7c3aed;border-radius:2px;display:inline-block}
 
-.metric-chart-wrap{width:100%}
+.metric-chart-wrap{width:100%;height:280px;position:relative}
+.metric-chart-wrap canvas{max-height:280px}
 
 table{width:100%;border-collapse:collapse;font-size:0.72rem}
 th{padding:6px 8px;background:#1e293b;color:#94a3b8;font-weight:700;text-transform:uppercase;font-size:0.58rem;letter-spacing:0.3px;white-space:nowrap;text-align:right;position:sticky;top:0}
@@ -667,7 +668,7 @@ function lineChart(canvasId, labels, data, opts){
       borderRadius:3,
       yAxisID:'y1',
       order:2,
-      datalabels:{display:false}
+      datalabels:{display:true,anchor:'end',align:'bottom',color:'#334155',font:{size:10,weight:'bold'},formatter:function(v){return v>0?v+'T':'';}}
     });
     scales.y1={
       position:'right',
@@ -680,6 +681,7 @@ function lineChart(canvasId, labels, data, opts){
     data:{labels:labels,datasets:datasets},
     options:{
       responsive:true,
+      maintainAspectRatio:false,
       layout:{padding:{top:28}},
       plugins:{
         legend:{display:!!opts.kgData,position:'bottom',labels:{font:{size:11}}},
