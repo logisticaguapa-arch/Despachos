@@ -179,6 +179,12 @@ table.rtable tbody tr:hover{background:#f8fafc}
     <div class="dtable-wrap"><table class="rtable" id="tblKgFaltantes"></table></div>
   </div>
 
+  <div class="card">
+    <div class="card-title">⚠️ Pedidos a Tiempo pero Incompletos (fallan OTIF por cantidad, no por puntualidad)</div>
+    <div class="card-sub" style="margin-bottom:10px">Llegaron a tiempo, pero el Kg Cargado no alcanzó el <span id="otifUmbralTxt2">99</span>% del Kg OC — el cliente sí quedó afectado en cantidad</div>
+    <div class="dtable-wrap"><table class="rtable" id="tblIncompletos"></table></div>
+  </div>
+
   <div class="section-title">🚚 Viajes NO entregados a tiempo — detalle y causal</div>
   <div class="card">
     <input id="dSearch" placeholder="Buscar por OC, cliente, placa, destino, causal…" oninput="renderDetalle()">
@@ -212,7 +218,7 @@ var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8
 Tomado directamente de la hoja el 19/09/2026. Si agregas clientes nuevos en
 CRITERIOS, avisa para actualizar esta lista — no se sincroniza sola. */
 var CLIENTE_CATEGORIA={
-'AFRUCOL':'MAYORISTA','AGRICOLA GUAPA SAS':'CLIENTE INTERNO','ALDINSEN GONZALEZ':'MAYORISTA',
+'AFRUCOL':'MAYORISTA','AGRICOLA GUAPA SAS':'PUNTOS DE VENTA','ALDINSEN GONZALEZ':'MAYORISTA',
 'ALIMENTOS SAS':'INDUSTRIA','ALMACENES ÉXITO':'GRANDES SUPERFICIES','ANDRES GARCIA':'MAYORISTA',
 'ARA CERETE':'GRANDES SUPERFICIES','ARA COTA':'GRANDES SUPERFICIES','ARA GACHANCIPA':'GRANDES SUPERFICIES',
 'ARA GIRARDOTA':'GRANDES SUPERFICIES','CARMEN HOYOS':'MAYORISTA','CLAUDIA RODRIGUEZ':'MAYORISTA',
@@ -226,11 +232,11 @@ var CLIENTE_CATEGORIA={
 'JUAN PABLO COGOLLO CORREA':'MAYORISTA','KARINA BORJA LONDOÑO':'MAYORISTA','KATHERINE RUIZ':'MAYORISTA',
 'LEIDY JHOANA SUAZA MALDONADO':'MAYORISTA','LEIDY SUAZA':'MAYORISTA','LINO JOSE HOYOS':'MAYORISTA',
 'LUIS CAMILO QUIÑONES':'MAYORISTA','LUIS NARVAEZ':'MAYORISTA','MI SEGUNDA CASA 2':'INDUSTRIA',
-'MONTERIA REPARTO':'INDUSTRIA','NINI JOHANA PINZON NIÑO':'INDUSTRIA','PDV APARTADO':'CLIENTE INTERNO',
-'PDV CARTAGENA':'CLIENTE INTERNO','PDV MEDELLIN':'CLIENTE INTERNO','PDV MONTERIA':'CLIENTE INTERNO',
-'PDV SINCELEJO':'CLIENTE INTERNO','PRODUCTOS DEL CAMPO SAN GREGORIO':'INDUSTRIA','PROVEEDURIA DE INSUMOS Y ALIMENTOS SAS':'INDUSTRIA',
+'MONTERIA REPARTO':'INDUSTRIA','NINI JOHANA PINZON NIÑO':'INDUSTRIA','PDV APARTADO':'PUNTOS DE VENTA',
+'PDV CARTAGENA':'PUNTOS DE VENTA','PDV MEDELLIN':'PUNTOS DE VENTA','PDV MONTERIA':'PUNTOS DE VENTA',
+'PDV SINCELEJO':'PUNTOS DE VENTA','PRODUCTOS DEL CAMPO SAN GREGORIO':'INDUSTRIA','PROVEEDURIA DE INSUMOS Y ALIMENTOS SAS':'INDUSTRIA',
 'RAMIRO PARADA':'MAYORISTA','RUBEN OQUENDO':'MAYORISTA','RUBIELA CASTRO':'MAYORISTA',
-'SADIS DE JESUS MESA PIEDRAHITA':'MAYORISTA','SADIS PIEDRAHITA':'MAYORISTA','SINCELEJO REPARTO':'CLIENTE INTERNO',
+'SADIS DE JESUS MESA PIEDRAHITA':'MAYORISTA','SADIS PIEDRAHITA':'MAYORISTA','SINCELEJO REPARTO':'PUNTOS DE VENTA',
 'YAMILED CORREA SEPULVEDA':'MAYORISTA'
 };
 function categoriaDeCliente(cliente){
@@ -459,6 +465,7 @@ function applyFilters(){
   renderAreas();
   renderCategoria();
   renderKgFaltantes();
+  renderIncompletos();
   renderDetalle();
 }
 
@@ -655,6 +662,26 @@ function renderKgFaltantes(){
   }).join('') : '<tr><td colspan="7" class="empty">Sin brechas de kilos en este filtro 🎉</td></tr>';
   html+='</tbody>';
   document.getElementById('tblKgFaltantes').innerHTML=html;
+}
+
+/* ===== Pedidos a Tiempo pero Incompletos (fallan OTIF por cantidad) ===== */
+function renderIncompletos(){
+  document.getElementById('otifUmbralTxt2').textContent=OTIF_COMPLETO_MIN;
+  var rows=filteredData.filter(function(r){return esATiempo(r)===true&&esCompleto(r)===false;});
+  rows=rows.slice().sort(function(a,b){
+    var fa=parseFecha(a[C.FECHA]), fb=parseFecha(b[C.FECHA]);
+    return (fb?fb.getTime():0)-(fa?fa.getTime():0);
+  });
+  var html='<thead><tr><th class="left">Fecha</th><th class="left">OC</th><th class="left">Cliente</th><th class="left">Categoría</th><th class="left">Destino</th><th>Kg OC</th><th>Kg Cargados</th><th>Kg Faltantes</th><th>% Completado</th></tr></thead><tbody>';
+  html+=rows.length?rows.slice(0,300).map(function(r){
+    var kgOC=toNum(r[C.KG_OC]), kg=toNum(r[C.CANT]);
+    var faltante=kgOC-kg;
+    var pct=kgOC>0?Math.round(kg/kgOC*100):null;
+    var badge=pct===null?'—':(pct>=80?'<span class="badge badge-warn">'+pct+'%</span>':'<span class="badge badge-bad">'+pct+'%</span>');
+    return '<tr><td class="left">'+(r[C.FECHA]||'—')+'</td><td class="left">'+(r[C.OC]||'—')+'</td><td class="left">'+(r[C.CLIENTE]||'—')+'</td><td class="left">'+categoriaDeCliente(r[C.CLIENTE])+'</td><td class="left">'+(r[C.DESTINO]||'—')+'</td><td>'+fmtN(kgOC)+'</td><td>'+fmtN(kg)+'</td><td style="color:#dc2626;font-weight:800">'+fmtN(faltante)+'</td><td>'+badge+'</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty">Sin pedidos incompletos en este filtro 🎉</td></tr>';
+  html+='</tbody>';
+  document.getElementById('tblIncompletos').innerHTML=html;
 }
 
 /* ===== Detalle de viajes NO entregados a tiempo ===== */
