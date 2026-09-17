@@ -185,6 +185,36 @@ table.rtable tbody tr:hover{background:#f8fafc}
     <div class="dtable-wrap"><table class="rtable" id="tblIncompletos"></table></div>
   </div>
 
+  <div class="section-title">🚚 Tránsitos en Curso — Seguimiento en Vivo</div>
+  <div class="card-sub" style="margin-bottom:2px">Solo aplica a <strong>Puntos de Venta</strong> y <strong>Grandes Superficies</strong> (Éxito, Ara, Jerónimo Martins). Un vehículo está "en tránsito" cuando ya registró H.Salida pero todavía no tiene Fecha/Hora de Llegada a destino.</div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi c1"><div class="v" id="kEnTransito">—</div><div class="l">🚛 Vehículos en Tránsito</div></div>
+    <div class="kpi c6"><div class="v" id="kAlertaTransito">—</div><div class="l">⚠️ +24h sin registrar llegada</div></div>
+    <div class="kpi c4"><div class="v" id="kPromHorasTransito">—</div><div class="l">⏱️ Prom. Horas en Tránsito</div></div>
+  </div>
+
+  <div class="card" id="cardAlertasTransito" style="display:none;background:#fff1f2;border:1px solid #fecaca">
+    <div class="card-title" style="color:#dc2626">⚠️ Vehículos con más de 24 horas sin registrar llegada al cliente</div>
+    <div class="card-sub" style="margin-bottom:10px">Requiere seguimiento interno — falta cerrar el viaje en el sistema, o el vehículo realmente sigue varado/en ruta</div>
+    <div class="grid3" id="alertasTransitoGrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 Vehículos actualmente en tránsito</div>
+    <div class="card-sub" style="margin-bottom:10px">Ordenado de más tiempo a menos tiempo en ruta</div>
+    <div class="dtable-wrap"><table class="rtable" id="tblEnTransito"></table></div>
+  </div>
+
+  <div class="section-title">📊 Histórico de Tránsitos ya Completados</div>
+  <div class="card">
+    <div class="card-sub" style="margin-bottom:10px">Viajes que ya registraron llegada — tiempo promedio real que tomó el tránsito</div>
+    <div class="dtable-wrap"><table class="rtable" id="tblTransitoResumen"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Detalle de tránsitos completados</div>
+    <div class="dtable-wrap"><table class="rtable" id="tblTransitoDetalle"></table></div>
+  </div>
+
   <div class="section-title">🚚 Viajes NO entregados a tiempo — detalle y causal</div>
   <div class="card">
     <input id="dSearch" placeholder="Buscar por OC, cliente, placa, destino, causal…" oninput="renderDetalle()">
@@ -205,6 +235,9 @@ function checkPass(){
 }
 function unlock(){ document.getElementById('lockScreen').style.display='none'; document.getElementById('mainContent').style.display='block'; fetchData(); }
 if(sessionStorage.getItem('kpiEntregaUnlocked')==='1') unlock();
+// Refresca datos y las horas de tránsito cada 60 segundos, para que las
+// alertas de +24h se mantengan al día sin recargar la página.
+setInterval(function(){ if(allData.length) fetchData(); },60000);
 
 /* ===== Misma fuente CSV que los demás tableros ===== */
 var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
@@ -300,6 +333,27 @@ var filtros={categorias:[],clientes:[],anos:[],meses:[],semanas:[],fechas:[]};
 function normStr(s){return(s||'').toLowerCase().trim();}
 function toNum(v){if(!v)return 0;var s=v.toString().replace(/"/g,'').replace('%','').trim();s=s.replace(/\./g,'').replace(',','.');return parseFloat(s)||0;}
 function parseFecha(s){var p=(s||'').split('/');if(p.length===3){var d=parseInt(p[0]),m=parseInt(p[1]),y=parseInt(p[2]);if(y<100)y+=2000;return new Date(y,m-1,d);}return null;}
+function timeToMin(t){if(!t)return null;var s=(t+'').trim();var m12=s.match(/(\d+):(\d+)(?::\d+)?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);if(m12){var h=parseInt(m12[1]),m=parseInt(m12[2]),pm=/p/i.test(m12[3]);if(pm&&h!==12)h+=12;if(!pm&&h===12)h=0;return h*60+m;}var p=s.split(':');if(p.length>=2)return parseInt(p[0])*60+parseInt(p[1]);return null;}
+/* Combina Fecha (texto dd/mm/yyyy) + Hora (texto) en un Date completo, para
+   poder medir tránsitos que cruzan de un día a otro correctamente. */
+function fechaHoraCompleta(fechaStr,horaStr){
+  var fecha=parseFecha(fechaStr);
+  var min=timeToMin(horaStr);
+  if(!fecha||min===null) return null;
+  return new Date(fecha.getFullYear(),fecha.getMonth(),fecha.getDate(),Math.floor(min/60),min%60);
+}
+function minToHM(m){if(m===null||m===undefined||isNaN(m))return'—';m=Math.round(m);var h=Math.floor(m/60),mi=m%60;return h+'h '+(mi<10?'0'+mi:mi)+'m';}
+/* Tiempo en tránsito (minutos) = Fecha+H.Salida -> Fecha Llegada+Hora Llegada.
+   Si la llegada calculada queda antes de la salida, se descarta (dato inconsistente). */
+function calcTransito(r){
+  var salida=fechaHoraCompleta(r[C.FECHA],r[C.H_SALIDA]);
+  var llegada=fechaHoraCompleta(r[C.FECHA_LLEGADA_DEST],r[C.HORA_LLEGADA_DEST]);
+  if(!salida||!llegada) return null;
+  var diffMin=(llegada.getTime()-salida.getTime())/60000;
+  if(diffMin<0||diffMin>4320) return null; // negativo o más de 3 días: dato inconsistente
+  return diffMin;
+}
+function esCategoriaTransito(cat){ return cat==='PUNTOS DE VENTA'||cat==='GRANDES SUPERFICIES'; }
 function fmtN(n){return Math.round(n).toLocaleString('es-CO');}
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 function avg(arr){var v=arr.filter(function(x){return x!==null&&x!==undefined&&!isNaN(x);});if(!v.length)return null;return v.reduce(function(a,b){return a+b;},0)/v.length;}
@@ -468,6 +522,8 @@ function applyFilters(){
   renderCategoria();
   renderKgFaltantes();
   renderIncompletos();
+  renderTransitoEnCurso();
+  renderTransito();
   renderDetalle();
 }
 
@@ -684,6 +740,96 @@ function renderIncompletos(){
   }).join('') : '<tr><td colspan="9" class="empty">Sin pedidos incompletos en este filtro 🎉</td></tr>';
   html+='</tbody>';
   document.getElementById('tblIncompletos').innerHTML=html;
+}
+
+/* ===== Tiempo en Tránsito (Salida -> Llegada a Destino) =====
+Solo aplica a Puntos de Venta y Grandes Superficies. */
+/* ===== Tránsitos en Curso (seguimiento en vivo) =====
+"En tránsito" = ya tiene H.Salida registrada, pero AÚN NO tiene Fecha/Hora de
+Llegada a destino. Se calculan las horas transcurridas desde la salida hasta
+el momento actual (hora en que se está viendo el tablero). */
+var ALERTA_HORAS_TRANSITO=24;
+function renderTransitoEnCurso(){
+  var ahora=Date.now();
+  var candidatos=filteredData.filter(function(r){return esCategoriaTransito(categoriaDeCliente(r[C.CLIENTE]));});
+  var enTransito=candidatos.map(function(r){
+    var salida=fechaHoraCompleta(r[C.FECHA],r[C.H_SALIDA]);
+    if(!salida) return null; // aún no ha salido, no aplica
+    var llegada=fechaHoraCompleta(r[C.FECHA_LLEGADA_DEST],r[C.HORA_LLEGADA_DEST]);
+    if(llegada) return null; // ya registró llegada, no está en tránsito
+    var horas=(ahora-salida.getTime())/3600000;
+    if(horas<0) return null; // salida en el futuro (dato inconsistente), se ignora
+    return {r:r,salida:salida,horas:horas};
+  }).filter(function(x){return x!==null;});
+
+  enTransito.sort(function(a,b){return b.horas-a.horas;});
+  var alertas=enTransito.filter(function(x){return x.horas>=ALERTA_HORAS_TRANSITO;});
+
+  document.getElementById('kEnTransito').textContent=enTransito.length;
+  document.getElementById('kAlertaTransito').textContent=alertas.length;
+  document.getElementById('kPromHorasTransito').textContent=enTransito.length?Math.round(avg(enTransito.map(function(x){return x.horas;})))+'h':'—';
+
+  var cardAlertas=document.getElementById('cardAlertasTransito');
+  if(alertas.length){
+    cardAlertas.style.display='block';
+    document.getElementById('alertasTransitoGrid').innerHTML=alertas.map(function(x){
+      var r=x.r;
+      return '<div class="alert-card" style="background:#fff;border:1px solid #fecaca;border-radius:10px;padding:12px 14px">'
+        +'<div style="font-size:1.3rem;font-weight:800;color:#dc2626">'+Math.floor(x.horas)+'h</div>'
+        +'<div style="font-size:.76rem;color:#374151;margin-top:4px"><strong>'+(r[C.PLACAS]||'Sin placa')+'</strong> · '+(r[C.CLIENTE]||'—')+'<br>'
+        +'<span style="color:#94a3b8">Destino: '+(r[C.DESTINO]||'—')+' · Salió: '+(r[C.FECHA]||'—')+' '+(r[C.H_SALIDA]||'—')+'</span></div>'
+        +'</div>';
+    }).join('');
+  } else {
+    cardAlertas.style.display='none';
+  }
+
+  var htmlT='<thead><tr><th class="left">Cliente</th><th class="left">Categoría</th><th class="left">Destino</th><th class="left">Placa</th><th class="left">Fecha Salida</th><th class="left">H.Salida</th><th>Horas Transcurridas</th><th class="left">Estado</th></tr></thead><tbody>';
+  htmlT+=enTransito.length?enTransito.map(function(x){
+    var r=x.r;
+    var estado = x.horas>=ALERTA_HORAS_TRANSITO ? '<span class="badge badge-bad">⚠ Alerta +24h</span>' : '<span class="badge badge-ok">En ruta</span>';
+    return '<tr'+(x.horas>=ALERTA_HORAS_TRANSITO?' style="background:#fff1f2"':'')+'><td class="left">'+(r[C.CLIENTE]||'—')+'</td><td class="left">'+categoriaDeCliente(r[C.CLIENTE])+'</td><td class="left">'+(r[C.DESTINO]||'—')+'</td><td class="left">'+(r[C.PLACAS]||'—')+'</td><td class="left">'+(r[C.FECHA]||'—')+'</td><td class="left">'+(r[C.H_SALIDA]||'—')+'</td><td style="font-weight:800">'+Math.floor(x.horas)+'h</td><td class="left">'+estado+'</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="empty">No hay vehículos en tránsito para Puntos de Venta / Grandes Superficies en este filtro 🎉</td></tr>';
+  htmlT+='</tbody>';
+  document.getElementById('tblEnTransito').innerHTML=htmlT;
+}
+
+/* ===== Histórico de Tránsitos ya Completados =====
+Viajes que ya registraron llegada — mide cuánto tomó realmente el tránsito. */
+function renderTransito(){
+  var rows=filteredData.filter(function(r){return esCategoriaTransito(categoriaDeCliente(r[C.CLIENTE]));});
+
+  // --- Resumen por cliente ---
+  var grupos={};
+  rows.forEach(function(r){
+    var t=calcTransito(r);
+    if(t===null) return;
+    var cli=(r[C.CLIENTE]||'Sin cliente').trim()||'Sin cliente';
+    if(!grupos[cli]) grupos[cli]={categoria:categoriaDeCliente(cli),tiempos:[]};
+    grupos[cli].tiempos.push(t);
+  });
+  var resumen=Object.keys(grupos).map(function(cli){
+    var g=grupos[cli], t=g.tiempos;
+    return {cliente:cli,categoria:g.categoria,n:t.length,prom:avg(t),min:Math.min.apply(null,t),max:Math.max.apply(null,t)};
+  });
+  resumen.sort(function(a,b){return b.prom-a.prom;});
+  var htmlR='<thead><tr><th class="left">Cliente</th><th class="left">Categoría</th><th>Viajes</th><th>Prom. Tránsito</th><th>Mínimo</th><th>Máximo</th></tr></thead><tbody>';
+  htmlR+=resumen.length?resumen.map(function(d){
+    return '<tr><td class="left">'+d.cliente+'</td><td class="left">'+d.categoria+'</td><td>'+d.n+'</td><td style="font-weight:800;color:#9a3412">'+minToHM(d.prom)+'</td><td>'+minToHM(d.min)+'</td><td>'+minToHM(d.max)+'</td></tr>';
+  }).join('') : '<tr><td colspan="6" class="empty">Sin datos de tránsito para Puntos de Venta / Grandes Superficies en este filtro</td></tr>';
+  htmlR+='</tbody>';
+  document.getElementById('tblTransitoResumen').innerHTML=htmlR;
+
+  // --- Detalle individual ---
+  var detalle=rows.map(function(r){return {r:r,t:calcTransito(r)};}).filter(function(x){return x.t!==null;});
+  detalle.sort(function(a,b){return b.t-a.t;}); // más demorados primero
+  var htmlD='<thead><tr><th class="left">Fecha</th><th class="left">OC</th><th class="left">Cliente</th><th class="left">Destino</th><th class="left">Placa</th><th class="left">H.Salida</th><th class="left">Fecha Llegada</th><th class="left">Hora Llegada</th><th>Tiempo en Tránsito</th></tr></thead><tbody>';
+  htmlD+=detalle.length?detalle.slice(0,300).map(function(x){
+    var r=x.r;
+    return '<tr><td class="left">'+(r[C.FECHA]||'—')+'</td><td class="left">'+(r[C.OC]||'—')+'</td><td class="left">'+(r[C.CLIENTE]||'—')+'</td><td class="left">'+(r[C.DESTINO]||'—')+'</td><td class="left">'+(r[C.PLACAS]||'—')+'</td><td class="left">'+(r[C.H_SALIDA]||'—')+'</td><td class="left">'+(r[C.FECHA_LLEGADA_DEST]||'—')+'</td><td class="left">'+(r[C.HORA_LLEGADA_DEST]||'—')+'</td><td style="font-weight:800;color:#9a3412">'+minToHM(x.t)+'</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty">Sin datos de tránsito disponibles en este filtro</td></tr>';
+  htmlD+='</tbody>';
+  document.getElementById('tblTransitoDetalle').innerHTML=htmlD;
 }
 
 /* ===== Detalle de viajes NO entregados a tiempo ===== */
