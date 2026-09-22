@@ -186,7 +186,7 @@ table.rtable tbody tr:hover{background:#f8fafc}
   </div>
 
   <div class="section-title">🚚 Tránsitos en Curso — Seguimiento en Vivo</div>
-  <div class="card-sub" style="margin-bottom:2px">Solo aplica a <strong>Puntos de Venta</strong> y <strong>Grandes Superficies</strong> (Éxito, Ara, Jerónimo Martins). Un vehículo está "en tránsito" cuando ya registró H.Salida pero todavía no tiene Fecha/Hora de Llegada a destino.</div>
+  <div class="card-sub" style="margin-bottom:2px">Solo aplica a <strong>Puntos de Venta</strong> (excepto PDV Apartado, que es reparto local diario) y <strong>Grandes Superficies</strong> (Éxito, Ara, Jerónimo Martins). Un vehículo está "en tránsito" cuando ya registró H.Salida pero la columna "Entrega a Tiempo" todavía está vacía.</div>
   <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
     <div class="kpi c1"><div class="v" id="kEnTransito">—</div><div class="l">🚛 Vehículos en Tránsito</div></div>
     <div class="kpi c6"><div class="v" id="kAlertaTransito">—</div><div class="l">⚠️ +24h sin registrar llegada</div></div>
@@ -354,6 +354,15 @@ function calcTransito(r){
   return diffMin;
 }
 function esCategoriaTransito(cat){ return cat==='PUNTOS DE VENTA'||cat==='GRANDES SUPERFICIES'; }
+/* Clientes excluidos del seguimiento de tránsito aunque estén en una
+   categoría que normalmente aplicaría (ej: reparto local diario, no
+   tránsito real de larga distancia). */
+var CLIENTES_EXCLUIDOS_TRANSITO=['PDV APARTADO'];
+function aplicaTransito(cliente){
+  if(!esCategoriaTransito(categoriaDeCliente(cliente))) return false;
+  var cli=(cliente||'').trim().toUpperCase();
+  return CLIENTES_EXCLUIDOS_TRANSITO.indexOf(cli)===-1;
+}
 function fmtN(n){return Math.round(n).toLocaleString('es-CO');}
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 function avg(arr){var v=arr.filter(function(x){return x!==null&&x!==undefined&&!isNaN(x);});if(!v.length)return null;return v.reduce(function(a,b){return a+b;},0)/v.length;}
@@ -749,14 +758,20 @@ Solo aplica a Puntos de Venta y Grandes Superficies. */
 Llegada a destino. Se calculan las horas transcurridas desde la salida hasta
 el momento actual (hora en que se está viendo el tablero). */
 var ALERTA_HORAS_TRANSITO=24;
+function tripCerrado(r){
+  var v=(r[C.ENTREGA_TIEMPO]||'').trim().toUpperCase();
+  return v==='SI'||v==='NO';
+}
 function renderTransitoEnCurso(){
   var ahora=Date.now();
-  var candidatos=filteredData.filter(function(r){return esCategoriaTransito(categoriaDeCliente(r[C.CLIENTE]));});
+  var candidatos=filteredData.filter(function(r){return aplicaTransito(r[C.CLIENTE]);});
   var enTransito=candidatos.map(function(r){
     var salida=fechaHoraCompleta(r[C.FECHA],r[C.H_SALIDA]);
     if(!salida) return null; // aún no ha salido, no aplica
-    var llegada=fechaHoraCompleta(r[C.FECHA_LLEGADA_DEST],r[C.HORA_LLEGADA_DEST]);
-    if(llegada) return null; // ya registró llegada, no está en tránsito
+    // Dato confiable de cierre del viaje: columna "Entrega a Tiempo" (SI/NO).
+    // Si tiene valor, el viaje ya se evaluó/cerró, sin importar si falta
+    // Fecha o Hora de Llegada por separado.
+    if(tripCerrado(r)) return null;
     var horas=(ahora-salida.getTime())/3600000;
     if(horas<0) return null; // salida en el futuro (dato inconsistente), se ignora
     return {r:r,salida:salida,horas:horas};
@@ -797,7 +812,7 @@ function renderTransitoEnCurso(){
 /* ===== Histórico de Tránsitos ya Completados =====
 Viajes que ya registraron llegada — mide cuánto tomó realmente el tránsito. */
 function renderTransito(){
-  var rows=filteredData.filter(function(r){return esCategoriaTransito(categoriaDeCliente(r[C.CLIENTE]));});
+  var rows=filteredData.filter(function(r){return aplicaTransito(r[C.CLIENTE]);});
 
   // --- Resumen por cliente ---
   var grupos={};
