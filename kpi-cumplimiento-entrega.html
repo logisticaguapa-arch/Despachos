@@ -186,7 +186,7 @@ table.rtable tbody tr:hover{background:#f8fafc}
   </div>
 
   <div class="section-title">🚚 Tránsitos en Curso — Seguimiento en Vivo</div>
-  <div class="card-sub" style="margin-bottom:2px">Solo aplica a <strong>Puntos de Venta</strong> (excepto PDV Apartado, que es reparto local diario) y <strong>Grandes Superficies</strong> (Éxito, Ara, Jerónimo Martins). Un vehículo está "en tránsito" cuando ya registró H.Salida pero la columna "Entrega a Tiempo" todavía está vacía.</div>
+  <div class="card-sub" style="margin-bottom:2px">Solo aplica a <strong>Puntos de Venta</strong> (excepto PDV Apartado, que es reparto local diario) y <strong>Grandes Superficies</strong> (Éxito, Ara, Jerónimo Martins). Un vehículo está "en tránsito" cuando ya está <strong>Cargado</strong> pero la columna "Entrega a Tiempo" todavía está vacía (sin importar si falta H.Salida).</div>
   <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
     <div class="kpi c1"><div class="v" id="kEnTransito">—</div><div class="l">🚛 Vehículos en Tránsito</div></div>
     <div class="kpi c6"><div class="v" id="kAlertaTransito">—</div><div class="l">⚠️ +24h sin registrar llegada</div></div>
@@ -780,27 +780,49 @@ function tripCerrado(r){
   var v=(r[C.ENTREGA_TIEMPO]||'').trim().toUpperCase();
   return v==='SI'||v==='NO';
 }
+/* Hora de referencia de "salida hacia el cliente": usa H.Salida si está
+   registrada; si no, cae a Fin de Cargue, y si tampoco, a Inicio de Cargue
+   — porque muchas veces el conductor no registra H.Salida exacta pero el
+   camión sí salió apenas terminó de cargar. */
+/* Hora de referencia para medir el tránsito: se usa Fin de Cargue como
+   principal, NO H.Salida — porque H.Salida la registra el portero
+   manualmente y suele quedar 1-2 días desactualizada/en blanco, lo que
+   distorsionaría el cálculo de horas transcurridas. Fin de Cargue es un
+   dato del sistema (se registra al momento) y es más confiable para saber
+   cuándo el vehículo quedó listo para salir hacia el cliente. */
+function horaSalidaEstim(r){
+  var t=fechaHoraCompleta(r[C.FECHA],r[C.H_FIN]);
+  if(t) return t;
+  t=fechaHoraCompleta(r[C.FECHA],r[C.H_INI]);
+  if(t) return t;
+  return null;
+}
+function isCargadoRow(r){ return (r[C.STATUS]||'').trim().toLowerCase()==='cargado'; }
+
 function renderTransitoEnCurso(){
   var ahora=Date.now();
   var candidatos=dataParaTransito.filter(function(r){return aplicaTransito(r[C.CLIENTE]);});
-  var enTransito=candidatos.map(function(r){
-    var salida=fechaHoraCompleta(r[C.FECHA],r[C.H_SALIDA]);
-    if(!salida) return null; // aún no ha salido, no aplica
-    // Dato confiable de cierre del viaje: columna "Entrega a Tiempo" (SI/NO).
-    // Si tiene valor, el viaje ya se evaluó/cerró, sin importar si falta
-    // Fecha o Hora de Llegada por separado.
-    if(tripCerrado(r)) return null;
-    var horas=(ahora-salida.getTime())/3600000;
-    if(horas<0) return null; // salida en el futuro (dato inconsistente), se ignora
+  // "En tránsito" = ya está Cargado y la columna "Entrega a Tiempo" sigue
+  // vacía (el viaje no se ha cerrado), sin importar si H.Salida está lleno.
+  var enTransito=candidatos.filter(function(r){
+    return isCargadoRow(r)&&!tripCerrado(r);
+  }).map(function(r){
+    var salida=horaSalidaEstim(r);
+    var horas=salida?(ahora-salida.getTime())/3600000:null;
+    if(horas!==null&&horas<0) horas=null; // hora de referencia en el futuro: dato inconsistente
     return {r:r,salida:salida,horas:horas};
-  }).filter(function(x){return x!==null;});
+  });
 
-  enTransito.sort(function(a,b){return b.horas-a.horas;});
-  var alertas=enTransito.filter(function(x){return x.horas>=ALERTA_HORAS_TRANSITO;});
+  enTransito.sort(function(a,b){
+    var ha=a.horas===null?-1:a.horas, hb=b.horas===null?-1:b.horas;
+    return hb-ha;
+  });
+  var alertas=enTransito.filter(function(x){return x.horas!==null&&x.horas>=ALERTA_HORAS_TRANSITO;});
 
   document.getElementById('kEnTransito').textContent=enTransito.length;
   document.getElementById('kAlertaTransito').textContent=alertas.length;
-  document.getElementById('kPromHorasTransito').textContent=enTransito.length?Math.round(avg(enTransito.map(function(x){return x.horas;})))+'h':'—';
+  var conHoras=enTransito.filter(function(x){return x.horas!==null;});
+  document.getElementById('kPromHorasTransito').textContent=conHoras.length?Math.round(avg(conHoras.map(function(x){return x.horas;})))+'h':'—';
 
   var cardAlertas=document.getElementById('cardAlertasTransito');
   if(alertas.length){
@@ -810,18 +832,19 @@ function renderTransitoEnCurso(){
       return '<div class="alert-card" style="background:#fff;border:1px solid #fecaca;border-radius:10px;padding:12px 14px">'
         +'<div style="font-size:1.3rem;font-weight:800;color:#dc2626">'+Math.floor(x.horas)+'h</div>'
         +'<div style="font-size:.76rem;color:#374151;margin-top:4px"><strong>'+(r[C.PLACAS]||'Sin placa')+'</strong> · '+(r[C.CLIENTE]||'—')+'<br>'
-        +'<span style="color:#94a3b8">Destino: '+(r[C.DESTINO]||'—')+' · Salió: '+(r[C.FECHA]||'—')+' '+(r[C.H_SALIDA]||'—')+'</span></div>'
+        +'<span style="color:#94a3b8">Destino: '+(r[C.DESTINO]||'—')+' · Fin de Cargue: '+(r[C.FECHA]||'—')+' '+(r[C.H_FIN]||r[C.H_INI]||'—')+'</span></div>'
         +'</div>';
     }).join('');
   } else {
     cardAlertas.style.display='none';
   }
 
-  var htmlT='<thead><tr><th class="left">Cliente</th><th class="left">Categoría</th><th class="left">Destino</th><th class="left">Placa</th><th class="left">Fecha Salida</th><th class="left">H.Salida</th><th>Horas Transcurridas</th><th class="left">Estado</th></tr></thead><tbody>';
+  var htmlT='<thead><tr><th class="left">Cliente</th><th class="left">Categoría</th><th class="left">Destino</th><th class="left">Placa</th><th class="left">Fecha</th><th class="left">Fin de Cargue</th><th>Horas Transcurridas</th><th class="left">Estado</th></tr></thead><tbody>';
   htmlT+=enTransito.length?enTransito.map(function(x){
     var r=x.r;
-    var estado = x.horas>=ALERTA_HORAS_TRANSITO ? '<span class="badge badge-bad">⚠ Alerta +24h</span>' : '<span class="badge badge-ok">En ruta</span>';
-    return '<tr'+(x.horas>=ALERTA_HORAS_TRANSITO?' style="background:#fff1f2"':'')+'><td class="left">'+(r[C.CLIENTE]||'—')+'</td><td class="left">'+categoriaDeCliente(r[C.CLIENTE])+'</td><td class="left">'+(r[C.DESTINO]||'—')+'</td><td class="left">'+(r[C.PLACAS]||'—')+'</td><td class="left">'+(r[C.FECHA]||'—')+'</td><td class="left">'+(r[C.H_SALIDA]||'—')+'</td><td style="font-weight:800">'+Math.floor(x.horas)+'h</td><td class="left">'+estado+'</td></tr>';
+    var horasTxt = x.horas!==null ? Math.floor(x.horas)+'h' : 'N/D';
+    var estado = x.horas===null ? '<span class="badge badge-neu">Sin hora de referencia</span>' : (x.horas>=ALERTA_HORAS_TRANSITO ? '<span class="badge badge-bad">⚠ Alerta +24h</span>' : '<span class="badge badge-ok">En ruta</span>');
+    return '<tr'+(x.horas!==null&&x.horas>=ALERTA_HORAS_TRANSITO?' style="background:#fff1f2"':'')+'><td class="left">'+(r[C.CLIENTE]||'—')+'</td><td class="left">'+categoriaDeCliente(r[C.CLIENTE])+'</td><td class="left">'+(r[C.DESTINO]||'—')+'</td><td class="left">'+(r[C.PLACAS]||'—')+'</td><td class="left">'+(r[C.FECHA]||'—')+'</td><td class="left">'+(r[C.H_FIN]||r[C.H_INI]||'—')+'</td><td style="font-weight:800">'+horasTxt+'</td><td class="left">'+estado+'</td></tr>';
   }).join('') : '<tr><td colspan="8" class="empty">No hay vehículos en tránsito para Puntos de Venta / Grandes Superficies en este filtro 🎉</td></tr>';
   htmlT+='</tbody>';
   document.getElementById('tblEnTransito').innerHTML=htmlT;
