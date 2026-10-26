@@ -161,41 +161,46 @@ tbody tr:hover{background:#f8fafc}
   </div>
 
   <div class="tabs">
+    <button class="tab-btn" id="tab-dia" onclick="setTab('dia')">📅 Diario</button>
     <button class="tab-btn active" id="tab-semana" onclick="setTab('semana')">🗓️ Semanal</button>
     <button class="tab-btn" id="tab-mes" onclick="setTab('mes')">📆 Mensual</button>
   </div>
 
   <!-- ===== VISTA SEMANAL (7 indicadores homologados con las tablas dinámicas) ===== -->
   <div id="viewSemana">
+    <div class="card" id="cardKgDia" style="display:none;margin-bottom:12px">
+      <div class="card-title">📦 Kilos despachados por día (Ton)</div>
+      <div class="metric-chart-wrap" style="height:320px"><canvas id="chartKgDia" height="200"></canvas></div>
+    </div>
     <div class="metric-grid">
 
       <div class="card">
-        <div class="card-title">⚡ KL/MIN Cargados semanal</div>
+        <div class="card-title">⚡ KL/MIN Cargados <span class="periodoTxt">semanal</span></div>
         <div class="metric-chart-wrap"><canvas id="chartKlMin" height="180"></canvas></div>
       </div>
 
       <div class="card">
-        <div class="card-title">🕐 Tiempo total (llegada → fin de cargue) promedio semanal</div>
+        <div class="card-title">🕐 Tiempo total (llegada → fin de cargue) promedio <span class="periodoTxt">semanal</span></div>
         <div class="metric-chart-wrap"><canvas id="chartTiempoTotal" height="180"></canvas></div>
       </div>
 
       <div class="card">
-        <div class="card-title">👷 KL/HORA/HOMBRE promedio semanal</div>
+        <div class="card-title">👷 KL/HORA/HOMBRE promedio <span class="periodoTxt">semanal</span></div>
         <div class="metric-chart-wrap"><canvas id="chartKlHoraHombre" height="180"></canvas></div>
       </div>
 
       <div class="card">
-        <div class="card-title">👷 KL/MIN/HOMBRE promedio semanal</div>
+        <div class="card-title">👷 KL/MIN/HOMBRE promedio <span class="periodoTxt">semanal</span></div>
         <div class="metric-chart-wrap"><canvas id="chartKlMinHombre" height="180"></canvas></div>
       </div>
 
       <div class="card">
-        <div class="card-title">⏱️ Tiempo de Cargue Neto (inicio → fin) promedio semanal</div>
+        <div class="card-title">⏱️ Tiempo de Cargue Neto (inicio → fin) promedio <span class="periodoTxt">semanal</span></div>
         <div class="metric-chart-wrap"><canvas id="chartCargueNeto" height="180"></canvas></div>
       </div>
 
       <div class="card">
-        <div class="card-title">🕐 Tiempo de Espera (llegada → inicio) promedio semanal</div>
+        <div class="card-title">🕐 Tiempo de Espera (llegada → inicio) promedio <span class="periodoTxt">semanal</span></div>
         <div class="metric-chart-wrap"><canvas id="chartEspera" height="180"></canvas></div>
       </div>
 
@@ -207,7 +212,7 @@ tbody tr:hover{background:#f8fafc}
     </div>
 
     <div class="card" style="margin-top:12px">
-      <div class="card-title">🍩 KL / EMPAQUE semanal (% Canasta vs Granel)</div>
+      <div class="card-title">🍩 KL / EMPAQUE <span class="periodoTxt">semanal</span> (% Canasta vs Granel)</div>
       <canvas id="chartEmpaque" height="90"></canvas>
     </div>
   </div>
@@ -580,7 +585,12 @@ function buildBuckets(mode){
     var fecha=parseFecha(r[C.FECHA]);
     if(!fecha) return;
     var key,label,sortKey;
-    if(mode==='semana'){
+    if(mode==='dia'){
+      var dd=fecha.getDate(), mm=fecha.getMonth()+1;
+      key=fecha.getFullYear()+'-'+mm+'-'+dd;
+      label=(dd<10?'0'+dd:dd)+'/'+(mm<10?'0'+mm:mm);
+      sortKey=fecha.getTime();
+    } else if(mode==='semana'){
       var wk=getISOWeek(fecha), yr=fecha.getFullYear();
       key=yr+'-W'+wk;
       label=''+wk;
@@ -635,9 +645,16 @@ function computeBucketStats(bucket){
   };
 }
 
+/* Cantidad máxima de etiquetas de datos visibles por gráfica y tamaño de
+   letra. En la vista diaria hay muchos más puntos, así que se muestra una
+   etiqueta cada N puntos (el valor completo siempre sale en el tooltip). */
+var labelCap=16, labelFont=13;
+function labelStep(n){ return Math.max(1,Math.ceil(n/labelCap)); }
+
 function lineChart(canvasId, labels, data, opts){
   opts=opts||{};
   dc(canvasId);
+  var stepLbl=labelStep(labels.length);
   var yScale = opts.yOptions ? Object.assign({},opts.yOptions) : {ticks:{font:{size:12},color:'#64748b'},grid:{color:'#f1f5f9'}};
   if(opts.log){
     yScale.type='logarithmic';
@@ -668,7 +685,7 @@ function lineChart(canvasId, labels, data, opts){
       borderRadius:3,
       yAxisID:'y1',
       order:2,
-      datalabels:{display:true,anchor:'end',align:'bottom',color:'#334155',font:{size:10,weight:'bold'},formatter:function(v){return v>0?v+'T':'';}}
+      datalabels:{display:function(ctx){return ctx.dataIndex%stepLbl===0;},anchor:'end',align:'bottom',color:'#334155',font:{size:10,weight:'bold'},formatter:function(v){return v>0?v+'T':'';}}
     });
     scales.y1={
       position:'right',
@@ -685,7 +702,7 @@ function lineChart(canvasId, labels, data, opts){
       layout:{padding:{top:28}},
       plugins:{
         legend:{display:!!opts.kgData,position:'bottom',labels:{font:{size:11}}},
-        datalabels:{display:true,align:'top',anchor:'end',color:'#374151',font:{size:13,weight:'bold'},formatter:opts.labelFormatter||function(v){return v;}},
+        datalabels:{display:function(ctx){return ctx.dataIndex%stepLbl===0;},align:'top',anchor:'end',color:'#374151',font:{size:labelFont,weight:'bold'},formatter:opts.labelFormatter||function(v){return v;}},
         tooltip:{callbacks:{label:function(c){
           if(c.dataset.type==='bar') return c.dataset.label+': '+c.raw+' T';
           return opts.tooltipFormatter?opts.tooltipFormatter(c.raw):c.raw;
@@ -698,19 +715,27 @@ function lineChart(canvasId, labels, data, opts){
 
 function setTab(mode){
   currentTab=mode;
-  document.getElementById('tab-semana').classList.toggle('active',mode==='semana');
-  document.getElementById('tab-mes').classList.toggle('active',mode==='mes');
-  document.getElementById('viewSemana').style.display=mode==='semana'?'block':'none';
+  ['dia','semana','mes'].forEach(function(m){
+    var b=document.getElementById('tab-'+m);
+    if(b) b.classList.toggle('active',mode===m);
+  });
+  document.getElementById('viewSemana').style.display=(mode==='semana'||mode==='dia')?'block':'none';
   document.getElementById('viewMes').style.display=mode==='mes'?'block':'none';
+  document.getElementById('cardKgDia').style.display=mode==='dia'?'block':'none';
+  document.querySelectorAll('.periodoTxt').forEach(function(el){el.textContent=(mode==='dia')?'diario':'semanal';});
   if(!allData.length) return;
 
-  if(mode==='semana'){ renderSemanal(); } else { renderMensual(); }
+  if(mode==='semana'||mode==='dia'){ renderSemanal(mode); } else { renderMensual(); }
 }
 
-function renderSemanal(){
-  var buckets=buildBuckets('semana').map(computeBucketStats);
+function renderSemanal(mode){
+  mode=mode||'semana';
+  labelCap=16;
+  labelFont=(mode==='dia')?11:13;
+  var buckets=buildBuckets(mode).map(computeBucketStats);
   if(!buckets.length) return;
   var labels=buckets.map(function(b){return b.label;});
+  var stepEmp=labelStep(labels.length);
 
   lineChart('chartKlMin',labels,buckets.map(function(b){return b.klMin!==null?parseFloat(b.klMin.toFixed(1)):null;}),{color:'#1e6f8f',kgData:buckets.map(function(b){return b.kg;})});
 
@@ -735,11 +760,27 @@ function renderSemanal(){
       {label:'GRANEL',data:buckets.map(function(b){return b.pctGranel;}),borderColor:'#f97316',backgroundColor:'#f97316',tension:0.3,pointRadius:3,borderWidth:2}
     ]},
     options:{responsive:true,layout:{padding:{top:28}},plugins:{legend:{display:true,position:'right',labels:{font:{size:13}}},
-      datalabels:{display:true,align:'top',anchor:'end',color:'#374151',font:{size:13,weight:'bold'},formatter:function(v){return v!==null?v+'%':'';}},
+      datalabels:{display:function(ctx){return ctx.dataIndex%stepEmp===0;},align:'top',anchor:'end',color:'#374151',font:{size:labelFont,weight:'bold'},formatter:function(v){return v!==null?v+'%':'';}},
       tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.raw+'%';}}}},
       scales:{x:{ticks:{font:{size:12},color:'#64748b'},grid:{display:false}},
         y:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'}}}}
   });
+
+  // Kilos despachados por día (solo en la vista diaria)
+  dc('chartKgDia');
+  if(mode==='dia'){
+    var stepKg=Math.max(1,Math.ceil(labels.length/40));
+    charts['chartKgDia']=new Chart(document.getElementById('chartKgDia'),{
+      type:'bar',
+      data:{labels:labels,datasets:[{label:'Kg Cargados (Ton)',data:buckets.map(function(b){return parseFloat((b.kg/1000).toFixed(2));}),backgroundColor:'#2563eb',borderRadius:3}]},
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:28}},
+        plugins:{legend:{display:false},
+          datalabels:{display:function(ctx){return ctx.dataIndex%stepKg===0;},anchor:'end',align:'top',color:'#374151',font:{size:11,weight:'bold'},formatter:function(v){return v>0?v+'T':'';}},
+          tooltip:{callbacks:{label:function(c){return c.raw+' Ton despachadas';}}}},
+        scales:{x:{ticks:{font:{size:11},color:'#64748b'},grid:{display:false}},
+          y:{ticks:{font:{size:12},color:'#64748b',callback:function(v){return v+'T';}},grid:{color:'#f1f5f9'}}}}
+    });
+  }
 }
 
 function renderMensual(){
