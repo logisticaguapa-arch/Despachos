@@ -65,6 +65,13 @@ header{background:linear-gradient(90deg,#7c2d12,#9a3412);padding:12px 20px}
 .card-sub{font-size:.68rem;color:#94a3b8;margin-top:2px;font-weight:600}
 
 .grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
+.grid-wide{display:grid;grid-template-columns:2.2fr 1fr;gap:16px}
+@media(max-width:1000px){.grid-wide{grid-template-columns:1fr}}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.card-hdr .card-title{margin-bottom:0}
+.seg{display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:8px}
+.seg button{padding:5px 12px;border:none;background:transparent;color:#64748b;font-size:.72rem;font-weight:700;border-radius:6px;cursor:pointer;font-family:inherit}
+.seg button.active{background:#fff;color:#9a3412;box-shadow:0 1px 3px rgba(0,0,0,.1)}
 @media(max-width:1000px){.grid2{grid-template-columns:1fr}}
 
 table.rtable{width:100%;border-collapse:collapse;font-size:.74rem}
@@ -143,15 +150,27 @@ table.rtable tbody tr:hover{background:#f8fafc}
     <div class="kpi c6"><div class="v" id="kTarde">—</div><div class="l">Entregas Tarde</div></div>
   </div>
 
-  <div class="grid2">
+  <div class="grid-wide">
     <div class="card">
-      <div class="card-title">📈 % Entregas a Tiempo vs OTIF — tendencia semanal</div>
-      <canvas id="chartTendencia" height="130"></canvas></canvas>
+      <div class="card-hdr">
+        <div class="card-title">📈 % Entregas a Tiempo vs OTIF — <span id="tendTitulo">día a día</span></div>
+        <div class="seg" id="segTend">
+          <button type="button" data-g="dia" class="active" onclick="setTendGran('dia')">Día</button>
+          <button type="button" data-g="semana" onclick="setTendGran('semana')">Semana</button>
+        </div>
+      </div>
+      <div style="position:relative;height:320px"><canvas id="chartTendencia"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">🎯 Entregas a Tiempo vs Tarde</div>
       <canvas id="chartDonut" height="140"></canvas>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 OTIF — detalle <span id="tendTitulo2">por día</span></div>
+    <div class="card-sub" style="margin-bottom:10px">Más reciente primero. OTIF = pedidos a tiempo Y completos ÷ pedidos evaluados del período</div>
+    <div class="dtable-wrap"><table class="rtable" id="tblOTIFDetalle"></table></div>
   </div>
 
   <div class="grid2">
@@ -593,45 +612,93 @@ function renderOTIF(){
   document.getElementById('kOTIFNinguno').textContent=ninguno;
 }
 
-/* ===== Tendencia semanal % entregas a tiempo ===== */
+/* ===== Tendencia % entregas a tiempo vs OTIF (día a día o por semana) ===== */
+var tendGranularidad='dia';
+function pad2(n){return n<10?'0'+n:''+n;}
+function setTendGran(g){
+  tendGranularidad=g;
+  document.querySelectorAll('#segTend button').forEach(function(b){b.classList.toggle('active',b.dataset.g===g);});
+  renderTendencia();
+}
 function renderTendencia(){
+  var gran=tendGranularidad;
+  document.getElementById('tendTitulo').textContent=gran==='dia'?'día a día':'tendencia semanal';
+  document.getElementById('tendTitulo2').textContent=gran==='dia'?'por día':'por semana';
+
   var rows=filteredData.filter(function(r){return esATiempo(r)!==null&&parseFecha(r[C.FECHA]);});
   var buckets={};
   rows.forEach(function(r){
-    var fecha=parseFecha(r[C.FECHA]);
-    var wk=getISOWeek(fecha), yr=fecha.getFullYear();
-    var key=yr+'-'+wk;
-    if(!buckets[key]) buckets[key]={label:''+wk,sortKey:yr*100+wk,si:0,total:0,otifOk:0,otifTotal:0};
-    buckets[key].total++;
-    if(esATiempo(r)) buckets[key].si++;
-    if(esCompleto(r)!==null){ buckets[key].otifTotal++; if(esATiempo(r)&&esCompleto(r)) buckets[key].otifOk++; }
+    var fecha=parseFecha(r[C.FECHA]), key, label, full, sortKey;
+    if(gran==='dia'){
+      var dd=fecha.getDate(), mm=fecha.getMonth()+1;
+      key=fecha.getFullYear()+'-'+mm+'-'+dd;
+      label=pad2(dd)+'/'+pad2(mm);
+      full=pad2(dd)+'/'+pad2(mm)+'/'+fecha.getFullYear();
+      sortKey=fecha.getTime();
+    } else {
+      var wk=getISOWeek(fecha), yr=fecha.getFullYear();
+      key=yr+'-W'+wk; label=''+wk; full='Semana '+wk+' ('+yr+')'; sortKey=yr*100+wk;
+    }
+    if(!buckets[key]) buckets[key]={label:label,full:full,sortKey:sortKey,si:0,total:0,otifOk:0,otifTotal:0,soloTiempo:0,soloCompleto:0,ninguno:0};
+    var b=buckets[key], t=esATiempo(r), cmp=esCompleto(r);
+    b.total++;
+    if(t) b.si++;
+    if(cmp!==null){
+      b.otifTotal++;
+      if(t&&cmp) b.otifOk++;
+      else if(t&&!cmp) b.soloTiempo++;
+      else if(!t&&cmp) b.soloCompleto++;
+      else b.ninguno++;
+    }
   });
   var keys=Object.keys(buckets).sort(function(a,b){return buckets[a].sortKey-buckets[b].sortKey;});
-  var labels=keys.map(function(k){return buckets[k].label;});
-  var dataTiempo=keys.map(function(k){return Math.round(buckets[k].si/buckets[k].total*100);});
-  var dataOTIF=keys.map(function(k){return buckets[k].otifTotal?Math.round(buckets[k].otifOk/buckets[k].otifTotal*100):null;});
+  var B=keys.map(function(k){return buckets[k];});
+  var labels=B.map(function(b){return b.label;});
+  var dataTiempo=B.map(function(b){return Math.round(b.si/b.total*100);});
+  var dataOTIF=B.map(function(b){return b.otifTotal?Math.round(b.otifOk/b.otifTotal*100):null;});
 
   // Eje Y dinámico: se enfoca en el rango real de los datos en vez de 0-100%
   var todosValores=dataTiempo.concat(dataOTIF).filter(function(v){return v!==null;});
   var minVal=todosValores.length?Math.min.apply(null,todosValores):0;
   var yMin=Math.max(0,Math.floor((minVal-8)/5)*5);
+  var step=Math.max(1,Math.ceil(labels.length/20)); // evita amontonar etiquetas cuando hay muchos días
+  var showLbl=function(ctx){return ctx.dataIndex%step===0;};
 
   dc('chartTendencia');
   charts['chartTendencia']=new Chart(document.getElementById('chartTendencia'),{
     type:'line',
     data:{labels:labels,datasets:[
       {label:'% A Tiempo',data:dataTiempo,borderColor:'#0d9488',backgroundColor:'#0d9488',tension:.3,pointRadius:3,borderWidth:2,
-        datalabels:{align:'end',anchor:'end',offset:6}},
+        datalabels:{display:showLbl,align:'end',anchor:'end',offset:6}},
       {label:'% OTIF',data:dataOTIF,borderColor:'#9a3412',backgroundColor:'#9a3412',tension:.3,pointRadius:3,borderWidth:2,borderDash:[5,3],
-        datalabels:{align:'start',anchor:'start',offset:6}}
+        datalabels:{display:showLbl,align:'start',anchor:'start',offset:6}}
     ]},
-    options:{responsive:true,layout:{padding:{top:30,bottom:6}},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:30,bottom:6}},
       plugins:{legend:{display:true,position:'bottom',labels:{font:{size:11}}},
         datalabels:{display:true,color:'#374151',font:{size:11,weight:'bold'},formatter:function(v){return v!==null?v+'%':'';}},
-        tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+c.raw+'%';}}}},
+        tooltip:{callbacks:{
+          title:function(items){return items.length?B[items[0].dataIndex].full:'';},
+          label:function(c){
+            var b=B[c.dataIndex];
+            if(c.datasetIndex===0) return c.dataset.label+': '+c.raw+'% ('+b.si+' de '+b.total+' pedidos)';
+            return c.dataset.label+': '+(c.raw!==null?c.raw+'% ('+b.otifOk+' de '+b.otifTotal+' pedidos)':'N/D');
+          }}}},
       scales:{x:{ticks:{font:{size:11},color:'#64748b'},grid:{display:false}},
         y:{min:yMin,max:100,ticks:{font:{size:11},color:'#64748b',callback:function(v){return v+'%';}},grid:{color:'#f1f5f9'}}}}
   });
+
+  // ---- Tabla de detalle (más reciente primero) ----
+  var T=B.slice().reverse();
+  var badge=function(p,ok){return p===null?'<span class="badge badge-neu">N/D</span>':'<span class="badge '+(p>=ok?'badge-ok':'badge-bad')+'">'+p+'%</span>';};
+  var html='<thead><tr><th class="left">'+(gran==='dia'?'Fecha':'Semana')+'</th><th>Pedidos evaluados</th><th>Cumple OTIF</th><th>A tiempo, incompleto</th><th>Completo, tarde</th><th>Ninguno</th><th>% A Tiempo</th><th>% Completo</th><th>% OTIF</th></tr></thead><tbody>';
+  html+=T.length?T.map(function(b){
+    var pT=b.otifTotal?Math.round((b.otifOk+b.soloTiempo)/b.otifTotal*100):null;
+    var pC=b.otifTotal?Math.round((b.otifOk+b.soloCompleto)/b.otifTotal*100):null;
+    var pO=b.otifTotal?Math.round(b.otifOk/b.otifTotal*100):null;
+    return '<tr><td class="left">'+b.full+'</td><td>'+b.otifTotal+'</td><td>'+b.otifOk+'</td><td>'+b.soloTiempo+'</td><td>'+b.soloCompleto+'</td><td>'+b.ninguno+'</td><td>'+badge(pT,90)+'</td><td>'+badge(pC,95)+'</td><td>'+badge(pO,85)+'</td></tr>';
+  }).join(''):'<tr><td colspan="9" class="empty">Sin pedidos evaluados en este filtro</td></tr>';
+  html+='</tbody>';
+  document.getElementById('tblOTIFDetalle').innerHTML=html;
 }
 
 function renderDonut(){
