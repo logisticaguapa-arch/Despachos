@@ -147,10 +147,19 @@ table.rtable tr.total td{background:#ecfdf5;font-weight:800;border-top:2px solid
     <div class="src-row">
       <div class="src-chip" id="chipKg">Kilos despachados: cargando…</div>
       <div class="src-chip warn" id="chipHoras">Horas trabajadas: sin cargar</div>
-      <label class="btn btn-green" for="fileHoras" style="cursor:pointer">📂 Cargar Excel/CSV de horas</label>
+      <label class="btn btn-green" for="fileHoras" style="cursor:pointer">📂 Cargar Excel/CSV de horas (control o consolidado)</label>
       <input type="file" id="fileHoras" accept=".xlsx,.xls,.csv" style="display:none" onchange="onFileHoras(event)">
       <button class="btn btn-gray" onclick="cargarHorasDesdeUrl()" id="btnRecargar" style="display:none">🔄 Recargar horas</button>
       <button class="btn btn-gray" onclick="olvidarGuardado()" id="btnOlvidar" style="display:none">🗑️ Olvidar datos guardados</button>
+    </div>
+    <div id="srcList" style="margin-top:10px;display:grid;gap:6px"></div>
+    <div class="pfield" style="max-width:520px;margin-top:10px">
+      <label>Si el mismo colaborador y día están en los dos formatos, usar</label>
+      <select id="pPrior" onchange="onParam()">
+        <option value="consolidado">Reporte consolidado (recomendado: es el que se paga y trae los días completos)</option>
+        <option value="control">Control de horas</option>
+      </select>
+      <div class="hint">Solo se usa un registro por colaborador y día, así que nada se cuenta dos veces.</div>
     </div>
     <div id="srcMsg" style="margin-top:10px"></div>
   </div>
@@ -186,6 +195,19 @@ table.rtable tr.total td{background:#ecfdf5;font-weight:800;border-top:2px solid
           <label>Horas ordinarias por día (respaldo)</label>
           <input type="number" id="pHorasDia" value="7" min="1" max="12" step="0.25" onchange="onParam()">
           <div class="hint">Se usa solo cuando el turno no trae HORAS PROGRAMADAS (o vienen en 0). Lo que exceda ese límite o el tope semanal (44 h / 42 h) se liquida como extra.</div>
+        </div>
+        <div class="pfield">
+          <label>Horas ordinarias en domingo/festivo no programado</label>
+          <input type="number" id="pHorasDomFest" value="8" min="1" max="12" step="0.25" onchange="onParam()">
+          <div class="hint">El reporte consolidado clasifica 8 horas como ordinarias (FD/FN) en festivos y el resto como extra festiva.</div>
+        </div>
+        <div class="pfield">
+          <label>Descarte de fruta post cosecha</label>
+          <select id="pDescarte" onchange="onParam()">
+            <option value="0">Incluir sus horas en el costo</option>
+            <option value="1">Excluirlas (no es labor de despacho)</option>
+          </select>
+          <div class="hint">Aparece en el reporte consolidado con observación "DESCARTE DE FRUTA POST COSECHA".</div>
         </div>
         <div class="pfield">
           <label>Descanso/almuerzo no pagado (min por turno)</label>
@@ -306,6 +328,11 @@ table.rtable tr.total td{background:#ecfdf5;font-weight:800;border-top:2px solid
       <div class="card-sub">De dónde sale el costo: cuántas horas de cada clase se trabajaron y cuánto cuestan.</div>
       <div class="dtable-wrap"><table class="rtable" id="tblTipos"></table></div>
     </div>
+    <div class="card" id="cardConcil" style="display:none;margin-bottom:14px">
+      <div class="card-title">🔍 Conciliación: control de horas vs reporte consolidado</div>
+      <div class="card-sub">Mismas fechas en los dos formatos. La diferencia es lo que el consolidado trae de más (+) o de menos (−) frente al control.</div>
+      <div class="dtable-wrap"><table class="rtable" id="tblConcil"></table></div>
+    </div>
     <div class="card">
       <div class="card-title">💲 Valor por hora según vigencia (con el sueldo por defecto)</div>
       <div class="card-sub">Compara la tabla inicial contra lo que exige la ley en cada fecha.</div>
@@ -343,7 +370,7 @@ var C={FECHA:0,CANT:5,STATUS:15};
 /* =====================================================================
    MOTOR DE LIQUIDACIÓN (funciones puras — probadas por separado)
    ===================================================================== */
-var CFG={modo:'ley',sueldo:1750905,domModo:'auto',horasDia:7,descansoRem:true,carga:0,descansoMin:0,meta:null};
+var CFG={modo:'ley',sueldo:1750905,domModo:'auto',horasDia:7,horasDomFest:8,descansoRem:true,carga:0,descansoMin:0,meta:null,prioridad:'consolidado',excluirDescarte:false};
 
 // Festivos oficiales de Colombia 2026 (18 días). Para otros años agregar aquí.
 var FESTIVOS_LISTA=['2026-01-01','2026-01-12','2026-03-23','2026-04-02','2026-04-03','2026-05-01','2026-05-18','2026-06-08','2026-06-15','2026-06-29','2026-07-20','2026-08-07','2026-08-17','2026-10-12','2026-11-02','2026-11-16','2026-12-08','2026-12-25'];
@@ -401,12 +428,13 @@ function liquidar(turnos){
     var total=t.fin-t.ini;
     var desc=Math.min(t.descanso||0,Math.max(0,total-1));
     var bIni=t.ini+Math.floor((total-desc)/2), bFin=bIni+desc;
-    // Horas ordinarias del turno: las PROGRAMADAS del archivo (si vienen), si no el parámetro.
-    var dayQ=(t.prog>0)?Math.round(t.prog):Math.round(CFG.horasDia*60), shiftOrd=0;
+    // Horas ordinarias del turno: las PROGRAMADAS del archivo (si vienen). Si no: 8 h en domingo/festivo no programado
+    // (así lo clasifica el reporte consolidado) o el parámetro de respaldo en días ordinarios.
+    var dayQ=(t.prog>0)?Math.round(t.prog):Math.round((esDominical(t.fecha)?CFG.horasDomFest:CFG.horasDia)*60), shiftOrd=0;
     // Domingo/festivo: 'auto' = si el día estaba programado es habitual (solo recargo); si no, ocasional (pago completo)
     var domOcas=(CFG.domModo==='ocasional')||(CFG.domModo==='auto'&&!(t.prog>0));
     var cache={};
-    var out={persona:t.persona,fecha:t.fecha,min:0,cat:{},catBase:{},catAdic:{},base:0,rec:0,ext:0};
+    var out={id:t.id,persona:t.persona,fecha:t.fecha,min:0,cat:{},catBase:{},catAdic:{},base:0,rec:0,ext:0};
     CATS.forEach(function(c){out.cat[c]=0;out.catBase[c]=0;out.catAdic[c]=0;});
     for(var m=t.ini;m<t.fin;m++){
       if(desc>0&&m>=bIni&&m<bFin) continue;
@@ -502,16 +530,20 @@ function toDurMin(v){
 }
 
 /* Detecta por NOMBRE de columna (no por posición): así no se daña si se mueven columnas.
-   Formato del control de horas: FECHA INGRESO | FECHA SALIDA | NOMBRE | HORA DE ENTRADA |
-   FECHA Y HORA ENTRADA | HORA SALIDA | ALMUERZO | FECHA Y HORA SALIDA | HORAS TRABAJADAS |
-   HORAS PROGRAMADAS | DIFERENCIA | NOVEDADES */
+   FORMATO 1 · Control de horas: FECHA INGRESO | NOMBRE | HORA DE ENTRADA | FECHA Y HORA ENTRADA | HORA SALIDA |
+     ALMUERZO | FECHA Y HORA SALIDA | HORAS TRABAJADAS | HORAS PROGRAMADAS | DIFERENCIA | NOVEDADES
+   FORMATO 2 · Reporte consolidado (formato único de novedades): FECHA | CÉDULA | NOMBRE COMPLETO | HORA INICIO |
+     HORA FINAL | CÓDIGO LABOR | HORAS ORDINARIAS (JORNAL) | RN | HED | HEN | RFN | RFD | FN | FD | HEDF | HENF | OBSERVACIONES */
+var TID=0;
+var CATN={rn:'RN',hed:'HED',hen:'HEN',rfn:'RNF',rfd:'RDF',fn:'FN',fd:'FD',hedf:'HEFD',henf:'HEFN'};
 function mapearEncabezado(cells){
-  var m={},n=cells.map(normH);
+  var m={cat:{}},n=cells.map(normH);
   n.forEach(function(h,i){
     if(!h) return;
+    function set(k){if(m[k]===undefined)m[k]=i;}
+    if(CATN[h]){ if(m.cat[CATN[h]]===undefined) m.cat[CATN[h]]=i; return; }
     var esFecha=/fecha/.test(h),esHora=/hora/.test(h),esEnt=/entrada|ingreso/.test(h),esSal=/salida/.test(h);
     var dos=/(^| )2( |$)|segund/.test(h);
-    function set(k){if(m[k]===undefined)m[k]=i;}
     if(esFecha&&esEnt&&esHora) set('fhEnt');                 // FECHA Y HORA ENTRADA
     else if(esFecha&&esSal&&esHora) set('fhSal');            // FECHA Y HORA SALIDA
     else if(esFecha&&esSal) set('fechaSal');                 // FECHA SALIDA
@@ -519,9 +551,14 @@ function mapearEncabezado(cells){
     else if(/^dia$/.test(h)) set('fecha');
     else if(!esFecha&&esEnt) set(dos?'ent2':'ent');          // HORA DE ENTRADA
     else if(!esFecha&&esSal) set(dos?'sal2':'sal');          // HORA SALIDA
+    else if(!esFecha&&esHora&&/inicio/.test(h)) set('ent');  // HORA INICIO (consolidado)
+    else if(!esFecha&&esHora&&/final/.test(h)) set('sal');   // HORA FINAL (consolidado)
+    else if(/jornal/.test(h)) set('jornal');
     else if(/horas trabajadas|trabajadas/.test(h)) set('trab');
     else if(/programad/.test(h)) set('prog');
     else if(/novedad/.test(h)) set('nov');
+    else if(/codigo labor/.test(h)) set('labor');
+    else if(/observacion/.test(h)) set('obs');
     else if(/descanso|almuerzo/.test(h)) set('desc');
     else if(/sueldo|salario|basico/.test(h)) set('sueldo');
     else if(/nombre|colaborador|empleado|operario|^trabajador$/.test(h)) set('nombre');
@@ -530,6 +567,19 @@ function mapearEncabezado(cells){
   return m;
 }
 function filaVacia(row){return !row||row.every(function(c){return c===''||c===null||c===undefined||(''+c).trim()==='';});}
+/* ¿La fila es la segunda línea de un encabezado (solo textos cortos, sin fechas ni números)? */
+function esSubEncabezado(row){
+  if(!row||filaVacia(row)) return false;
+  var hayTexto=false;
+  for(var c=0;c<row.length;c++){var v=row[c];
+    if(v===''||v===null||v===undefined) continue;
+    if(typeof v==='number'||v instanceof Date||toDate(v)) return false;
+    hayTexto=true;}
+  return hayTexto;
+}
+function combinarEncabezados(a,b){var n=Math.max(a.length,b.length),o=[];for(var i=0;i<n;i++)o.push(((a[i]||'')+' '+(b[i]||'')).trim());return o;}
+function numH(v){if(v===null||v===undefined||v==='')return 0;if(typeof v==='number')return v;var x=parseFloat((''+v).replace(',','.'));return isNaN(x)?0:x;}
+
 function parseHoras(rows){
   var hdr=-1,map=null;
   for(var i=0;i<Math.min(rows.length,25);i++){
@@ -541,42 +591,72 @@ function parseHoras(rows){
     var vistos=[]; for(var j=0;j<Math.min(rows.length,6);j++){ (rows[j]||[]).forEach(function(c){ if((''+c).trim()) vistos.push((''+c).trim()); }); }
     return {error:true,vistos:vistos.slice(0,25)};
   }
-  var turnos=[],omitidas=0,novedades={},sinSalida={},valOk=0,valMal=0,sinSalidaN=0,sinReg={},sinRegN=0,filasDia={},huecosDia={};
-  for(var r=hdr+1;r<rows.length;r++){
+  var inicio=hdr+1;
+  if(esSubEncabezado(rows[hdr+1])){ map=mapearEncabezado(combinarEncabezados(rows[hdr],rows[hdr+1])); inicio=hdr+2; }
+  var formato=(map.jornal!==undefined||Object.keys(map.cat).length>=3)?'consolidado':'control';
+  var turnos=[],omitidas=0,novedades={},sinSalida={},valOk=0,valMal=0,sinSalidaN=0,sinReg={},sinRegN=0,filas=[],huecos=[],labores={};
+  for(var r=inicio;r<rows.length;r++){
     var row=rows[r]; if(filaVacia(row)) continue;
     var persona=normNombre(map.nombre!==undefined?row[map.nombre]:'')||normNombre(map.cedula!==undefined?row[map.cedula]:'');
+    var f0=map.fecha!==undefined?toDate(row[map.fecha]):null, iso0=f0?isoDate(f0):null;
+    if(!persona){ if(f0) omitidas++; continue; }
     var nov=map.nov!==undefined?(''+(row[map.nov]||'')).replace(/\s+/g,' ').trim().toUpperCase():'';
+    var obs=map.obs!==undefined?(''+(row[map.obs]||'')).replace(/\s+/g,' ').trim():'';
     var desc=map.desc!==undefined?toDurMin(row[map.desc]):(CFG.descansoMin||0);
     var prog=map.prog!==undefined?toDurMin(row[map.prog]):null;
     var sueldo=map.sueldo!==undefined?toNum(row[map.sueldo]):0;
-    if(!persona){omitidas++;continue;}
-    var f0=map.fecha!==undefined?toDate(row[map.fecha]):null, iso0=f0?isoDate(f0):null;
-    if(iso0) filasDia[iso0]=(filasDia[iso0]||0)+1;
+    if(iso0) filas.push([persona,iso0]);
+    var hizo=false;
 
-    // --- preferido: fecha y hora completas de entrada y salida (resuelve turnos nocturnos) ---
-    var S=null,E=null,fecha=null,ini=null,fin=null,hizo=false;
-    if(map.fhEnt!==undefined&&map.fhSal!==undefined){S=toSerialMin(row[map.fhEnt]);E=toSerialMin(row[map.fhSal]);}
-    if(S!==null&&E!==null){
-      var ds=Math.floor(S/1440); fecha=serialAFecha(ds); ini=Math.round(S-ds*1440); fin=Math.round(E-ds*1440);
-      if(fin<=ini){omitidas++;continue;}
-      turnos.push({persona:persona,fecha:fecha,ini:ini,fin:fin,descanso:desc,sueldo:sueldo>0?sueldo:null,prog:prog,descExplicito:map.desc!==undefined});
-      hizo=true;
-    } else if(map.ent!==undefined&&map.sal!==undefined){
-      // --- respaldo: fecha + hora de entrada + hora de salida ---
-      fecha=map.fecha!==undefined?toDate(row[map.fecha]):(S!==null?serialAFecha(Math.floor(S/1440)):null);
-      [[map.ent,map.sal],[map.ent2,map.sal2]].forEach(function(par,k){
-        if(par[0]===undefined||par[1]===undefined) return;
-        var a=toMin(row[par[0]]),b=toMin(row[par[1]]);
-        if(!fecha||a===null||b===null) return;
+    if(formato==='consolidado'){
+      // --- Reporte consolidado: hora inicio/final + horas ya clasificadas por el área ---
+      var a=toMin(row[map.ent]),b=toMin(row[map.sal]);
+      if(f0&&a!==null&&b!==null){
         if(b<=a) b+=1440;
-        turnos.push({persona:persona,fecha:fecha,ini:a,fin:b,descanso:desc,sueldo:sueldo>0?sueldo:null,prog:prog,descExplicito:map.desc!==undefined});
+        var H={};Object.keys(map.cat).forEach(function(k){H[k]=numH(row[map.cat[k]]);});
+        var jor=map.jornal!==undefined?numH(row[map.jornal]):0;
+        var habit=(H.RDF||0)+(H.RNF||0);
+        // horas trabajadas según el reporte (las de recargo RDF/RNF van DENTRO de la jornada)
+        var rep=jor+(H.HED||0)+(H.HEN||0)+(H.FD||0)+(H.FN||0)+(H.HEFD||0)+(H.HEFN||0)+(jor>0?0:habit);
+        // el almuerzo no se registra: se deduce de lo que falta entre la duración del turno y las horas reportadas
+        var brk=rep>0?Math.max(0,(b-a)-Math.round(rep*60)):0;
+        var pg=jor>0?Math.round(jor*60):(habit>0?Math.round(habit*60):0);
+        var lab=map.labor!==undefined?(''+row[map.labor]).trim():'';
+        var desca=/descarte/i.test(obs);
+        TID++;
+        turnos.push({id:TID,persona:persona,fecha:f0,ini:a,fin:b,descanso:brk,sueldo:null,prog:pg,descExplicito:true,fuente:'consolidado',descarte:desca,labor:lab,rep:H,jor:jor});
+        var lk=desca?'DESCARTE DE FRUTA POST COSECHA':(obs&&/despacho/i.test(obs)?'DESPACHO DE FRUTA':(obs||'(sin observación)'));
+        if(/despacho|descarte/i.test(obs)||!obs) labores[lk]=(labores[lk]||0)+1;
         hizo=true;
-      });
+      }
+    } else {
+      // --- Control de horas: fecha y hora completas (resuelve turnos nocturnos) ---
+      var S=null,E=null,fecha=null,ini=null,fin=null;
+      if(map.fhEnt!==undefined&&map.fhSal!==undefined){S=toSerialMin(row[map.fhEnt]);E=toSerialMin(row[map.fhSal]);}
+      if(S!==null&&E!==null){
+        var ds=Math.floor(S/1440); fecha=serialAFecha(ds); ini=Math.round(S-ds*1440); fin=Math.round(E-ds*1440);
+        if(fin<=ini){omitidas++;continue;}
+        TID++;
+        turnos.push({id:TID,persona:persona,fecha:fecha,ini:ini,fin:fin,descanso:desc,sueldo:sueldo>0?sueldo:null,prog:prog,descExplicito:map.desc!==undefined,fuente:'control'});
+        hizo=true;
+      } else if(map.ent!==undefined&&map.sal!==undefined){
+        // --- respaldo: fecha + hora de entrada + hora de salida ---
+        fecha=map.fecha!==undefined?toDate(row[map.fecha]):(S!==null?serialAFecha(Math.floor(S/1440)):null);
+        [[map.ent,map.sal],[map.ent2,map.sal2]].forEach(function(par){
+          if(par[0]===undefined||par[1]===undefined) return;
+          var a2=toMin(row[par[0]]),b2=toMin(row[par[1]]);
+          if(!fecha||a2===null||b2===null) return;
+          if(b2<=a2) b2+=1440;
+          TID++;
+          turnos.push({id:TID,persona:persona,fecha:fecha,ini:a2,fin:b2,descanso:desc,sueldo:sueldo>0?sueldo:null,prog:prog,descExplicito:map.desc!==undefined,fuente:'control'});
+          hizo=true;
+        });
+      }
     }
     if(hizo){
-      if(map.trab!==undefined){
+      if(formato==='control'&&map.trab!==undefined){
         var esperado=toDurMin(row[map.trab]);
-        if(esperado>0){var t=turnos[turnos.length-1];((t.fin-t.ini-t.descanso)===esperado||Math.abs(t.fin-t.ini-t.descanso-esperado)<=1)?valOk++:valMal++;}
+        if(esperado>0){var t=turnos[turnos.length-1];(Math.abs(t.fin-t.ini-t.descanso-esperado)<=1)?valOk++:valMal++;}
       }
       continue;
     }
@@ -584,18 +664,18 @@ function parseHoras(rows){
     var tieneEnt=(map.ent!==undefined&&row[map.ent]!==''&&row[map.ent]!==null&&row[map.ent]!==undefined)||(map.fhEnt!==undefined&&row[map.fhEnt]!==''&&row[map.fhEnt]!==null&&row[map.fhEnt]!==undefined);
     if(tieneEnt){sinSalidaN++;var k=nov||'(sin novedad)';sinSalida[k]=(sinSalida[k]||0)+1;
       // salvo que la novedad explique que no trabajaron (enviados a casa, permiso...), es un hueco de registro
-      if(iso0&&!/casa|cancel|no se present|permiso|incapac|vacacion|descanso/i.test(nov)) huecosDia[iso0]=(huecosDia[iso0]||0)+1;}
+      if(iso0&&!/casa|cancel|no se present|permiso|incapac|vacacion|descanso/i.test(nov)) huecos.push([persona,iso0]);}
     else if(nov){novedades[nov]=(novedades[nov]||0)+1;}
     else{
-      if(f0){sinRegN++;var kf=isoDate(f0);sinReg[kf]=(sinReg[kf]||0)+1;huecosDia[kf]=(huecosDia[kf]||0)+1;} else omitidas++;
+      if(f0){sinRegN++;var kf=isoDate(f0);sinReg[kf]=(sinReg[kf]||0)+1;huecos.push([persona,kf]);} else omitidas++;
     }
   }
-  return {turnos:turnos,omitidas:omitidas,novedades:novedades,sinSalida:sinSalida,sinSalidaN:sinSalidaN,valOk:valOk,valMal:valMal,sinReg:sinReg,sinRegN:sinRegN,filasDia:filasDia,huecosDia:huecosDia};
+  return {formato:formato,turnos:turnos,omitidas:omitidas,novedades:novedades,sinSalida:sinSalida,sinSalidaN:sinSalidaN,valOk:valOk,valMal:valMal,sinReg:sinReg,sinRegN:sinRegN,filas:filas,huecos:huecos,labores:labores};
 }
 
 /* ===== Estado ===== */
 var KG_DIA={}, KG_LISTO=false;
-var TURNOS=[], RES=[], FUENTE_HORAS='';
+var TURNOS=[], RES=[];
 var vista='dia';
 var charts={};
 var filtros={anos:[],meses:[],semanas:[],personas:[]};
@@ -635,83 +715,241 @@ async function cargarKilos(){
   }
 }
 
-/* ===== Carga de horas ===== */
+/* ===== Carga de horas =====
+Cada formato se guarda por separado (FUENTES.control / FUENTES.consolidado). Si un colaborador y un día aparecen en los
+dos, se usa UNO solo (según la prioridad elegida) para no contar las horas dos veces. Cargar un archivo nuevo del mismo
+formato reemplaza solo las fechas que ese archivo cubre; lo anterior fuera de ese rango se conserva. */
+var FUENTES={}, CANON={}, HUECOS_FM={}, CONCIL=null, UNIF=[];
+var FMT_NOMBRE={control:'Control de horas (REPORTE DE TIEMPO)',consolidado:'Reporte consolidado (formato único de novedades)'};
 function sumaObj(a,b){Object.keys(b).forEach(function(k){a[k]=(a[k]||0)+b[k];});}
 function listaObj(o,max){return Object.keys(o).sort(function(x,y){return o[y]-o[x];}).slice(0,max||8).map(function(k){return k.toLowerCase()+' ×'+o[k];}).join(', ');}
+function fmtFechaHora(ts){var d=new Date(ts);return pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad2(d.getHours())+':'+pad2(d.getMinutes());}
+function fmtIso(k){var q=k.split('-');return q[2]+'/'+q[1];}
+function trabajadoMin(t){return t.fin-t.ini-(t.descanso||0);}
+
+/* Mismo nombre escrito con una letra distinta (p. ej. CAMILO / CAMIILO) = misma persona */
+function dist1(a,b){
+  if(a===b) return true;
+  var la=a.length,lb=b.length; if(Math.abs(la-lb)>1) return false;
+  var i=0; while(i<la&&i<lb&&a[i]===b[i]) i++;
+  if(la===lb) return a.slice(i+1)===b.slice(i+1);
+  if(la>lb) return a.slice(i+1)===b.slice(i);
+  return a.slice(i)===b.slice(i+1);
+}
+function unificarNombres(frec){
+  var orden=Object.keys(frec).sort(function(x,y){return frec[y]-frec[x];}),canon=[],map={},cambios=[];
+  orden.forEach(function(n){
+    var hit=null;
+    for(var k=0;k<canon.length;k++){var c=canon[k];if(n.length>=10&&c.length>=10&&dist1(n,c)){hit=c;break;}}
+    if(hit){map[n]=hit;cambios.push(n+' → '+hit);}else{canon.push(n);map[n]=n;}
+  });
+  return {map:map,cambios:cambios};
+}
+
+function combinarFuentes(){
+  var fms=Object.keys(FUENTES), frec={};
+  fms.forEach(function(fm){FUENTES[fm].turnos.forEach(function(t){frec[t.persona]=(frec[t.persona]||0)+1;});});
+  var u=unificarNombres(frec);UNIF=u.cambios;
+  var cn=function(p){return u.map[p]||p;};
+  CANON={};HUECOS_FM={};
+  var porClave={};
+  // Descarte de fruta: se marca por colaborador-día e intervalo, para excluirlo también del otro formato (que no lo identifica)
+  var desc={};
+  if(CFG.excluirDescarte) fms.forEach(function(fm){FUENTES[fm].turnos.forEach(function(t){if(t.descarte){var k=cn(t.persona)+'|'+isoDate(t.fecha);(desc[k]=desc[k]||[]).push([t.ini,t.fin]);}});});
+  function esDescarte(t){
+    if(!CFG.excluirDescarte) return false;
+    if(t.descarte) return true;
+    var iv=desc[cn(t.persona)+'|'+isoDate(t.fecha)];
+    return !!iv&&iv.some(function(b){return t.ini<b[1]&&t.fin>b[0];});
+  }
+  fms.forEach(function(fm){
+    var S=FUENTES[fm];CANON[fm]=[];
+    S.turnos.forEach(function(t){
+      if(esDescarte(t)) return;
+      var c={};for(var k in t)c[k]=t[k];
+      c.persona=cn(t.persona);
+      if(!c.descExplicito) c.descanso=CFG.descansoMin;
+      CANON[fm].push(c);
+      var key=c.persona+'|'+isoDate(c.fecha);
+      if(!porClave[key]) porClave[key]={};
+      (porClave[key][fm]=porClave[key][fm]||[]).push(c);
+    });
+    HUECOS_FM[fm]=S.huecos.map(function(h){return [cn(h[0]),h[1]];});
+  });
+  var out=[],ambos=0,difieren=0,minC=0,minK=0;
+  Object.keys(porClave).forEach(function(k){
+    var o=porClave[k],f=Object.keys(o),elegido;
+    if(f.length===1) elegido=f[0];
+    else{
+      elegido=o[CFG.prioridad]?CFG.prioridad:f[0];
+      ambos++;
+      var mc=(o.control||[]).reduce(function(a,t){return a+trabajadoMin(t);},0), mk=(o.consolidado||[]).reduce(function(a,t){return a+trabajadoMin(t);},0);
+      if(Math.abs(mc-mk)>1) difieren++;
+      minC+=mc;minK+=mk;
+    }
+    o[elegido].forEach(function(t){out.push(t);});
+  });
+  // Días incompletos: colaboradores con fila pero sin horas utilizables en NINGUNA fuente (20% o más del día, mínimo 2)
+  var universo={};
+  fms.forEach(function(fm){FUENTES[fm].filas.forEach(function(p){universo[cn(p[0])+'|'+p[1]]=1;});});
+  Object.keys(porClave).forEach(function(k){universo[k]=1;});
+  var totD={},hueD={},visto={};
+  Object.keys(universo).forEach(function(k){var d=k.split('|')[1];totD[d]=(totD[d]||0)+1;});
+  fms.forEach(function(fm){HUECOS_FM[fm].forEach(function(h){var k=h[0]+'|'+h[1];if(porClave[k]||visto[k])return;visto[k]=1;hueD[h[1]]=(hueD[h[1]]||0)+1;});});
+  DIAS_INC={};Object.keys(hueD).forEach(function(d){if(hueD[d]>=2&&hueD[d]/totD[d]>=0.2)DIAS_INC[d]=1;});
+  CONCIL={ambos:ambos,difieren:difieren,minC:minC,minK:minK};
+  TURNOS=out;
+}
+
+/* El consolidado ya trae las horas clasificadas: se compara contra lo que calcula el motor por reglas */
+function validarConsolidado(turnos){
+  var res=liquidar(turnos),porId={},ok=0,mal=0;
+  turnos.forEach(function(t){porId[t.id]=t;});
+  res.forEach(function(r){
+    var t=porId[r.id];if(!t)return;
+    var H=t.rep||{},bien=true;
+    ['RN','HED','HEN','FD','FN','HEFD','HEFN','RDF','RNF'].forEach(function(k){if(Math.abs(r.cat[k]/60-(H[k]||0))>0.01)bien=false;});
+    if(t.jor>0&&Math.abs((r.cat.ORD+r.cat.RN)/60-t.jor)>0.01) bien=false;
+    bien?ok++:mal++;
+  });
+  return {ok:ok,mal:mal};
+}
+
+function agregarFuente(fm,g,nombre,ts){
+  var fechas=g.turnos.map(function(t){return t.fecha.getTime();});
+  if(!fechas.length) return;
+  var isoI=isoDate(new Date(Math.min.apply(null,fechas))),isoF=isoDate(new Date(Math.max.apply(null,fechas)));
+  var viejo=FUENTES[fm];
+  var nuevo={formato:fm,turnos:g.turnos,filas:g.filas,huecos:g.huecos,archivos:[{nombre:nombre,ts:ts,ini:isoI,fin:isoF,n:g.turnos.length}]};
+  if(viejo){
+    nuevo.turnos=viejo.turnos.filter(function(t){var i=isoDate(t.fecha);return i<isoI||i>isoF;}).concat(g.turnos);
+    nuevo.filas=viejo.filas.filter(function(p){return p[1]<isoI||p[1]>isoF;}).concat(g.filas);
+    nuevo.huecos=viejo.huecos.filter(function(p){return p[1]<isoI||p[1]>isoF;}).concat(g.huecos);
+    nuevo.archivos=viejo.archivos.filter(function(a){return a.nombre!==nombre;}).concat(nuevo.archivos);
+  }
+  FUENTES[fm]=nuevo;
+}
+
+function mensajeFuente(fm,g,nombre,val){
+  var h='<div class="note" style="margin-top:6px"><b>Formato detectado: '+FMT_NOMBRE[fm]+'</b> — '+nombre+': '+g.turnos.length+' turnos ('+g.hojas.join(', ')+')</div>';
+  if(fm==='control'&&(g.vOk+g.vMal)) h+='<div class="note">✔ Validación: las horas calculadas (salida − entrada − almuerzo) coinciden con HORAS TRABAJADAS del Excel en <b>'+g.vOk+' de '+(g.vOk+g.vMal)+'</b> turnos'+(g.vMal?' — '+g.vMal+' no coinciden, revisa esas filas':'')+'.</div>';
+  if(fm==='consolidado'&&val) h+='<div class="note">✔ Validación: el motor de costeo reproduce la clasificación de horas del reporte (RN, HED, HEN, FD, FN…) en <b>'+val.ok+' de '+(val.ok+val.mal)+'</b> turnos'+(val.mal?' (las '+val.mal+' diferencias son menores, de una hora en un recargo nocturno)':'')+'. El almuerzo no viene registrado y se deduce de las horas reportadas.</div>';
+  if(fm==='consolidado'&&Object.keys(g.labores).length) h+='<div class="note">Labores en el reporte: '+listaObj(g.labores)+(g.labores['DESCARTE DE FRUTA POST COSECHA']?'. El descarte de fruta se incluye en el costo; puedes excluirlo en <i>Supuestos de costeo</i>.':'')+'</div>';
+  return h;
+}
+function mensajeConciliacion(){
+  if(!(FUENTES.control&&FUENTES.consolidado)||!CONCIL) return '';
+  var pc=CONCIL.minK>0?(CONCIL.minK/CONCIL.minC-1)*100:0;
+  return '<div class="note" style="margin-top:8px">🔍 <b>Los dos formatos comparten '+CONCIL.ambos+' colaborador-días</b>; en '+CONCIL.difieren+' los horarios son distintos. Se usa un solo registro por colaborador y día ('+(CFG.prioridad==='consolidado'?'reporte consolidado':'control de horas')+'), así que nada se cuenta dos veces. En esos días comunes el control suma '+horasTxt(CONCIL.minC)+' h y el consolidado '+horasTxt(CONCIL.minK)+' h ('+pct1(pc)+'). Detalle día por día en la pestaña <i>Detalle del costo</i>.</div>'+(UNIF.length?'<div class="note">Nombres unificados por diferir en una letra: '+UNIF.join('; ')+'.</div>':'');
+}
+
 function aplicarHojas(hojas,nombreFuente){
-  var todos=[],ok=[],fallidas=[],ocultas=[],omit=0,nov={},sinSal={},sinSalN=0,vOk=0,vMal=0,sinReg={},sinRegN=0,filasD={},huecosD={};
+  var porFmt={},ocultas=[],fallidas=[];
   hojas.forEach(function(h){
     if(h.oculta){ocultas.push(h.nombre);return;}
     if(!h.rows.length||h.rows.every(filaVacia)) return;   // hoja vacía: se ignora sin ruido
     var r=parseHoras(h.rows);
-    if(r.error) fallidas.push({nombre:h.nombre,vistos:r.vistos});
-    else{ok.push(h.nombre+' ('+r.turnos.length+' turnos)');todos=todos.concat(r.turnos);omit+=r.omitidas;sumaObj(nov,r.novedades);sumaObj(sinSal,r.sinSalida);sinSalN+=r.sinSalidaN;vOk+=r.valOk;vMal+=r.valMal;sumaObj(sinReg,r.sinReg);sinRegN+=r.sinRegN;sumaObj(filasD,r.filasDia);sumaObj(huecosD,r.huecosDia);}
+    if(r.error){fallidas.push({nombre:h.nombre,vistos:r.vistos});return;}
+    var g=porFmt[r.formato]||(porFmt[r.formato]={turnos:[],filas:[],huecos:[],omit:0,nov:{},sinSal:{},sinSalN:0,vOk:0,vMal:0,sinReg:{},sinRegN:0,labores:{},hojas:[]});
+    g.hojas.push(h.nombre+' · '+r.turnos.length);
+    g.turnos=g.turnos.concat(r.turnos);g.filas=g.filas.concat(r.filas);g.huecos=g.huecos.concat(r.huecos);
+    g.omit+=r.omitidas;sumaObj(g.nov,r.novedades);sumaObj(g.sinSal,r.sinSalida);g.sinSalN+=r.sinSalidaN;g.vOk+=r.valOk;g.vMal+=r.valMal;sumaObj(g.sinReg,r.sinReg);g.sinRegN+=r.sinRegN;sumaObj(g.labores,r.labores);
   });
   var msg=document.getElementById('srcMsg');
-  if(!todos.length){
-    msg.innerHTML='<div class="alert-box"><b>No reconocí el formato del archivo.</b> Necesito columnas de <b>Fecha</b>, <b>Nombre (o Cédula)</b>, <b>Entrada</b> y <b>Salida</b> (una fila por persona y día).<br>Encabezados que encontré: <i>'+(fallidas.length?fallidas[0].vistos.join(' · '):'ninguno')+'</i><br>Compárteme el archivo en el chat y adapto el lector a su formato exacto.</div>';
+  var fmts=Object.keys(porFmt).filter(function(fm){return porFmt[fm].turnos.length;});
+  if(!fmts.length){
+    msg.innerHTML='<div class="alert-box"><b>No reconocí el formato del archivo.</b> Reconozco el <b>control de horas</b> (Fecha, Nombre, Fecha y hora de entrada/salida) y el <b>reporte consolidado</b> (Fecha, Nombre completo, Hora inicio, Hora final, columnas RN/HED/HEN…).<br>Encabezados que encontré: <i>'+(fallidas.length?fallidas[0].vistos.join(' · '):'ninguno')+'</i><br>Compárteme el archivo en el chat y adapto el lector.</div>';
     document.getElementById('chipHoras').className='src-chip bad';
     document.getElementById('chipHoras').textContent='Horas trabajadas: formato no reconocido';
     return;
   }
-  var ts=Date.now();
-  // Día incompleto: al menos 2 colaboradores y 20% o más sin horas utilizables ni explicación
-  var inc={};Object.keys(huecosD).forEach(function(k){if(huecosD[k]>=2&&huecosD[k]/filasD[k]>=0.2)inc[k]=1;});
-  DIAS_INC=inc;
-  mostrarCarga(todos,nombreFuente,ts);
-  guardarLocal(todos,nombreFuente,ts);
-  var extra='';
-  if(vOk+vMal) extra+='<div class="note" style="margin-top:6px">✔ Validación: las horas calculadas (salida − entrada − almuerzo) coinciden con la columna HORAS TRABAJADAS del Excel en <b>'+vOk+' de '+(vOk+vMal)+'</b> turnos'+(vMal?' — '+vMal+' no coinciden, revisa esas filas':'')+'.</div>';
-  if(ocultas.length) extra+='<div class="note" style="margin-top:6px">Hojas ocultas ignoradas: '+ocultas.join(', ')+'.</div>';
-  var incL=Object.keys(DIAS_INC).sort();
-  if(incL.length) extra+='<div class="alert-box" style="margin-top:8px"><b>'+incL.length+' día(s) con registro de horas incompleto</b> (20% o más de los colaboradores sin horas utilizables): '+incL.map(function(k){var q=k.split('-');return q[2]+'/'+q[1];}).join(', ')+'. Se excluyen del costo por kilo y del análisis porque su costo está subestimado; complétalos en el Excel y vuelve a cargarlo.</div>';
-  if(sinRegN){var fl=Object.keys(sinReg).sort().map(function(k){var p=k.split('-');return p[2]+'/'+p[1]+' ×'+sinReg[k];});extra+='<div class="alert-box" style="margin-top:8px"><b>'+sinRegN+' registro(s) sin hora de entrada, sin salida y sin novedad</b> (falta digitar las horas o la novedad; no se pueden costear): '+fl.slice(0,14).join(', ')+(fl.length>14?'…':'')+'.</div>';}
-  if(sinSalN) extra+='<div class="alert-box" style="margin-top:8px"><b>'+sinSalN+' fila(s) con hora de entrada pero sin hora de salida</b> no entran al costo (no hay forma de saber cuánto trabajaron). Novedades: '+listaObj(sinSal)+'.</div>';
-  if(Object.keys(nov).length){var tn=0;Object.keys(nov).forEach(function(k){tn+=nov[k];});extra+='<details style="margin-top:8px"><summary class="note" style="cursor:pointer">'+tn+' fila(s) sin horas por novedad (vacaciones, descanso, etc.) — ver detalle</summary><div class="note" style="margin-top:4px">'+listaObj(nov,20)+'</div></details>';}
-  if(fallidas.length) extra+='<div class="alert-box" style="margin-top:8px">Hojas ignoradas (sin formato reconocible): '+fallidas.map(function(f){return f.nombre;}).join(', ')+'.</div>';
-  if(omit) extra+='<div class="alert-box" style="margin-top:8px">'+omit+' fila(s) con datos incompletos fueron omitidas.</div>';
-  msg.innerHTML='<div class="note">Fuente: <b>'+nombreFuente+'</b> — hojas leídas: '+ok.join(', ')+'</div>'+extra;
-}
-function fmtFechaHora(ts){var d=new Date(ts);return pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear()+' '+pad2(d.getHours())+':'+pad2(d.getMinutes());}
-function mostrarCarga(todos,fuente,ts,guardado){
-  TURNOS=todos; FUENTE_HORAS=fuente;
-  var personas={};todos.forEach(function(t){personas[t.persona]=1;});
-  var fechas=todos.map(function(t){return t.fecha.getTime();});
-  var d1=new Date(Math.min.apply(null,fechas)),d2=new Date(Math.max.apply(null,fechas));
-  var chip=document.getElementById('chipHoras');chip.className='src-chip ok';
-  chip.textContent='Horas trabajadas: '+todos.length+' turnos · '+Object.keys(personas).length+' colaboradores · '+isoDate(d1)+' a '+isoDate(d2)+' ✔ · archivo "'+fuente+'" cargado el '+fmtFechaHora(ts)+(guardado?' (guardado en este navegador)':'');
+  var ts=Date.now(),html='';
+  fmts.forEach(function(fm){
+    var g=porFmt[fm];
+    var val=fm==='consolidado'?validarConsolidado(g.turnos):null;
+    agregarFuente(fm,g,nombreFuente,ts);
+    html+=mensajeFuente(fm,g,nombreFuente,val);
+    if(g.sinRegN){var fl=Object.keys(g.sinReg).sort().map(function(k){return fmtIso(k)+' ×'+g.sinReg[k];});html+='<div class="alert-box" style="margin-top:8px"><b>'+g.sinRegN+' registro(s) sin hora de entrada, sin salida y sin novedad</b> (falta digitar las horas o la novedad; no se pueden costear): '+fl.slice(0,14).join(', ')+(fl.length>14?'…':'')+'.</div>';}
+    if(g.sinSalN) html+='<div class="alert-box" style="margin-top:8px"><b>'+g.sinSalN+' fila(s) con hora de entrada pero sin hora de salida</b> no entran al costo (no hay forma de saber cuánto trabajaron). Novedades: '+listaObj(g.sinSal)+'.</div>';
+    if(Object.keys(g.nov).length){var tn=0;Object.keys(g.nov).forEach(function(k){tn+=g.nov[k];});html+='<details style="margin-top:8px"><summary class="note" style="cursor:pointer">'+tn+' fila(s) sin horas por novedad (vacaciones, descanso, etc.) — ver detalle</summary><div class="note" style="margin-top:4px">'+listaObj(g.nov,20)+'</div></details>';}
+    if(g.omit) html+='<div class="alert-box" style="margin-top:8px">'+g.omit+' fila(s) con datos incompletos fueron omitidas.</div>';
+  });
+  if(ocultas.length) html+='<div class="note" style="margin-top:6px">Hojas ocultas ignoradas: '+ocultas.join(', ')+'.</div>';
+  if(fallidas.length) html+='<div class="alert-box" style="margin-top:8px">Hojas ignoradas (sin formato reconocible): '+fallidas.map(function(f){return f.nombre;}).join(', ')+'.</div>';
+  guardarLocal();
   recalcular();
+  var incL=Object.keys(DIAS_INC).sort();
+  if(incL.length) html+='<div class="alert-box" style="margin-top:8px"><b>'+incL.length+' día(s) con registro de horas incompleto</b> (20% o más de los colaboradores sin horas utilizables en ninguna fuente): '+incL.map(fmtIso).join(', ')+'. Se excluyen del costo por kilo y del análisis porque su costo está subestimado.</div>';
+  msg.innerHTML=html+mensajeConciliacion();
 }
-/* Memoria local: se guarda SOLO en este navegador (no se envía a ningún servidor). */
-var LS_KEY='costosHorasV2';
-function guardarLocal(turnos,fuente,ts){
+
+/* ===== Fuentes cargadas (lista) ===== */
+function renderFuentes(){
+  var fms=Object.keys(FUENTES),chip=document.getElementById('chipHoras'),lista=document.getElementById('srcList');
+  document.getElementById('btnOlvidar').style.display=fms.length?'inline-block':'none';
+  if(!fms.length){chip.className='src-chip warn';chip.textContent='Horas trabajadas: sin cargar';lista.innerHTML='';return;}
+  var pers={},ms=[];
+  TURNOS.forEach(function(t){pers[t.persona]=1;ms.push(t.fecha.getTime());});
+  chip.className='src-chip ok';
+  chip.textContent='Horas trabajadas: '+TURNOS.length+' turnos · '+Object.keys(pers).length+' colaboradores'+(ms.length?' · '+isoDate(new Date(Math.min.apply(null,ms)))+' a '+isoDate(new Date(Math.max.apply(null,ms))):'')+' ✔'+(fms.length>1?' · '+fms.length+' formatos combinados':'');
+  lista.innerHTML=fms.map(function(fm){
+    var S=FUENTES[fm];
+    return '<div class="src-chip ok" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span><b>'+FMT_NOMBRE[fm]+'</b> · '+S.turnos.length.toLocaleString('es-CO')+' turnos · '+S.archivos.map(function(a){return a.nombre+' ('+fmtIso(a.ini)+' → '+fmtIso(a.fin)+', cargado '+fmtFechaHora(a.ts)+')';}).join(' + ')+'</span><button class="btn btn-gray" style="padding:3px 9px" onclick="quitarFuente(\''+fm+'\')">Quitar</button></div>';
+  }).join('');
+}
+function quitarFuente(fm){delete FUENTES[fm];guardarLocal();recalcular();document.getElementById('srcMsg').innerHTML='';}
+
+/* ===== Conciliación entre formatos (solo si hay dos) ===== */
+function renderConciliacion(){
+  var card=document.getElementById('cardConcil');
+  if(!(FUENTES.control&&FUENTES.consolidado)||!CANON.control||!CANON.consolidado){card.style.display='none';return;}
+  card.style.display='block';
+  function porDia(res){var m={};res.forEach(function(r){var k=isoDate(r.fecha);if(!m[k])m[k]={min:0,tot:0};m[k].min+=r.min;m[k].tot+=r.total;});return m;}
+  var A=porDia(liquidar(CANON.control)),B=porDia(liquidar(CANON.consolidado));
+  var hu={};(HUECOS_FM.control||[]).forEach(function(h){hu[h[1]]=(hu[h[1]]||0)+1;});
+  var fechas=Object.keys(A).filter(function(k){return B[k];}).sort();
+  var sa=0,sb=0,ca=0,cb=0;
+  var html='<thead><tr><th class="left">Fecha</th><th>Control (h)</th><th>Consolidado (h)</th><th>Diferencia (h)</th><th>Control ($)</th><th>Consolidado ($)</th><th>Diferencia ($)</th><th class="left">Observación</th></tr></thead><tbody>';
+  fechas.forEach(function(k){
+    var a=A[k],b=B[k],dh=(b.min-a.min),dc=b.tot-a.tot;
+    if(!hu[k]){sa+=a.min;sb+=b.min;ca+=a.tot;cb+=b.tot;}
+    html+='<tr><td class="left">'+k.split('-').reverse().join('/')+'</td><td>'+horasTxt(a.min)+'</td><td>'+horasTxt(b.min)+'</td><td style="color:'+(Math.abs(dh)<1?'#64748b':(dh>0?'#b45309':'#15803d'))+';font-weight:700">'+(Math.abs(dh)<1?'—':(dh>0?'+':'−')+horasTxt(Math.abs(dh)))+'</td><td>'+money(a.tot)+'</td><td>'+money(b.tot)+'</td><td>'+(Math.abs(dc)<1?'—':(dc>0?'+':'−')+money(Math.abs(dc)))+'</td><td class="left">'+(hu[k]?'<span class="badge badge-warn">el control tiene '+hu[k]+' fila(s) sin horas</span>':'')+'</td></tr>';
+  });
+  html+=fechas.length?'<tr class="total"><td class="left">Días sin huecos en el control</td><td>'+horasTxt(sa)+'</td><td>'+horasTxt(sb)+'</td><td>'+(sb>=sa?'+':'−')+horasTxt(Math.abs(sb-sa))+'</td><td>'+money(ca)+'</td><td>'+money(cb)+'</td><td>'+(cb>=ca?'+':'−')+money(Math.abs(cb-ca))+'</td><td></td></tr>':'<tr><td colspan="8" class="empty">Los dos formatos no comparten fechas</td></tr>';
+  document.getElementById('tblConcil').innerHTML=html+'</tbody>';
+}
+
+/* ===== Memoria local: solo en este navegador (no se envía a ningún servidor) ===== */
+var LS_KEY='costosFuentesV3';
+function guardarLocal(){
   try{
-    localStorage.setItem(LS_KEY,JSON.stringify({fuente:fuente,ts:ts,inc:Object.keys(DIAS_INC),t:turnos.map(function(t){return [t.persona,isoDate(t.fecha),t.ini,t.fin,t.descanso,t.sueldo,t.descExplicito?1:0,t.prog];})}));
-    document.getElementById('btnOlvidar').style.display='inline-block';
+    var o={};
+    Object.keys(FUENTES).forEach(function(fm){var S=FUENTES[fm];o[fm]={archivos:S.archivos,filas:S.filas,huecos:S.huecos,t:S.turnos.map(function(t){return [t.persona,isoDate(t.fecha),t.ini,t.fin,t.descanso,t.sueldo,t.descExplicito?1:0,t.prog,t.descarte?1:0,t.labor||''];})};});
+    localStorage.setItem(LS_KEY,JSON.stringify(o));
   }catch(e){}
 }
 function cargarLocal(){
   try{
-    var raw=localStorage.getItem(LS_KEY); if(!raw) return false;
-    var o=JSON.parse(raw);
-    var turnos=o.t.map(function(a){return {persona:a[0],fecha:toDate(a[1]),ini:a[2],fin:a[3],descanso:a[4],sueldo:a[5],descExplicito:!!a[6],prog:(a[7]===undefined?null:a[7])};}).filter(function(t){return t.fecha;});
-    if(!turnos.length) return false;
-    turnos.forEach(function(t){ if(!t.descExplicito) t.descanso=CFG.descansoMin; });
-    DIAS_INC={};(o.inc||[]).forEach(function(k){DIAS_INC[k]=1;});
-    document.getElementById('btnOlvidar').style.display='inline-block';
-    mostrarCarga(turnos,o.fuente,o.ts,true);
-    document.getElementById('srcMsg').innerHTML='<div class="note">Se recuperaron las horas de tu última carga. Cuando el Excel cambie, vuelve a subirlo con el botón verde para actualizar.</div>';
+    var raw=localStorage.getItem(LS_KEY);if(!raw) return false;
+    var o=JSON.parse(raw),hay=false;
+    Object.keys(o).forEach(function(fm){
+      var S=o[fm];
+      var turnos=S.t.map(function(a){TID++;return {id:TID,persona:a[0],fecha:toDate(a[1]),ini:a[2],fin:a[3],descanso:a[4],sueldo:a[5],descExplicito:!!a[6],prog:a[7],descarte:!!a[8],labor:a[9],fuente:fm};}).filter(function(t){return t.fecha;});
+      if(!turnos.length) return;
+      FUENTES[fm]={formato:fm,turnos:turnos,filas:S.filas||[],huecos:S.huecos||[],archivos:S.archivos||[]};hay=true;
+    });
+    if(!hay) return false;
+    recalcular();
+    document.getElementById('srcMsg').innerHTML='<div class="note">Se recuperaron las horas de tus últimas cargas en este navegador. Cuando los archivos cambien, vuelve a subirlos con el botón verde para actualizar.</div>'+mensajeConciliacion();
     return true;
   }catch(e){return false;}
 }
 function olvidarGuardado(){
   try{localStorage.removeItem(LS_KEY);}catch(e){}
-  TURNOS=[];RES=[];
-  document.getElementById('btnOlvidar').style.display='none';
-  document.getElementById('chipHoras').className='src-chip warn';
-  document.getElementById('chipHoras').textContent='Horas trabajadas: sin cargar';
-  recalcular();
+  FUENTES={};recalcular();
+  document.getElementById('srcMsg').innerHTML='';
 }
+
 function onFileHoras(ev){
   var f=ev.target.files[0]; if(!f) return;
   var name=f.name, rd=new FileReader();
@@ -757,21 +995,24 @@ function leerParams(){
   CFG.sueldo=parseFloat(document.getElementById('pSueldo').value)||1750905;
   CFG.domModo=document.getElementById('pDom').value;
   CFG.horasDia=parseFloat(document.getElementById('pHorasDia').value)||7;
+  CFG.horasDomFest=parseFloat(document.getElementById('pHorasDomFest').value)||8;
+  CFG.prioridad=document.getElementById('pPrior').value;
+  CFG.excluirDescarte=document.getElementById('pDescarte').value==='1';
   CFG.descansoMin=parseFloat(document.getElementById('pDescanso').value)||0;
   CFG.descansoRem=document.getElementById('pDesc').value==='1';
   CFG.carga=parseFloat(document.getElementById('pCarga').value)||0;
 }
 function onParam(){
   leerParams();
-  // el descanso por defecto solo se aplica a turnos cuyo archivo no traía la columna
-  TURNOS.forEach(function(t){ if(!t.descExplicito) t.descanso=CFG.descansoMin; });
   recalcular();
 }
 
 /* ===== Cálculo y filtros ===== */
 function recalcular(){
+  combinarFuentes();
   RES=liquidar(TURNOS);
   construirFiltros();
+  renderFuentes();
   render();
 }
 var MSEL=[{id:'fAno',key:'anos',label:'Año'},{id:'fMes',key:'meses',label:'Mes'},{id:'fSemana',key:'semanas',label:'Semana'},{id:'fPers',key:'personas',label:'Colaborador'}];
@@ -906,6 +1147,7 @@ function render(){
   renderTipos(lista);
   renderTarifas();
   renderNotas();
+  if(vista==='detalle') renderConciliacion();
   document.getElementById('hdrMeta').textContent=sinHoras?'Carga el archivo de horas para ver el seguimiento':'Cuánto cuesta cada día la mano de obra de despachos y cuánto cuesta cada kilo despachado · '+lista.length.toLocaleString('es-CO')+' turnos en el período';
 }
 function renderAvisos(lista){
@@ -1255,7 +1497,7 @@ async function iniciar(){
   if(HORAS_CSV_URL){ document.getElementById('btnRecargar').style.display='inline-block'; await cargarHorasDesdeUrl(); }
   else if(!cargarLocal()){
     document.getElementById('srcMsg').innerHTML='<div class="how"><b>Cómo cargar las horas:</b><ol>'+
-    '<li><b>Sin configurar nada:</b> descarga el Excel de control de horas desde SharePoint (con sus fórmulas, se leen los valores ya calculados) y súbelo con el botón verde. Se lee en tu navegador y queda recordado en este equipo.</li>'+
+    '<li><b>Sin configurar nada:</b> descarga el Excel de control de horas desde SharePoint (con sus fórmulas, se leen los valores ya calculados) o el reporte consolidado del mes, y súbelo con el botón verde. Puedes cargar los dos: se combinan sin duplicar horas. Se leen en tu navegador y quedan recordados en este equipo.</li>'+
     '<li><b>Automático:</b> copia las horas a una hoja de Google Sheets (una fila por persona y día: Fecha, Nombre, Entrada, Salida), publícala como CSV y pega el link en <code>HORAS_CSV_URL</code> al inicio del script.</li></ol></div>';
   }
   render();
