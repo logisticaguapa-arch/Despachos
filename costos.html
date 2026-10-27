@@ -202,12 +202,9 @@ table.rtable tr.total td{background:#ecfdf5;font-weight:800;border-top:2px solid
           <div class="hint">El reporte consolidado clasifica 8 horas como ordinarias (FD/FN) en festivos y el resto como extra festiva.</div>
         </div>
         <div class="pfield">
-          <label>Descarte de fruta post cosecha</label>
-          <select id="pDescarte" onchange="onParam()">
-            <option value="0">Incluir sus horas en el costo</option>
-            <option value="1">Excluirlas (no es labor de despacho)</option>
-          </select>
-          <div class="hint">Aparece en el reporte consolidado con observación "DESCARTE DE FRUTA POST COSECHA".</div>
+          <label>Código de labor que cuenta como despacho</label>
+          <input type="text" id="pLabor" value="99" maxlength="10" onchange="onParam()">
+          <div class="hint">Del reporte consolidado solo se cuentan las filas con este código (99 = despachos). Los demás códigos (131, 78…) son personal prestado a otra área y no entran al costo. Vacío = contar todos.</div>
         </div>
         <div class="pfield">
           <label>Descanso/almuerzo no pagado (min por turno)</label>
@@ -370,7 +367,7 @@ var C={FECHA:0,CANT:5,STATUS:15};
 /* =====================================================================
    MOTOR DE LIQUIDACIÓN (funciones puras — probadas por separado)
    ===================================================================== */
-var CFG={modo:'ley',sueldo:1750905,topeSemanal:false,domModo:'auto',horasDia:7,horasDomFest:8,descansoRem:true,carga:0,descansoMin:0,meta:null,prioridad:'consolidado',excluirDescarte:false};
+var CFG={modo:'ley',sueldo:1750905,topeSemanal:false,domModo:'auto',horasDia:7,horasDomFest:8,descansoRem:true,carga:0,descansoMin:0,meta:null,prioridad:'consolidado',laborDespacho:'99'};
 
 // Festivos oficiales de Colombia 2026 (18 días). Para otros años agregar aquí.
 var FESTIVOS_LISTA=['2026-01-01','2026-01-12','2026-03-23','2026-04-02','2026-04-03','2026-05-01','2026-05-18','2026-06-08','2026-06-15','2026-06-29','2026-07-20','2026-08-07','2026-08-17','2026-10-12','2026-11-02','2026-11-16','2026-12-08','2026-12-25'];
@@ -784,13 +781,16 @@ function combinarFuentes(){
   var cn=function(p){return u.map[p]||p;};
   CANON={};HUECOS_FM={};
   var porClave={};
-  // Descarte de fruta: se marca por colaborador-día e intervalo, para excluirlo también del otro formato (que no lo identifica)
-  var desc={};
-  if(CFG.excluirDescarte) fms.forEach(function(fm){FUENTES[fm].turnos.forEach(function(t){if(t.descarte){var k=cn(t.persona)+'|'+isoDate(t.fecha);(desc[k]=desc[k]||[]).push([t.ini,t.fin]);}});});
+  // Personal prestado a otra área: en el reporte consolidado, toda fila cuyo código de labor no sea el de despacho se excluye;
+  // también se excluye ese mismo colaborador-día e intervalo en el control de horas (que no trae el código).
+  var laborOk=(CFG.laborDespacho||'').trim();
+  function esOtraArea(t){var L=(''+(t.labor===undefined||t.labor===null?'':t.labor)).trim();return laborOk!==''&&t.fuente==='consolidado'&&L!==''&&L!==laborOk;}
+  var otra={};
+  if(laborOk!=='') fms.forEach(function(fm){FUENTES[fm].turnos.forEach(function(t){if(esOtraArea(t)){var k=cn(t.persona)+'|'+isoDate(t.fecha);(otra[k]=otra[k]||[]).push([t.ini,t.fin]);}});});
   function esDescarte(t){
-    if(!CFG.excluirDescarte) return false;
-    if(t.descarte) return true;
-    var iv=desc[cn(t.persona)+'|'+isoDate(t.fecha)];
+    if(laborOk==='') return false;
+    if(esOtraArea(t)) return true;
+    var iv=otra[cn(t.persona)+'|'+isoDate(t.fecha)];
     return !!iv&&iv.some(function(b){return t.ini<b[1]&&t.fin>b[0];});
   }
   fms.forEach(function(fm){
@@ -872,7 +872,16 @@ function mensajeFuente(fm,g,nombre,val){
     h+='<div class="note">✔ <b>Espejo del reporte:</b> las horas se toman tal cual vienen clasificadas en el archivo y solo se convierten a costo. Totales del archivo: JORNAL '+f1(T.JORNAL)+' · RN '+f1(T.RN)+' · HED '+f1(T.HED)+' · HEN '+f1(T.HEN)+' · RFN '+f1(T.RFN)+' · RFD '+f1(T.RFD)+' · FN '+f1(T.FN)+' · FD '+f1(T.FD)+' · HEDF '+f1(T.HEDF)+' · HENF '+f1(T.HENF)+'.</div>';
     if(g.textos&&g.textos.length) h+='<div class="alert-box" style="margin-top:6px"><b>'+g.textos.length+' celda(s) con horas guardadas como texto</b> en el archivo ('+g.textos.map(function(x){return x.col.replace('RDF','RFD').replace('RNF','RFN').replace('HEFD','HEDF').replace('HEFN','HENF')+' "'+x.valor+'" · '+fmtIso(x.iso)+' · '+x.persona;}).join('; ')+'). Excel no las suma; aquí se toman por su valor. Si conviertes esas celdas a número en el archivo, tu suma y la del tablero coinciden.</div>';
   }
-  if(fm==='consolidado'&&Object.keys(g.labores).length) h+='<div class="note">Labores en el reporte: '+listaObj(g.labores)+(g.labores['DESCARTE DE FRUTA POST COSECHA']?'. El descarte de fruta se incluye en el costo; puedes excluirlo en <i>Supuestos de costeo</i>.':'')+'</div>';
+  if(fm==='consolidado'){
+    var porCod={};
+    g.turnos.forEach(function(t){var c=(''+(t.labor||'(sin código)')).trim()||'(sin código)';var H2=t.rep||{},j=t.jor||0;var hh=j+(H2.HED||0)+(H2.HEN||0)+(H2.FD||0)+(H2.FN||0)+(H2.HEFD||0)+(H2.HEFN||0)+(j>0?0:(H2.RDF||0)+(H2.RNF||0));if(!porCod[c])porCod[c]={n:0,h:0};porCod[c].n++;porCod[c].h+=hh;});
+    var L=(CFG.laborDespacho||'').trim();
+    if(Object.keys(porCod).length){
+      var inc=[],exc=[];
+      Object.keys(porCod).sort().forEach(function(c){var txt='<b>'+c+'</b> ('+porCod[c].n+' filas · '+porCod[c].h.toLocaleString('es-CO',{maximumFractionDigits:1})+' h)';if(L===''||c===L)inc.push(txt);else exc.push(txt);});
+      h+='<div class="note">Códigos de labor — <b>cuentan (despacho)</b>: '+(inc.join(', ')||'ninguno')+(exc.length?' · <b>no cuentan (personal prestado a otra área)</b>: '+exc.join(', '):'')+'.</div>';
+    }
+  }
   return h;
 }
 function mensajeConciliacion(){
@@ -1035,7 +1044,7 @@ function leerParams(){
   CFG.horasDia=parseFloat(document.getElementById('pHorasDia').value)||7;
   CFG.horasDomFest=parseFloat(document.getElementById('pHorasDomFest').value)||8;
   CFG.prioridad=document.getElementById('pPrior').value;
-  CFG.excluirDescarte=document.getElementById('pDescarte').value==='1';
+  CFG.laborDespacho=(document.getElementById('pLabor').value||'').trim();
   CFG.descansoMin=parseFloat(document.getElementById('pDescanso').value)||0;
   CFG.descansoRem=document.getElementById('pDesc').value==='1';
   CFG.carga=parseFloat(document.getElementById('pCarga').value)||0;
@@ -1500,6 +1509,7 @@ function renderNotas(){
   '<ul>'+
   '<li><b>Qué mide esta página:</b> cuánto cuesta cada día la mano de obra de despachos y cuánto cuesta cada kilo despachado (<b>costo por kilo = costo de mano de obra del día ÷ kilos despachados ese día</b>, columna KG CARGADOS con Status Cargado). Es una herramienta de gestión, no una liquidación de nómina.</li>'+
   '<li><b>La página es un espejo de los archivos:</b> no reclasifica las horas, solo las convierte en costo. <b>Reporte consolidado:</b> se usan tal cual las columnas JORNAL, RN, HED, HEN, FD, FN, HEDF, HENF, RFD y RFN. <b>Control de horas:</b> las horas extra son las de la columna DIFERENCIA ("Horas extras"); lo demás es jornada ordinaria. Sin tope semanal ni otras reglas propias.</li>'+
+  '<li><b>Solo despacho:</b> del reporte consolidado cuentan únicamente las filas con código de labor 99 (despachos). Los demás códigos son personal prestado a otra área y se excluyen, junto con esas mismas horas del control de horas.</li>'+
   '<li><b>Cómo se valora cada hora:</b> valor hora = sueldo ÷ divisor legal de la fecha (220 h hasta 14-jul-26; 210 h desde 15-jul-26) y el factor de su tipo: HED 1,25 · HEN 1,75 · RN 0,35 · FD 1+dom · FN 1,35+dom · HEDF 1,25+dom · HENF 1,75+dom · RFD dom · RFN 0,35+dom (dom = 0,80 hasta 30-jun-26; 0,90 desde 1-jul-26). El costo del día se asigna a la fecha del turno.</li>'+
   '<li><b>Solo en el control de horas</b> (que no trae la clasificación diurna/nocturna ni de festivo): las horas ordinarias son las primeras del turno y las extra las últimas; cada hora se marca como nocturna (7 p.m.–6 a.m.) o festiva según el reloj y el calendario. En un día programado en 0 (domingo/festivo) todas las horas son extra, tal como las cuenta ese archivo.</li>'+
   '<li><b>Salario base asignado:</b> cada hora ordinaria vale valor hora × 7/6 (incluye la parte proporcional del descanso dominical remunerado), para que el costo del mes cuadre con el valor de la nómina.</li>'+
