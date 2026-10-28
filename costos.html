@@ -85,6 +85,7 @@ details.params summary{cursor:pointer;font-size:.82rem;font-weight:800;color:#1e
 .seg{display:flex;gap:4px;background:#f1f5f9;padding:3px;border-radius:8px;flex-wrap:wrap}
 .seg button{padding:6px 12px;border:none;background:transparent;color:#64748b;font-size:.72rem;font-weight:700;border-radius:6px;cursor:pointer;font-family:inherit}
 .seg button.active{background:#fff;color:#065f46;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.dlink{color:#065f46;font-weight:700;text-decoration:underline;cursor:pointer}
 .insights{list-style:none;display:grid;gap:8px}
 .insights li{background:#f8fafc;border-left:3px solid #10b981;border-radius:8px;padding:9px 12px;font-size:.8rem;color:#1e293b;line-height:1.5}
 .insights li.warn{border-left-color:#f59e0b;background:#fffbeb}
@@ -202,6 +203,14 @@ table.rtable tr.total td{background:#ecfdf5;font-weight:800;border-top:2px solid
           <div class="hint">El reporte consolidado clasifica 8 horas como ordinarias (FD/FN) en festivos y el resto como extra festiva.</div>
         </div>
         <div class="pfield">
+          <label>Horas escritas como texto en el archivo (ej. "0.5")</label>
+          <select id="pTexto" onchange="onParam()">
+            <option value="1">Contarlas por su valor</option>
+            <option value="0">Ignorarlas, como hace la suma de Excel</option>
+          </select>
+          <div class="hint">Excel no suma las celdas guardadas como texto. Elige "Ignorarlas" para que el tablero dé exactamente la misma suma que tu archivo.</div>
+        </div>
+        <div class="pfield">
           <label>Código de labor que cuenta como despacho</label>
           <input type="text" id="pLabor" value="99" maxlength="10" onchange="onParam()">
           <div class="hint">Del reporte consolidado solo se cuentan las filas con este código (99 = despachos). Los demás códigos (131, 78…) son personal prestado a otra área y no entran al costo. Vacío = contar todos.</div>
@@ -260,6 +269,7 @@ table.rtable tr.total td{background:#ecfdf5;font-weight:800;border-top:2px solid
   <!-- ===== Vistas ===== -->
   <div class="tabs" id="tabs">
     <button class="tab-btn active" data-v="dia" onclick="setVista('dia')">📊 Seguimiento diario</button>
+    <button class="tab-btn" data-v="diaesp" onclick="setVista('diaesp')">🔎 Revisar un día</button>
     <button class="tab-btn" data-v="semana" onclick="setVista('semana')">🗓️ Semanal</button>
     <button class="tab-btn" data-v="mes" onclick="setVista('mes')">📆 Mensual</button>
     <button class="tab-btn" data-v="personas" onclick="setVista('personas')">👷 Por colaborador</button>
@@ -274,7 +284,8 @@ table.rtable tr.total td{background:#ecfdf5;font-weight:800;border-top:2px solid
     </div>
     <div class="card" style="margin-bottom:14px">
       <div class="card-title">💰 Costo de mano de obra y costo por kilo — <span class="pTxt">por día</span></div>
-      <div class="chart-wrap"><canvas id="chartCosto"></canvas></div>
+      <div class="card-sub" id="subCosto" style="margin-bottom:6px"></div>
+      <div class="chart-wrap" style="height:440px"><canvas id="chartCosto"></canvas></div>
     </div>
     <div class="grid2" style="margin-bottom:14px">
       <div class="card">
@@ -311,6 +322,30 @@ table.rtable tr.total td{background:#ecfdf5;font-weight:800;border-top:2px solid
         <div><button class="btn btn-gray" onclick="exportarTabla()">⬇ Exportar tabla</button> <button class="btn btn-gray" onclick="exportarDetalle()">⬇ Detalle por turno</button></div>
       </div>
       <div class="dtable-wrap"><table class="rtable" id="tblPeriodo"></table></div>
+    </div>
+  </div>
+
+  <div id="vistaDiaEsp" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div class="pfield" style="width:190px"><label>Día a revisar</label><input type="date" id="diaSel" onchange="verDia(this.value)"></div>
+        <button class="btn btn-gray" onclick="moverDia(-1)">◀ Día anterior</button>
+        <button class="btn btn-gray" onclick="moverDia(1)">Día siguiente ▶</button>
+        <button class="btn btn-green" onclick="verDia('ultimo')">Último día con horas</button>
+        <div id="diaTitulo" style="font-weight:800;font-size:1rem;color:#065f46;margin-left:8px"></div>
+      </div>
+      <div class="card-sub" style="margin:8px 0 0">Los botones saltan entre días con horas registradas. También puedes pulsar cualquier fecha subrayada en las tablas de Seguimiento diario.</div>
+    </div>
+    <div class="kpi-grid" id="kpiDia" style="margin-bottom:14px"></div>
+    <div id="avisosDia" style="margin-bottom:14px"></div>
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-title">🕐 Quién trabajó y a qué hora</div>
+      <div id="wrapDiaTurnos" style="position:relative"><canvas id="chartDiaTurnos"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">👷 Detalle por colaborador del día</div>
+      <div class="dtable-wrap"><table class="rtable" id="tblDiaDetalle"></table></div>
+      <div id="notasDia"></div>
     </div>
   </div>
 
@@ -367,7 +402,7 @@ var C={FECHA:0,CANT:5,STATUS:15};
 /* =====================================================================
    MOTOR DE LIQUIDACIÓN (funciones puras — probadas por separado)
    ===================================================================== */
-var CFG={modo:'ley',sueldo:1750905,topeSemanal:false,domModo:'auto',horasDia:7,horasDomFest:8,descansoRem:true,carga:0,descansoMin:0,meta:null,prioridad:'consolidado',laborDespacho:'99'};
+var CFG={modo:'ley',sueldo:1750905,topeSemanal:false,domModo:'auto',horasDia:7,horasDomFest:8,descansoRem:true,carga:0,descansoMin:0,meta:null,prioridad:'consolidado',laborDespacho:'99',textoComoHoras:true};
 
 // Festivos oficiales de Colombia 2026 (18 días). Para otros años agregar aquí.
 var FESTIVOS_LISTA=['2026-01-01','2026-01-12','2026-03-23','2026-04-02','2026-04-03','2026-05-01','2026-05-18','2026-06-08','2026-06-15','2026-06-29','2026-07-20','2026-08-07','2026-08-17','2026-10-12','2026-11-02','2026-11-16','2026-12-08','2026-12-25'];
@@ -440,6 +475,7 @@ function liquidar(turnos){
     if(t.rep){
       var p0=paramsPara(t.fecha),V0=sueldo/p0.divisor,f0=factores(p0.d),Hh=t.rep,jor=t.jor||0;
       var hrs={RN:Hh.RN||0,HED:Hh.HED||0,HEN:Hh.HEN||0,FD:Hh.FD||0,FN:Hh.FN||0,HEFD:Hh.HEFD||0,HEFN:Hh.HEFN||0,RDF:Hh.RDF||0,RNF:Hh.RNF||0};
+      if(!CFG.textoComoHoras&&t.repTxt) Object.keys(t.repTxt).forEach(function(k){hrs[k]=Math.max(0,(hrs[k]||0)-t.repTxt[k]);});   // como Excel: el texto no se suma
       hrs.ORD=Math.max(0,jor-hrs.RN-(jor>0?hrs.RDF+hrs.RNF:0));
       CATS.forEach(function(c){
         var h=hrs[c];if(!h)return;
@@ -448,6 +484,7 @@ function liquidar(turnos){
         out.cat[c]=mn;out.catBase[c]=bs;out.catAdic[c]=ad;out.min+=mn;out.base+=bs;
         if(CAT_RECARGO[c]) out.rec+=ad; else if(CAT_EXTRA[c]) out.ext+=ad;
       });
+      if(CFG.textoComoHoras&&t.repTxt) out.txtExtraMin=Math.round(((t.repTxt.HED||0)+(t.repTxt.HEN||0)+(t.repTxt.HEFD||0)+(t.repTxt.HEFN||0))*60);
       out.total=out.base+out.rec+out.ext;
       return out;
     }
@@ -641,7 +678,7 @@ function parseHoras(rows){
       var a=toMin(row[map.ent]),b=toMin(row[map.sal]);
       if(f0&&a!==null&&b!==null){
         if(b<=a) b+=1440;
-        var H={};Object.keys(map.cat).forEach(function(k){var cv=row[map.cat[k]];H[k]=numH(cv);if(typeof cv==='string'&&cv.trim()!==''&&H[k]>0)textos.push({col:k,valor:cv,persona:persona,iso:iso0});});
+        var H={},HT={},hayTxt=false;Object.keys(map.cat).forEach(function(k){var cv=row[map.cat[k]];H[k]=numH(cv);if(typeof cv==='string'&&cv.trim()!==''&&H[k]>0){HT[k]=H[k];hayTxt=true;textos.push({col:k,valor:cv,persona:persona,iso:iso0});}});
         var jor=map.jornal!==undefined?numH(row[map.jornal]):0;
         var habit=(H.RDF||0)+(H.RNF||0);
         // horas trabajadas según el reporte (las de recargo RDF/RNF van DENTRO de la jornada)
@@ -652,7 +689,7 @@ function parseHoras(rows){
         var lab=map.labor!==undefined?(''+row[map.labor]).trim():'';
         var desca=/descarte/i.test(obs);
         TID++;
-        turnos.push({id:TID,persona:persona,fecha:f0,ini:a,fin:b,descanso:brk,sueldo:null,prog:pg,descExplicito:true,fuente:'consolidado',descarte:desca,labor:lab,rep:H,jor:jor});
+        turnos.push({id:TID,persona:persona,fecha:f0,ini:a,fin:b,descanso:brk,sueldo:null,prog:pg,descExplicito:true,fuente:'consolidado',descarte:desca,labor:lab,rep:H,jor:jor,repTxt:hayTxt?HT:undefined});
         var lk=desca?'DESCARTE DE FRUTA POST COSECHA':(obs&&/despacho/i.test(obs)?'DESPACHO DE FRUTA':(obs||'(sin observación)'));
         if(/despacho|descarte/i.test(obs)||!obs) labores[lk]=(labores[lk]||0)+1;
         hizo=true;
@@ -971,7 +1008,7 @@ var LS_KEY='costosFuentesV4';
 function guardarLocal(){
   try{
     var o={};
-    Object.keys(FUENTES).forEach(function(fm){var S=FUENTES[fm];o[fm]={archivos:S.archivos,filas:S.filas,huecos:S.huecos,t:S.turnos.map(function(t){return [t.persona,isoDate(t.fecha),t.ini,t.fin,t.descanso,t.sueldo,t.descExplicito?1:0,t.prog,t.descarte?1:0,t.labor||'',t.extraMin===undefined?null:t.extraMin,t.rep?[t.rep.RN||0,t.rep.HED||0,t.rep.HEN||0,t.rep.RNF||0,t.rep.RDF||0,t.rep.FN||0,t.rep.FD||0,t.rep.HEFD||0,t.rep.HEFN||0,t.jor||0]:null];})};});
+    Object.keys(FUENTES).forEach(function(fm){var S=FUENTES[fm];o[fm]={archivos:S.archivos,filas:S.filas,huecos:S.huecos,t:S.turnos.map(function(t){return [t.persona,isoDate(t.fecha),t.ini,t.fin,t.descanso,t.sueldo,t.descExplicito?1:0,t.prog,t.descarte?1:0,t.labor||'',t.extraMin===undefined?null:t.extraMin,t.rep?[t.rep.RN||0,t.rep.HED||0,t.rep.HEN||0,t.rep.RNF||0,t.rep.RDF||0,t.rep.FN||0,t.rep.FD||0,t.rep.HEFD||0,t.rep.HEFN||0,t.jor||0]:null,t.repTxt?[t.repTxt.RN||0,t.repTxt.HED||0,t.repTxt.HEN||0,t.repTxt.RNF||0,t.repTxt.RDF||0,t.repTxt.FN||0,t.repTxt.FD||0,t.repTxt.HEFD||0,t.repTxt.HEFN||0]:null];})};});
     localStorage.setItem(LS_KEY,JSON.stringify(o));
   }catch(e){}
 }
@@ -981,7 +1018,7 @@ function cargarLocal(){
     var o=JSON.parse(raw),hay=false;
     Object.keys(o).forEach(function(fm){
       var S=o[fm];
-      var turnos=S.t.map(function(a){TID++;return {id:TID,persona:a[0],fecha:toDate(a[1]),ini:a[2],fin:a[3],descanso:a[4],sueldo:a[5],descExplicito:!!a[6],prog:a[7],descarte:!!a[8],labor:a[9],fuente:fm,extraMin:(a[10]===null||a[10]===undefined)?undefined:a[10],rep:a[11]?{RN:a[11][0],HED:a[11][1],HEN:a[11][2],RNF:a[11][3],RDF:a[11][4],FN:a[11][5],FD:a[11][6],HEFD:a[11][7],HEFN:a[11][8]}:undefined,jor:a[11]?a[11][9]:undefined};}).filter(function(t){return t.fecha;});
+      var turnos=S.t.map(function(a){TID++;return {id:TID,persona:a[0],fecha:toDate(a[1]),ini:a[2],fin:a[3],descanso:a[4],sueldo:a[5],descExplicito:!!a[6],prog:a[7],descarte:!!a[8],labor:a[9],fuente:fm,extraMin:(a[10]===null||a[10]===undefined)?undefined:a[10],rep:a[11]?{RN:a[11][0],HED:a[11][1],HEN:a[11][2],RNF:a[11][3],RDF:a[11][4],FN:a[11][5],FD:a[11][6],HEFD:a[11][7],HEFN:a[11][8]}:undefined,jor:a[11]?a[11][9]:undefined,repTxt:a[12]?{RN:a[12][0],HED:a[12][1],HEN:a[12][2],RNF:a[12][3],RDF:a[12][4],FN:a[12][5],FD:a[12][6],HEFD:a[12][7],HEFN:a[12][8]}:undefined};}).filter(function(t){return t.fecha;});
       if(!turnos.length) return;
       FUENTES[fm]={formato:fm,turnos:turnos,filas:S.filas||[],huecos:S.huecos||[],archivos:S.archivos||[]};hay=true;
     });
@@ -1045,6 +1082,7 @@ function leerParams(){
   CFG.horasDomFest=parseFloat(document.getElementById('pHorasDomFest').value)||8;
   CFG.prioridad=document.getElementById('pPrior').value;
   CFG.laborDespacho=(document.getElementById('pLabor').value||'').trim();
+  CFG.textoComoHoras=document.getElementById('pTexto').value==='1';
   CFG.descansoMin=parseFloat(document.getElementById('pDescanso').value)||0;
   CFG.descansoRem=document.getElementById('pDesc').value==='1';
   CFG.carga=parseFloat(document.getElementById('pCarga').value)||0;
@@ -1135,9 +1173,10 @@ var DIAS_INC={};  // días con registro de horas incompleto (se excluyen del cos
 function calcCobertura(){var k=Object.keys(KG_DIA).filter(function(x){return KG_DIA[x]>0;}).sort();COB=k.length?{ini:k[0],fin:k[k.length-1]}:null;}
 function enRangoKg(f){return !COB||(f>=COB.ini&&f<=COB.fin);}
 function enCobertura(f){return enRangoKg(f)&&!DIAS_INC[f];}
-function nuevoAcc(){return {pers:{},min:0,minCob:0,minExtra:0,minDom:0,base:0,rec:0,ext:0,total:0,totalCob:0,kg:0,fechas:{}};}
+function nuevoAcc(){return {pers:{},min:0,minCob:0,minExtra:0,minDom:0,ex:{HED:0,HEN:0,HEFD:0,HEFN:0},minTxt:0,base:0,rec:0,ext:0,total:0,totalCob:0,kg:0,fechas:{}};}
 function sumarA(acc,r){
   acc.pers[r.persona]=1;acc.min+=r.min;acc.minExtra+=r.cat.HED+r.cat.HEN+r.cat.HEFD+r.cat.HEFN;acc.minDom+=r.cat.FD+r.cat.FN+r.cat.RDF+r.cat.RNF;
+  acc.ex.HED+=r.cat.HED;acc.ex.HEN+=r.cat.HEN;acc.ex.HEFD+=r.cat.HEFD;acc.ex.HEFN+=r.cat.HEFN;acc.minTxt+=r.txtExtraMin||0;
   acc.base+=r.base;acc.rec+=r.rec;acc.ext+=r.ext;acc.total+=r.total;
   var iso=isoDate(r.fecha);acc.fechas[iso]=1;
   if(enCobertura(iso)){acc.totalCob+=r.total;acc.minCob+=r.min;}
@@ -1220,6 +1259,7 @@ function renderAvisos(lista){
   }
   document.getElementById('avisos').innerHTML=h;
 }
+function hf(min){return (min/60).toLocaleString('es-CO',{maximumFractionDigits:1});}
 function deltaChip(act,prev,mejorSiSube){
   if(act===null||prev===null||act===undefined||prev===undefined||!prev) return '';
   var d=(act-prev)/Math.abs(prev)*100;if(!isFinite(d)) return '';
@@ -1238,7 +1278,7 @@ function renderKPIs(lista){
     {c:'k1',l:'📦 Kg despachados',v:hay?fmt1(a.kg/1000)+' T':'—',s:(hay?'<div class="s">'+diasOp+' días con despacho</div>':'')+(p?deltaChip(a.kg,p.kg,true):'')},
     {c:'k4',l:'⚙️ Productividad (kg por hora)',v:a.kgHora!==null?fmtN(a.kgHora)+' kg/h':'—',s:p?deltaChip(a.kgHora,p.kgHora,true):''},
     {c:'k6',l:'💵 Costo por hora trabajada',v:a.costoHora!==null?money(a.costoHora):'—',s:p?deltaChip(a.costoHora,p.costoHora,false):''},
-    {c:'k5',l:'🧾 % del costo en extras y recargos',v:a.pctRE!==null?a.pctRE.toFixed(1).replace('.',',')+'%':'—',s:hay?'<div class="s"><b>'+horasTxt(a.minExtra)+' h extra</b> ('+(a.pctExtraH*100).toFixed(1).replace('.',',')+'% de las horas)'+(a.minDom>0?'<br>+ '+horasTxt(a.minDom)+' h trabajadas en domingo/festivo<br><span style="font-weight:600">= '+horasTxt(a.minExtra+a.minDom)+' h fuera de la jornada ordinaria</span>':'')+'</div>':''}
+    {c:'k5',l:'🧾 % del costo en extras y recargos',v:a.pctRE!==null?a.pctRE.toFixed(1).replace('.',',')+'%':'—',s:hay?'<div class="s"><b>'+horasTxt(a.minExtra)+' h extra</b> ('+(a.pctExtraH*100).toFixed(1).replace('.',',')+'% de las horas)<br><span style="font-weight:600">= '+hf(a.ex.HED)+' HED + '+hf(a.ex.HEN)+' HEN + '+hf(a.ex.HEFD)+' HEDF + '+hf(a.ex.HEFN)+' HENF</span>'+(a.minTxt>0?'<br><span style="font-weight:600">incluye '+hf(a.minTxt)+' h guardadas como texto en el archivo</span>':'')+(a.minDom>0?'<br>+ '+horasTxt(a.minDom)+' h en domingo/festivo (FD, FN, RFD, RFN)':'')+'</div>':''}
   ];
   document.getElementById('kpiGrid').innerHTML=items.map(function(i){return '<div class="kpi '+i.c+'"><div class="v">'+i.v+'</div><div class="l">'+i.l+'</div>'+(i.s||'')+'</div>';}).join('');
 }
@@ -1364,7 +1404,7 @@ function renderSeguimiento(D){
   var html='<thead><tr><th class="left">Día</th><th>Kg</th><th>Horas</th><th>Personas</th><th>Costo del día</th><th>$/kg</th><th>vs '+(meta?'meta':'mediana')+'</th><th>kg/h</th><th>$/hora</th><th class="left">Por qué salió caro</th></tr></thead><tbody>';
   html+=top.map(function(d){
     var dif=(d.costoKg/objetivo-1)*100;
-    return '<tr><td class="left">'+d.full+'</td><td>'+fmtN(d.kg)+'</td><td>'+horasTxt(d.min)+'</td><td>'+Object.keys(d.pers).length+'</td><td>'+money(d.total)+'</td><td style="font-weight:800;color:#9a3412">$ '+fmt1(d.costoKg)+'</td><td style="color:'+(dif>0?'#dc2626':'#15803d')+';font-weight:700">'+pct1(dif)+'</td><td>'+fmtN(d.kgHora)+'</td><td>'+money(d.costoHora)+'</td><td class="left" style="white-space:normal;min-width:260px">'+etiquetasDia(d,ref)+'</td></tr>';
+    return '<tr><td class="left"><a href="#" class="dlink" onclick="verDia(\''+d.iso+'\');return false">'+d.full+'</a></td><td>'+fmtN(d.kg)+'</td><td>'+horasTxt(d.min)+'</td><td>'+Object.keys(d.pers).length+'</td><td>'+money(d.total)+'</td><td style="font-weight:800;color:#9a3412">$ '+fmt1(d.costoKg)+'</td><td style="color:'+(dif>0?'#dc2626':'#15803d')+';font-weight:700">'+pct1(dif)+'</td><td>'+fmtN(d.kgHora)+'</td><td>'+money(d.costoHora)+'</td><td class="left" style="white-space:normal;min-width:260px">'+etiquetasDia(d,ref)+'</td></tr>';
   }).join('');
   document.getElementById('tblRevisar').innerHTML=html+'</tbody>';
 }
@@ -1375,6 +1415,9 @@ function renderVista(lista){
   document.getElementById('vistaPersonas').style.display=vista==='personas'?'block':'none';
   document.getElementById('vistaDetalle').style.display=vista==='detalle'?'block':'none';
   document.getElementById('vistaNotas').style.display=vista==='notas'?'block':'none';
+  document.getElementById('vistaDiaEsp').style.display=vista==='diaesp'?'block':'none';
+  document.getElementById('kpiGrid').style.display=vista==='diaesp'?'none':'';
+  if(vista==='diaesp') renderDiaEspecifico();
   if(!esPeriodo) return;
   var esDia=(vista==='dia');
   document.getElementById('cardInsights').style.display=esDia?'block':'none';
@@ -1389,25 +1432,31 @@ function renderVista(lista){
   var X={ticks:{font:{size:11},color:'#64748b'},grid:{display:false}};
   var kgx=P.map(function(p){return p.costoKg!==null?parseFloat(p.costoKg.toFixed(1)):null;});
 
+  // Dos columnas por día, lado a lado: costo del día (eje izquierdo, verde) y costo por kilo (eje derecho, naranja)
+  var densa=labels.length>14, mostrarTodas=labels.length<=40;
+  var showC=function(ctx){return mostrarTodas||ctx.dataIndex%Math.ceil(labels.length/30)===0;};
+  var colKg=kgx.map(function(v){return (meta&&v!==null&&v>meta)?'#dc2626':'#f97316';});
+  var lblBase={anchor:'end',align:'end',clamp:true,rotation:densa?-90:0,offset:2};
   var dsCosto=[
-    {type:'bar',label:'Costo de mano de obra ($)',data:P.map(function(p){return Math.round(p.total);}),backgroundColor:'#10b981',borderRadius:3,yAxisID:'y',order:3,
-      datalabels:{display:show,anchor:'end',align:'bottom',color:'#065f46',font:{size:10,weight:'bold'},formatter:function(v){return compact(v);}}},
-    {type:'line',label:'Costo por kilo ($/kg)',data:kgx,borderColor:'#9a3412',backgroundColor:'#9a3412',tension:.25,pointRadius:3,borderWidth:2,yAxisID:'y1',order:1,spanGaps:true,
-      datalabels:{display:show,align:'top',anchor:'end',color:'#9a3412',font:{size:11,weight:'bold'},formatter:function(v){return v!==null?'$'+fmt1(v):'';}}}
+    {type:'bar',label:'Costo de mano de obra del día ($)',data:P.map(function(p){return Math.round(p.total);}),backgroundColor:'#10b981',hoverBackgroundColor:'#059669',borderRadius:4,yAxisID:'y',order:1,
+      datalabels:Object.assign({display:showC,color:'#047857',font:{size:densa?11:13,weight:'bold'},formatter:function(v){return compact(v);}},lblBase)},
+    {type:'bar',label:'Costo por kilo ($/kg)',data:kgx,backgroundColor:colKg,hoverBackgroundColor:colKg,borderRadius:4,yAxisID:'y1',order:2,
+      datalabels:Object.assign({display:function(ctx){return showC(ctx)&&ctx.dataset.data[ctx.dataIndex]!==null;},color:'#c2410c',font:{size:densa?11:13,weight:'bold'},formatter:function(v){return v!==null?'$'+fmt1(v):'';}},lblBase)}
   ];
-  if(esDia){
-    var ma=kgx.map(function(_,i){var v=[];for(var k=Math.max(0,i-6);k<=i;k++){if(kgx[k]!==null)v.push(kgx[k]);}return v.length?parseFloat((v.reduce(function(a,b){return a+b;},0)/v.length).toFixed(1)):null;});
-    dsCosto.push({type:'line',label:'Promedio móvil 7 días ($/kg)',data:ma,borderColor:'#0ea5e9',backgroundColor:'#0ea5e9',tension:.3,pointRadius:0,borderWidth:2.5,yAxisID:'y1',order:0,spanGaps:true,datalabels:{display:false}});
-  }
   if(meta) dsCosto.push({type:'line',label:'Meta ($/kg)',data:labels.map(function(){return meta;}),borderColor:'#16a34a',borderDash:[7,4],pointRadius:0,borderWidth:2,yAxisID:'y1',order:0,datalabels:{display:false}});
+  document.getElementById('subCosto').textContent=meta?'Verde = costo de la mano de obra del período · Naranja = costo por kilo despachado (rojo = sobre la meta de $ '+fmt1(meta)+')':'Verde = costo de la mano de obra del período (eje izquierdo) · Naranja = costo por kilo despachado (eje derecho)';
   dc('chartCosto');
   charts.chartCosto=new Chart(document.getElementById('chartCosto'),{
     data:{labels:labels,datasets:dsCosto},
-    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:28}},
-      plugins:{legend:{position:'bottom',labels:{font:{size:11}}},
-        tooltip:{callbacks:{title:function(it){return it.length?P[it[0].dataIndex].full:'';},label:function(c){return c.dataset.type==='bar'?c.dataset.label+': '+money(c.raw):(c.raw!==null?c.dataset.label+': $ '+fmt1(c.raw):c.dataset.label+': sin kilos ese día');}}}},
-      scales:{x:X,y:{position:'left',ticks:{font:{size:11},color:'#64748b',callback:function(v){return compact(v);}},grid:{color:'#f1f5f9'}},
-        y1:{position:'right',ticks:{font:{size:11},color:'#9a3412',callback:function(v){return '$'+v;}},grid:{display:false}}}}
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:densa?54:34}},
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top',labels:{font:{size:12},usePointStyle:true,pointStyle:'rectRounded',padding:16}},
+        tooltip:{callbacks:{title:function(it){return it.length?P[it[0].dataIndex].full:'';},
+          label:function(c){return c.dataset.type==='line'?c.dataset.label+': $ '+fmt1(c.raw):(c.dataset.yAxisID==='y'?c.dataset.label+': '+money(c.raw):(c.raw!==null?c.dataset.label+': $ '+fmt1(c.raw):c.dataset.label+': sin kilos ese día'));},
+          afterBody:function(it){if(!it.length)return '';var q=P[it[0].dataIndex];return ['Kg despachados: '+fmtN(q.kg),'Horas trabajadas: '+horasTxt(q.min)+' · '+Object.keys(q.pers).length+' colaboradores'];}}}},
+      scales:{x:X,
+        y:{position:'left',beginAtZero:true,title:{display:true,text:'Costo de mano de obra ($)',color:'#047857',font:{size:12,weight:'bold'}},ticks:{font:{size:11},color:'#047857',callback:function(v){return compact(v);}},grid:{color:'#f1f5f9'}},
+        y1:{position:'right',beginAtZero:true,title:{display:true,text:'Costo por kilo ($/kg)',color:'#c2410c',font:{size:12,weight:'bold'}},ticks:{font:{size:11},color:'#c2410c',callback:function(v){return '$'+v;}},grid:{display:false}}}}
   });
 
   dc('chartKgHoras');
@@ -1442,13 +1491,117 @@ function renderVista(lista){
   var T=P.slice().reverse();
   html+=T.length?T.map(function(p){
     var sobre=meta&&p.costoKg!==null&&p.costoKg>meta;
-    return '<tr><td class="left">'+p.full+'</td><td>'+Object.keys(p.pers).length+'</td><td>'+horasTxt(p.min)+'</td><td>'+horasTxt(p.minExtra)+'</td><td>'+money(p.base)+'</td><td>'+money(p.rec)+'</td><td>'+money(p.ext)+'</td><td style="font-weight:800">'+money(p.total)+'</td><td>'+(p.kg>0?fmtN(p.kg):(p.iso&&DIAS_INC[p.iso]?'<span class="badge badge-warn">horas incompletas</span>':'<span class="badge badge-neu">sin kg</span>'))+'</td><td style="font-weight:800;color:'+(sobre?'#dc2626':'#9a3412')+'">'+(p.costoKg!==null?'$ '+fmt1(p.costoKg):'—')+'</td><td>'+(p.kgHora!==null?fmtN(p.kgHora):'—')+'</td><td>'+(p.costoHora!==null?money(p.costoHora):'—')+'</td></tr>';
+    return '<tr><td class="left">'+(vista==='dia'&&p.iso?'<a href="#" class="dlink" onclick="verDia(\''+p.iso+'\');return false">'+p.full+'</a>':p.full)+'</td><td>'+Object.keys(p.pers).length+'</td><td>'+horasTxt(p.min)+'</td><td>'+horasTxt(p.minExtra)+'</td><td>'+money(p.base)+'</td><td>'+money(p.rec)+'</td><td>'+money(p.ext)+'</td><td style="font-weight:800">'+money(p.total)+'</td><td>'+(p.kg>0?fmtN(p.kg):(p.iso&&DIAS_INC[p.iso]?'<span class="badge badge-warn">horas incompletas</span>':'<span class="badge badge-neu">sin kg</span>'))+'</td><td style="font-weight:800;color:'+(sobre?'#dc2626':'#9a3412')+'">'+(p.costoKg!==null?'$ '+fmt1(p.costoKg):'—')+'</td><td>'+(p.kgHora!==null?fmtN(p.kgHora):'—')+'</td><td>'+(p.costoHora!==null?money(p.costoHora):'—')+'</td></tr>';
   }).join(''):'<tr><td colspan="12" class="empty">'+(RES.length?'Sin datos para el filtro actual':'Carga el archivo de horas para ver el detalle')+'</td></tr>';
   if(T.length){
     var t=kpiDe(lista);
     html+='<tr class="total"><td class="left">TOTAL</td><td></td><td>'+horasTxt(t.min)+'</td><td>'+horasTxt(t.minExtra)+'</td><td>'+money(t.base)+'</td><td>'+money(t.rec)+'</td><td>'+money(t.ext)+'</td><td>'+money(t.total)+'</td><td>'+fmtN(t.kg)+'</td><td>'+(t.costoKg!==null?'$ '+fmt1(t.costoKg):'—')+'</td><td>'+(t.kgHora!==null?fmtN(t.kgHora):'—')+'</td><td>'+(t.costoHora!==null?money(t.costoHora):'—')+'</td></tr>';
   }
   document.getElementById('tblPeriodo').innerHTML=html+'</tbody>';
+}
+
+/* ===== Revisar un día específico ===== */
+var diaSel=null;
+function fechasConHoras(){var m={};RES.forEach(function(r){m[isoDate(r.fecha)]=1;});return Object.keys(m).sort();}
+function verDia(iso){
+  var f=fechasConHoras();
+  if(iso==='ultimo') iso=f.length?f[f.length-1]:null;
+  if(!iso) return;
+  diaSel=iso;
+  if(vista!=='diaesp') setVista('diaesp'); else render();
+}
+function moverDia(d){
+  var f=fechasConHoras(); if(!f.length) return;
+  var ref=diaSel||f[f.length-1], i=f.indexOf(ref);
+  if(i<0){ // fecha sin horas: ir al día con horas más cercano en esa dirección
+    var cand=d>0?f.filter(function(x){return x>ref;}):f.filter(function(x){return x<ref;});
+    if(!cand.length) return; verDia(d>0?cand[0]:cand[cand.length-1]); return;
+  }
+  i=Math.min(f.length-1,Math.max(0,i+d)); verDia(f[i]);
+}
+function horaTxtDia(m){var x=((m%1440)+1440)%1440;return pad2(Math.floor(x/60))+':'+pad2(x%60)+(m>=1440?' (+1)':'');}
+function renderDiaEspecifico(){
+  var f=fechasConHoras(), inp=document.getElementById('diaSel');
+  if(!RES.length){
+    document.getElementById('diaTitulo').textContent='';
+    document.getElementById('kpiDia').innerHTML='';document.getElementById('avisosDia').innerHTML='<div class="alert-box">Carga el archivo de horas para revisar un día.</div>';
+    document.getElementById('tblDiaDetalle').innerHTML='';dc('chartDiaTurnos');return;
+  }
+  if(!diaSel||!/^\d{4}-\d{2}-\d{2}$/.test(diaSel)) diaSel=f[f.length-1];
+  inp.min=f[0];inp.max=f[f.length-1];inp.value=diaSel;
+  var iso=diaSel, fecha=toDate(iso.split('-').reverse().join('/'));
+  var nombreDia=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][fecha.getDay()];
+  var tipo=FESTIVOS[iso]?'Festivo':(fecha.getDay()===0?'Domingo':'Día ordinario');
+  document.getElementById('diaTitulo').textContent=nombreDia+' '+pad2(fecha.getDate())+'/'+pad2(fecha.getMonth()+1)+'/'+fecha.getFullYear()+' · '+tipo;
+
+  var rows=RES.filter(function(r){return isoDate(r.fecha)===iso;}).sort(function(a,b){return a.persona<b.persona?-1:1;});
+  var porId={};TURNOS.forEach(function(t){porId[t.id]=t;});
+  var a=kpiDe(rows), kgDia=(KG_DIA[iso]&&enCobertura(iso))?KG_DIA[iso]:0;
+  // referencia: mediana del costo por kilo de todos los días con horas y despachos
+  var ops=agruparPeriodo(RES,'dia').filter(function(d){return d.kg>0&&d.costoKg!==null;});
+  var med=mediana(ops.map(function(d){return d.costoKg;})), meta=CFG.meta>0?CFG.meta:null;
+  var fuentes={};rows.forEach(function(r){var t=porId[r.id];if(t)fuentes[t.fuente]=1;});
+  var fuenteTxt=Object.keys(fuentes).map(function(x){return x==='consolidado'?'Reporte consolidado':'Control de horas';}).join(' + ')||'—';
+  var ckg=a.costoKg, difMed=(ckg!==null&&med)?(ckg/med-1)*100:null;
+  var subKg=ckg!==null?(difMed!==null?'<div class="s '+(difMed>10?'bad':(difMed>0?'':'good'))+'">'+pct1(difMed)+' vs mediana del período ($ '+fmt1(med)+')</div>':'')+(meta?'<div class="s '+(ckg<=meta?'ok':'bad')+'">'+(ckg<=meta?'✔ dentro de la meta':'sobre la meta')+' de $ '+fmt1(meta)+'</div>':''):'<div class="s">'+(DIAS_INC[iso]?'día con registro incompleto: no se calcula':(!KG_DIA[iso]?'sin despachos registrados ese día':'fuera del rango de despachos'))+'</div>';
+  var ex=a.ex||{HED:0,HEN:0,HEFD:0,HEFN:0};
+  var items=[
+    {c:'k2',l:'💰 Costo del día',v:rows.length?money(a.total):'—',s:rows.length?'<div class="s">'+Object.keys(a.pers).length+' colaboradores · '+horasTxt(a.min)+' h</div>':''},
+    {c:'k1',l:'📦 Kg despachados',v:kgDia>0?fmtN(kgDia)+' kg':'—',s:a.kgHora!==null?'<div class="s">'+fmtN(a.kgHora)+' kg por hora trabajada</div>':''},
+    {c:'k3',l:'⚖️ Costo por kilo',v:ckg!==null?'$ '+fmt1(ckg):'—',s:subKg},
+    {c:'k6',l:'💵 Costo por hora',v:a.min>0?money(a.total/(a.min/60)):'—',s:''},
+    {c:'k5',l:'⚠️ Horas extra',v:horasTxt(a.minExtra)+' h',s:'<div class="s">'+hf(ex.HED*1)+' HED · '+hf(ex.HEN)+' HEN · '+hf(ex.HEFD)+' HEDF · '+hf(ex.HEFN)+' HENF'+(a.minDom>0?'<br>+ '+horasTxt(a.minDom)+' h en domingo/festivo':'')+'</div>'},
+    {c:'k4',l:'🗂️ Fuente de las horas',v:'<span style="font-size:.95rem">'+fuenteTxt+'</span>',s:DIAS_INC[iso]?'<div class="s bad">Registro incompleto</div>':''}
+  ];
+  document.getElementById('kpiDia').innerHTML=items.map(function(i){return '<div class="kpi '+i.c+'"><div class="v">'+i.v+'</div><div class="l">'+i.l+'</div>'+(i.s||'')+'</div>';}).join('');
+
+  // ----- avisos del día: sin horas, personal prestado, comparación de fuentes -----
+  var av='';
+  if(!rows.length) av+='<div class="alert-box">No hay horas costeadas para esta fecha (domingo, festivo, día sin operación o sin registro).'+(KG_DIA[iso]?' Sí hubo despachos: '+fmtN(KG_DIA[iso])+' kg.':'')+'</div>';
+  var sinHoras={};Object.keys(HUECOS_FM).forEach(function(fm){HUECOS_FM[fm].forEach(function(h){if(h[1]===iso&&!rows.some(function(r){return r.persona===h[0];}))sinHoras[h[0]]=1;});});
+  var nSH=Object.keys(sinHoras).length;
+  if(nSH) av+='<div class="alert-box" style="margin-top:8px"><b>'+nSH+' colaborador(es) con fila sin horas utilizables ese día:</b> '+Object.keys(sinHoras).sort().join(', ')+'.'+(DIAS_INC[iso]?' El día se considera incompleto y no entra al costo por kilo.':'')+'</div>';
+  var laborOk=(CFG.laborDespacho||'').trim(), prest=[];
+  if(laborOk!=='')Object.keys(FUENTES).forEach(function(fm){FUENTES[fm].turnos.forEach(function(t){var L=(''+(t.labor||'')).trim();if(t.fuente==='consolidado'&&isoDate(t.fecha)===iso&&L!==''&&L!==laborOk)prest.push(t.persona+' (código '+L+', '+horaTxtDia(t.ini)+' – '+horaTxtDia(t.fin)+')');});});
+  if(prest.length) av+='<div class="alert-box" style="margin-top:8px"><b>Personal prestado a otra área ese día (no cuenta como despacho):</b> '+prest.join('; ')+'.</div>';
+  if(CANON.control&&CANON.consolidado){
+    var tc=CANON.control.filter(function(t){return isoDate(t.fecha)===iso;}),tk=CANON.consolidado.filter(function(t){return isoDate(t.fecha)===iso;});
+    if(tc.length&&tk.length){
+      var rc=liquidar(tc),rk=liquidar(tk),sm=function(l,k){return l.reduce(function(x,r){return x+r[k];},0);};
+      av+='<div class="note" style="margin-top:8px">🔍 <b>Los dos formatos traen este día:</b> control '+horasTxt(sm(rc,'min'))+' h · '+money(sm(rc,'total'))+' &nbsp;|&nbsp; consolidado '+horasTxt(sm(rk,'min'))+' h · '+money(sm(rk,'total'))+'. Se usa '+(CFG.prioridad==='consolidado'?'el consolidado':'el control')+' para cada colaborador.</div>';
+    }
+  }
+  document.getElementById('avisosDia').innerHTML=av;
+
+  // ----- gráfica de turnos (quién trabajó y cuándo) -----
+  dc('chartDiaTurnos');
+  var wrap=document.getElementById('wrapDiaTurnos');
+  if(rows.length){
+    wrap.style.display='block';wrap.style.height=Math.max(180,rows.length*24+80)+'px';
+    var turnos=rows.map(function(r){return porId[r.id];}).filter(Boolean);
+    var maxFin=Math.max.apply(null,turnos.map(function(t){return t.fin;}).concat([1440]));
+    charts.chartDiaTurnos=new Chart(document.getElementById('chartDiaTurnos'),{
+      type:'bar',
+      data:{labels:turnos.map(function(t){return t.persona;}),datasets:[{label:'Turno',data:turnos.map(function(t){return [t.ini/60,t.fin/60];}),backgroundColor:turnos.map(function(t){return t.fuente==='consolidado'?'#10b981':'#3b82f6';}),borderRadius:3,barPercentage:.8}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},datalabels:{display:false},tooltip:{callbacks:{label:function(c){var t=turnos[c.dataIndex];return horaTxtDia(t.ini)+' – '+horaTxtDia(t.fin)+' ('+(t.fuente==='consolidado'?'consolidado':'control')+')';}}}},
+        scales:{x:{min:0,max:Math.ceil(maxFin/60/2)*2,ticks:{stepSize:2,font:{size:10},color:'#64748b',callback:function(v){return pad2(v%24)+':00';}},grid:{color:'#f1f5f9'}},y:{ticks:{font:{size:10},color:'#334155'},grid:{display:false}}}}
+    });
+  } else wrap.style.display='none';
+
+  // ----- tabla por colaborador -----
+  var CH=['RN','HED','HEN','FD','FN','HEFD','HEFN','RDF','RNF'];
+  var th='<thead><tr><th class="left">Colaborador</th><th class="left">Fuente</th><th>Entrada</th><th>Salida</th><th>Descanso</th><th>Horas</th><th>JORNAL</th><th>RN</th><th>HED</th><th>HEN</th><th>FD</th><th>FN</th><th>HEDF</th><th>HENF</th><th>RFD</th><th>RFN</th><th>Costo</th><th>$/hora</th></tr></thead><tbody>';
+  var tot={min:0,jor:0,c:{},cost:0,desc:0};CH.forEach(function(k){tot.c[k]=0;});
+  var cel=function(m){return '<td>'+(m>0?hf(m):'')+'</td>';};
+  var body=rows.map(function(r){
+    var t=porId[r.id]||{};
+    var jor=r.cat.ORD+r.cat.RN;tot.min+=r.min;tot.jor+=jor;tot.cost+=r.total;tot.desc+=(t.descanso||0);CH.forEach(function(k){tot.c[k]+=r.cat[k];});
+    return '<tr><td class="left">'+r.persona+'</td><td class="left">'+(t.fuente==='consolidado'?'Consolidado':'Control')+'</td><td>'+(t.ini!==undefined?horaTxtDia(t.ini):'—')+'</td><td>'+(t.fin!==undefined?horaTxtDia(t.fin):'—')+'</td><td>'+(t.descanso?t.descanso+' min':'—')+'</td><td style="font-weight:700">'+hf(r.min)+'</td>'+cel(jor)+cel(r.cat.RN)+cel(r.cat.HED)+cel(r.cat.HEN)+cel(r.cat.FD)+cel(r.cat.FN)+cel(r.cat.HEFD)+cel(r.cat.HEFN)+cel(r.cat.RDF)+cel(r.cat.RNF)+'<td style="font-weight:800">'+money(r.total)+'</td><td>'+(r.min>0?money(r.total/(r.min/60)):'—')+'</td></tr>';
+  }).join('');
+  var foot=rows.length?'<tr class="total"><td class="left">TOTAL ('+rows.length+')</td><td></td><td></td><td></td><td>'+(tot.desc?tot.desc+' min':'')+'</td><td>'+hf(tot.min)+'</td><td>'+hf(tot.jor)+'</td><td>'+hf(tot.c.RN)+'</td><td>'+hf(tot.c.HED)+'</td><td>'+hf(tot.c.HEN)+'</td><td>'+hf(tot.c.FD)+'</td><td>'+hf(tot.c.FN)+'</td><td>'+hf(tot.c.HEFD)+'</td><td>'+hf(tot.c.HEFN)+'</td><td>'+hf(tot.c.RDF)+'</td><td>'+hf(tot.c.RNF)+'</td><td>'+money(tot.cost)+'</td><td>'+(tot.min>0?money(tot.cost/(tot.min/60)):'—')+'</td></tr>':'';
+  document.getElementById('tblDiaDetalle').innerHTML=th+(rows.length?body+foot:'<tr><td colspan="18" class="empty">Sin turnos costeados en esta fecha</td></tr>')+'</tbody>';
+  document.getElementById('notasDia').innerHTML=rows.length?'<div class="note" style="margin-top:8px;font-size:.72rem;color:#64748b">Las horas están en horas decimales y con las mismas columnas del reporte (JORNAL = ordinaria + RN). En azul, turnos del control de horas; en verde, del reporte consolidado.</div>':'';
 }
 
 function renderPersonas(lista){
