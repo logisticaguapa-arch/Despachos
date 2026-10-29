@@ -557,6 +557,47 @@ function renderIngresosCuadrillas(R){
      +'<td style="'+td+'">'+hhmm(c.primero)+'</td><td style="'+td+'">'+hhmm(c.fin)+'</td><td style="'+td+'color:#64748b">'+([c.des>0?'desayuno '+horasHM(c.des):'',c.alm>0?'almuerzo '+horasHM(c.alm):'',c.cena>0?'cena '+horasHM(c.cena):''].filter(Boolean).join(' + ')||'—')+'</td><td style="'+td+'font-weight:700">'+horasHM(c.ef)+'</td></tr>';
   }).join('');
 }
+/* ===== Rendimiento con las HORAS REALES trabajadas =====
+   Las horas salen del control de horas / reporte consolidado (se cargan en Costos; ahí se combinan sin duplicar y solo se
+   cuenta despacho). Por cada día:  horas por persona = horas-hombre ÷ personas;  Ton/Hora real = T cargadas ÷ horas por persona.
+   Kg/hora-hombre = kg cargados ÷ horas-hombre. */
+/* ===== Horas en línea (SharePoint) =====
+   costos.html, en modo oculto (?sync=1), trae las horas de SharePoint con la sesión de Microsoft ya iniciada en este navegador,
+   las deja guardadas y avisa. Aquí solo se vuelve a calcular el rendimiento cuando llegan. */
+var horasSync={ts:null,ok:null,msg:''};
+function sincronizarHoras(){
+  var v=document.getElementById('ifrHoras');if(v)v.parentNode.removeChild(v);
+  var f=document.createElement('iframe');f.id='ifrHoras';f.style.display='none';f.setAttribute('aria-hidden','true');
+  f.src='costos.html?sync=1&t='+Date.now();
+  document.body.appendChild(f);
+}
+window.addEventListener('message',function(e){
+  if(e.origin!==location.origin||!e.data||e.data.tipo!=='horas-sincronizadas')return;
+  horasSync={ts:Date.now(),ok:!!e.data.ok,msg:e.data.msg||''};
+  var f=document.getElementById('ifrHoras');if(f&&f.parentNode)f.parentNode.removeChild(f);
+  try{renderOps();}catch(x){}
+});
+setTimeout(sincronizarHoras,2500);
+setInterval(sincronizarHoras,10*60*1000);
+
+function getHorasDia(){try{var o=JSON.parse(localStorage.getItem('horasDiaV1')||'null');return(o&&o.dias)?o:null;}catch(e){return null;}}
+function isoDeFecha(s){var p=(s||'').toString().trim().split('/');if(p.length!==3)return null;var y=parseInt(p[2]),m=parseInt(p[1]),d=parseInt(p[0]);if(isNaN(y)||isNaN(m)||isNaN(d))return null;if(y<100)y+=2000;return y+'-'+(m<10?'0'+m:m)+'-'+(d<10?'0'+d:d);}
+function calcRendimientoHoras(rows){
+  var H=getHorasDia(),kgDia={};
+  rows.forEach(function(x){if(!isCargado(x[C.STATUS]))return;var k=isoDeFecha(x[C.FECHA]);if(!k)return;kgDia[k]=(kgDia[k]||0)+toNum(x[C.CANT]);});
+  var dias=Object.keys(kgDia),res={hay:!!H,ts:H?H.ts:null,dias:dias.length,conHoras:0,incompletos:0,sinHoras:0,kg:0,minTot:0,hEq:0,pers:0};
+  dias.forEach(function(k){
+    var d=H&&H.dias[k];
+    if(!d||!d.m||!d.p){res.sinHoras++;return;}
+    if(d.i){res.incompletos++;return;}
+    res.conHoras++;res.kg+=kgDia[k];res.minTot+=d.m;res.hEq+=d.m/d.p;res.pers+=d.p;
+  });
+  res.tonReal=res.hEq>0?(res.kg/1000)/(res.hEq/60):null;
+  res.kgHH=res.minTot>0?res.kg/(res.minTot/60):null;
+  return res;
+}
+function fmtTs(ts){var d=new Date(ts),p=function(n){return n<10?'0'+n:n;};return p(d.getDate())+'/'+p(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes());}
+
 function renderOps(){
   var r=filteredData;if(!r.length){document.getElementById('panelOps').style.display='none';return;}document.getElementById('panelOps').style.display='grid';
   function minToStr(m){if(m===null)return'—';var h=Math.floor(m/60),min=m%60;return(h<10?'0'+h:h)+':'+(min<10?'0'+min:min);}
@@ -581,10 +622,14 @@ function renderOps(){
   document.getElementById('opsEmpaqueBody').innerHTML=Object.keys(empMap).map(function(k){var e=empMap[k],pct=totalEmpKg>0?Math.round(e.kg/totalEmpKg*100):0,kgMin=e.minSum>0?(e.kg/e.minSum).toFixed(1):'—';return'<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:4px 8px;font-weight:600;color:#374151">'+k+'</td><td style="padding:4px 8px;text-align:right;color:#64748b">'+pct+'%</td><td style="padding:4px 8px;text-align:right;color:#2563eb;font-weight:700">'+(e.kg/1000).toFixed(1)+' T</td><td style="padding:4px 8px;text-align:right;color:#d97706;font-weight:700">'+kgMin+'</td></tr>';}).join('');
   var tonHora=efectivo>0?((kgCargadoReal/1000)/(efectivo/60)).toFixed(1):'—';
   var R=calcRendimiento(r), tonReal=R.tonReal!==null?R.tonReal.toFixed(1):'—';
-  document.getElementById('opsTiemposBody').innerHTML=[{label:'Hora Inicio',val:minToStr(hIni)},{label:'Hora Fin',val:minToStr(hFin)},{label:'Total Horas',val:minToHM(totalMin)},{label:'Tiempo no efectivo<div style="font-size:.62rem;font-weight:500;color:#94a3b8">'+notaPausas+'</div>',val:minToHM(noEf)},{label:'Tiempo efectivo',val:minToHM(efectivo)},{label:'Horas equivalentes<div style="font-size:.62rem;font-weight:500;color:#94a3b8">cada cuadrilla desde su ingreso</div>',val:R.hEq>0?minToHM(Math.round(R.hEq)):'—'},{label:'Ton / Hora real<div style="font-size:.62rem;font-weight:500;color:#94a3b8">kg cargados ÷ horas equivalentes</div>',val:tonReal,bold:true,color:'#2563eb'},{label:'Ton / Hora ventana completa<div style="font-size:.62rem;font-weight:500;color:#94a3b8">como si todas entraran al primer camión</div>',val:tonHora,color:'#94a3b8'}].map(function(t){return'<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:4px 8px;color:#374151;font-weight:600">'+t.label+'</td><td style="padding:4px 8px;text-align:right;font-weight:'+(t.bold?'800':'600')+';color:'+(t.color||'#1a1a2e')+'">'+t.val+'</td></tr>';}).join('');
+  var RH=calcRendimientoHoras(r), subHoras,subReal;
+  if(!RH.hay){subHoras=(horasSync.ok===false&&horasSync.msg?horasSync.msg:'sin horas publicadas aún')+' · <a href=\"costos.html\" target=\"_blank\" style=\"color:#2563eb\">ver Costos</a>';subReal='necesita las horas del control';}
+  else if(RH.conHoras===0){subHoras=RH.incompletos?'día con registro de horas incompleto':'sin horas registradas para esta fecha';subReal='sin horas reales: se usa el estimado por cuadrillas';}
+  else{var pp=RH.pers/RH.conHoras;subHoras=Math.round(pp)+' personas · '+minToHM(Math.round(RH.hEq/RH.conHoras))+' por persona'+(RH.conHoras<RH.dias?' · '+RH.conHoras+' de '+RH.dias+' días':'')+' · control del '+fmtTs(RH.ts);subReal='kg cargados ÷ horas por persona';}
+  document.getElementById('opsTiemposBody').innerHTML=[{label:'Hora Inicio',val:minToStr(hIni)},{label:'Hora Fin',val:minToStr(hFin)},{label:'Total Horas',val:minToHM(totalMin)},{label:'Tiempo no efectivo<div style="font-size:.62rem;font-weight:500;color:#94a3b8">'+notaPausas+'</div>',val:minToHM(noEf)},{label:'Tiempo efectivo',val:minToHM(efectivo)},{label:'Horas reales trabajadas<div style=\"font-size:.62rem;font-weight:500;color:#94a3b8\">'+subHoras+'</div>',val:RH.minTot>0?minToHM(RH.minTot):'—'},{label:'Ton / Hora REAL<div style=\"font-size:.62rem;font-weight:500;color:#94a3b8\">'+subReal+'</div>',val:RH.tonReal!==null?RH.tonReal.toFixed(1):'—',bold:true,color:'#2563eb'},{label:'Kg / hora-hombre<div style=\"font-size:.62rem;font-weight:500;color:#94a3b8\">'+'kg cargados ÷ horas reales trabajadas'+'</div>',val:RH.kgHH!==null?Math.round(RH.kgHH).toLocaleString('es-CO'):'—',color:'#16a34a'},{label:'Ton / Hora estimado por cuadrillas<div style=\"font-size:.62rem;font-weight:500;color:#94a3b8\">'+'según ingreso y último cargue de cada una'+'</div>',val:tonReal,color:'#64748b'},{label:'Ton / Hora ventana completa<div style=\"font-size:.62rem;font-weight:500;color:#94a3b8\">'+'como si todas entraran al primer camión'+'</div>',val:tonHora,color:'#94a3b8'}].map(function(t){return'<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:4px 8px;color:#374151;font-weight:600">'+t.label+'</td><td style="padding:4px 8px;text-align:right;font-weight:'+(t.bold?'800':'600')+';color:'+(t.color||'#1a1a2e')+'">'+t.val+'</td></tr>';}).join('');
   renderRangos(r);
   renderIngresosCuadrillas(R);
-  document.getElementById('rendNota').innerHTML='<b>Ton/Hora real</b> = kg cargados ÷ <b>horas equivalentes</b>. Cada cuadrilla cuenta solo desde su <b>ingreso</b> (el que escribas aquí; vacío = su primer cargue) hasta su <b>último fin de cargue</b>, menos las pausas: desayuno de 30 min solo la cuadrilla que ingresa antes de las 8:00, almuerzo (12:00–13:00) y cena de 30 min si pasa de las 6 p. m.; las horas de todas se promedian entre el número de cuadrillas ('+(R.n||'—')+' hoy).';
+  document.getElementById('rendNota').innerHTML='<b>Ton/Hora REAL</b> usa las horas que cada persona trabajó según el control de horas (cargado en Costos). <b>Ton/Hora estimado por cuadrillas</b> (para días sin horas registradas) = kg cargados ÷ <b>horas equivalentes</b>. Cada cuadrilla cuenta solo desde su <b>ingreso</b> (el que escribas aquí; vacío = su primer cargue) hasta su <b>último fin de cargue</b>, menos las pausas: desayuno de 30 min solo la cuadrilla que ingresa antes de las 8:00, almuerzo (12:00–13:00) y cena de 30 min si pasa de las 6 p. m.; las horas de todas se promedian entre el número de cuadrillas ('+(R.n||'—')+' hoy).';
 }
 
 function renderCharts(){
