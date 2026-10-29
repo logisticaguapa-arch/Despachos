@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
@@ -148,11 +149,31 @@ table.rtable tr.total td{background:#ecfdf5;font-weight:800;border-top:2px solid
     <div class="src-row">
       <div class="src-chip" id="chipKg">Kilos despachados: cargando…</div>
       <div class="src-chip warn" id="chipHoras">Horas trabajadas: sin cargar</div>
-      <label class="btn btn-green" for="fileHoras" style="cursor:pointer">📂 Cargar Excel/CSV de horas (control o consolidado)</label>
+      <label class="btn btn-gray" for="fileHoras" style="cursor:pointer">📂 Cargar Excel/CSV a mano (respaldo)</label>
       <input type="file" id="fileHoras" accept=".xlsx,.xls,.csv" style="display:none" onchange="onFileHoras(event)">
       <button class="btn btn-gray" onclick="cargarHorasDesdeUrl()" id="btnRecargar" style="display:none">🔄 Recargar horas</button>
       <button class="btn btn-gray" onclick="olvidarGuardado()" id="btnOlvidar" style="display:none">🗑️ Olvidar datos guardados</button>
     </div>
+    <div id="spBox" style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-gray" id="btnSPConectar" onclick="conectarSharePoint()">🔗 Conectar con SharePoint</button>
+      <button class="btn btn-gray" id="btnSPActualizar" onclick="sincronizarSharePoint(true)" style="display:none">🔄 Actualizar ahora</button>
+      <span class="src-chip warn" id="ghEstado">Macro de Excel → GitHub: revisando…</span>
+      <span class="src-chip warn" id="spEstado">SharePoint: sin configurar</span>
+    </div>
+    <details id="spAyuda" style="margin-top:8px">
+      <summary class="note" style="cursor:pointer;font-weight:700">¿Cómo dejar que la página lea SharePoint? (una sola vez, ~10 minutos)</summary>
+      <div class="how" style="margin-top:6px">
+        <ol>
+          <li>Entra a <b>entra.microsoft.com</b> con tu cuenta de la empresa → <b>Aplicaciones → Registros de aplicaciones → Nuevo registro</b>.</li>
+          <li>Nombre: <i>Panel Despachos Guapa</i> · Tipos de cuenta: <i>Solo este directorio</i> · URI de redirección: plataforma <b>Aplicación de página única (SPA)</b> y la dirección <code id="spRedir"></code>. Pulsa <b>Registrar</b>.</li>
+          <li>Copia el <b>Id. de aplicación (cliente)</b> y el <b>Id. de directorio (inquilino)</b>.</li>
+          <li>En <b>Permisos de API → Agregar → Microsoft Graph → Permisos delegados</b> agrega <code>User.Read</code> y <code>Files.Read.All</code>. Si tu empresa lo pide, pulsa <i>Conceder consentimiento de administrador</i>.</li>
+          <li>En <code>costos.html</code> pega el Id. de aplicación en <code>MS_CLIENT_ID</code> (y el de directorio en <code>MS_TENANT</code>), y sube el archivo a GitHub.</li>
+          <li>Abre Costos y pulsa <b>Conectar con SharePoint</b>: inicia sesión una vez. La cuenta debe tener acceso al archivo (ser su dueña o que se lo hayan compartido).</li>
+        </ol>
+        <div class="hint" style="margin-top:6px">La página solo lee el archivo con tus permisos; no guarda contraseñas. Si tu empresa no deja registrar aplicaciones a los usuarios, TI lo hace en minutos. El botón verde "Cargar Excel/CSV" sigue funcionando como respaldo.</div>
+      </div>
+    </details>
     <div id="srcList" style="margin-top:10px;display:grid;gap:6px"></div>
     <div class="pfield" style="max-width:520px;margin-top:10px">
       <label>Si el mismo colaborador y día están en los dos formatos, usar</label>
@@ -1034,6 +1055,20 @@ function olvidarGuardado(){
   document.getElementById('srcMsg').innerHTML='';
 }
 
+/* ===== Lectura de un libro de Excel (subido a mano o descargado de SharePoint) ===== */
+function procesarLibro(buf,name){
+  var wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+  var ocultas={};((wb.Workbook&&wb.Workbook.Sheets)||[]).forEach(function(sh){if(sh.Hidden)ocultas[sh.name]=1;});
+  var hojas=wb.SheetNames.map(function(n){
+    var ws=wb.Sheets[n];
+    // Algunos libros declaran más de un millón de filas vacías: se recorta al rango con datos reales
+    var maxR=0,maxC=0;
+    Object.keys(ws).forEach(function(k){if(k.charAt(0)==='!')return;var c=XLSX.utils.decode_cell(k);if(c.r>maxR)maxR=c.r;if(c.c>maxC)maxC=c.c;});
+    ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:maxR,c:maxC}});
+    return {nombre:n,oculta:!!ocultas[n],rows:XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''})};
+  });
+  aplicarHojas(hojas,name);
+}
 function onFileHoras(ev){
   var f=ev.target.files[0]; if(!f) return;
   var name=f.name, rd=new FileReader();
@@ -1042,24 +1077,156 @@ function onFileHoras(ev){
     rd.readAsText(f,'utf-8');
   } else {
     rd.onload=function(){
-      try{
-        var wb=XLSX.read(new Uint8Array(rd.result),{type:'array'});
-        var ocultas={};((wb.Workbook&&wb.Workbook.Sheets)||[]).forEach(function(sh){if(sh.Hidden)ocultas[sh.name]=1;});
-        var hojas=wb.SheetNames.map(function(n){
-          var ws=wb.Sheets[n];
-          // Algunos libros declaran más de un millón de filas vacías: se recorta al rango con datos reales
-          var maxR=0,maxC=0;
-          Object.keys(ws).forEach(function(k){if(k.charAt(0)==='!')return;var c=XLSX.utils.decode_cell(k);if(c.r>maxR)maxR=c.r;if(c.c>maxC)maxC=c.c;});
-          ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:maxR,c:maxC}});
-          return {nombre:n,oculta:!!ocultas[n],rows:XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''})};
-        });
-        aplicarHojas(hojas,name);
-      }catch(e){document.getElementById('srcMsg').innerHTML='<div class="alert-box">No pude leer el archivo: '+e.message+'</div>';}
+      try{ procesarLibro(rd.result,name); }
+      catch(e){document.getElementById('srcMsg').innerHTML='<div class="alert-box">No pude leer el archivo: '+e.message+'</div>';}
     };
     rd.readAsArrayBuffer(f);
   }
   ev.target.value='';
 }
+
+/* =====================================================================
+   HORAS PUBLICADAS EN GITHUB (macro de Excel)
+   Una macro del libro de Excel publica, cada vez que se guarda, un archivo de datos en la carpeta datos/ de este sitio.
+   Aquí se leen solos (sin adjuntar y sin iniciar sesión). Cada archivo trae las hojas tal como están en Excel:
+   {"version":1,"archivo":"...","generado":"2026-10-29T19:30:00","hojas":[{"nombre":"...","rows":[[...],[...]]}]}
+   ===================================================================== */
+var HORAS_JSON=[
+  {nombre:'Control de horas',url:'datos/horas_control.json'},
+  {nombre:'Reporte consolidado',url:'datos/horas_consolidado.json'}
+];
+var GH_INTERVALO_MIN=5;
+var GH_ULTIMO={};
+function ghEstado(txt,cls){var e=document.getElementById('ghEstado');if(!e)return;e.className='src-chip'+(cls?' '+cls:'');e.innerHTML=txt;}
+async function sincronizarGitHub(forzar){
+  var hallados=0,nuevos=0,gens=[],err=null;
+  for(var i=0;i<HORAS_JSON.length;i++){
+    var f=HORAS_JSON[i];
+    try{
+      var r=await fetch(f.url+'?t='+Date.now(),{cache:'no-store'});
+      if(!r.ok) continue;                                  // todavía no se ha publicado ese archivo
+      var j=await r.json();
+      if(!j||!j.hojas||!j.hojas.length) continue;
+      hallados++;gens.push(j.generado||'');
+      if(!forzar&&GH_ULTIMO[f.url]&&GH_ULTIMO[f.url]===j.generado) continue;   // sin cambios desde la última lectura
+      GH_ULTIMO[f.url]=j.generado;nuevos++;
+      aplicarHojas(j.hojas.map(function(h){return {nombre:h.nombre,oculta:false,rows:h.rows};}),(j.archivo||f.nombre));
+    }catch(e){err=e;}
+  }
+  if(hallados){
+    var g=gens.filter(Boolean).sort().pop();
+    ghEstado('Macro de Excel → GitHub: ✔ '+hallados+' archivo(s) · última publicación '+(g?g.replace('T',' ').slice(0,16):'—')+' · revisado '+fmtFechaHora(Date.now()),'ok');
+  } else ghEstado(err?'Macro de Excel → GitHub: no se pudo leer ('+err.message+')':'Macro de Excel → GitHub: aún no hay archivos publicados en <code>datos/</code>','warn');
+  return hallados;
+}
+
+/* =====================================================================
+   SHAREPOINT EN LÍNEA (Microsoft Graph)
+   Una página pública no puede leer un archivo privado de SharePoint por sí sola: la persona inicia sesión con su cuenta de
+   Microsoft (una vez) y la página consulta el archivo con Microsoft Graph, con los permisos de esa persona.
+   Requiere registrar una vez la aplicación en Microsoft Entra ID (ver instrucciones en pantalla) y pegar su ID aquí.
+   ===================================================================== */
+var MS_CLIENT_ID='';             // ← "Application (client) ID" de la app registrada en Microsoft Entra ID
+var MS_TENANT='organizations';   // o el "Directory (tenant) ID" de la empresa
+var SP_ARCHIVOS=[                // archivos de SharePoint a traer (control de horas y, si quieres, el consolidado del mes)
+  {nombre:'CONTROL DE HORAS DESPACHOS.xlsx',url:'https://agricolaguapa-my.sharepoint.com/personal/coordinador_logistico_guapa_com_co/Documents/CONTROL%20DE%20HORAS%20DESPACHOS.xlsx'}
+  // ,{nombre:'REPORTE DESPACHO CONSOLIDADO.xlsx',url:'https://agricolaguapa-my.sharepoint.com/.../REPORTE_DESPACHO_OCTUBRE_2026_CONSOLIDADO.xlsx'}
+];
+var SP_INTERVALO_MIN=15;         // cada cuánto se actualiza solo mientras la página está abierta
+var SP_SCOPES=['User.Read','Files.Read.All'];
+var MODO_SYNC=/[?&]sync=1/.test(location.search);   // modo oculto que usa el tablero en vivo (index.html)
+var msalApp=null,spCuenta=null,spOcupado=false;
+
+function spEstado(txt,cls){var e=document.getElementById('spEstado');if(!e)return;e.className='src-chip'+(cls?' '+cls:'');e.innerHTML=txt;}
+function avisarPadre(o){window.__ultimoAviso=o;try{if(window.parent&&window.parent!==window)window.parent.postMessage(o,location.origin);}catch(e){}}
+async function spIniciar(){
+  if(!MS_CLIENT_ID||typeof msal==='undefined') return false;
+  if(msalApp) return true;
+  msalApp=new msal.PublicClientApplication({auth:{clientId:MS_CLIENT_ID,authority:'https://login.microsoftonline.com/'+MS_TENANT,redirectUri:location.origin+location.pathname},cache:{cacheLocation:'localStorage'}});
+  if(msalApp.initialize) await msalApp.initialize();
+  var cs=msalApp.getAllAccounts();spCuenta=cs.length?cs[0]:null;
+  return true;
+}
+async function spToken(interactivo){
+  try{
+    if(!spCuenta) throw new Error('interaction_required');
+    var r=await msalApp.acquireTokenSilent({scopes:SP_SCOPES,account:spCuenta});return r.accessToken;
+  }catch(e){
+    if(!interactivo) throw e;
+    var l=await msalApp.loginPopup({scopes:SP_SCOPES});
+    spCuenta=l.account;if(msalApp.setActiveAccount)msalApp.setActiveAccount(l.account);
+    var t=await msalApp.acquireTokenSilent({scopes:SP_SCOPES,account:spCuenta});return t.accessToken;
+  }
+}
+/* Graph identifica un enlace de SharePoint con "u!" + base64url de la dirección (sin relleno) */
+function spCodificar(url){
+  var b=btoa(unescape(encodeURIComponent(url)));
+  return 'u!'+b.replace(/=+$/,'').replace(/\//g,'_').replace(/\+/g,'-');
+}
+function spRutaDeUrl(url){var m=url.match(/\/personal\/([^\/]+)\/Documents\/(.+)$/i);return m?decodeURIComponent(m[2]):null;}
+/* Desde un navegador NO se descarga con /content (redirección + CORS): se pide el enlace de descarga y se baja sin cabecera de autorización */
+async function spDescargar(url,token){
+  var base=url.split('?')[0],sel='?$select=id,name,lastModifiedDateTime,@microsoft.graph.downloadUrl',h={Authorization:'Bearer '+token};
+  var cand=['https://graph.microsoft.com/v1.0/shares/'+spCodificar(base)+'/driveItem'+sel];
+  var ruta=spRutaDeUrl(base);
+  if(ruta) cand.push('https://graph.microsoft.com/v1.0/me/drive/root:/'+ruta.split('/').map(encodeURIComponent).join('/')+sel);
+  var ultimo=null,meta=null;
+  for(var i=0;i<cand.length&&!meta;i++){
+    var r=await fetch(cand[i],{headers:h});
+    if(r.ok){meta=await r.json();}else if(ultimo!==401&&ultimo!==403){ultimo=r.status;}   // un 403/401 (permiso) pesa más que un 404 de otra ruta
+  }
+  if(!meta){var e=new Error('graph_'+ultimo);e.status=ultimo;throw e;}
+  var du=meta['@microsoft.graph.downloadUrl'];
+  if(!du) throw new Error('sin_enlace_descarga');
+  var d=await fetch(du);
+  if(!d.ok){var e2=new Error('descarga_'+d.status);e2.status=d.status;throw e2;}
+  return {buf:await d.arrayBuffer(),name:meta.name,mod:meta.lastModifiedDateTime};
+}
+function spMensaje(e){
+  var c=(e&&(e.errorCode||e.message))||'';
+  if(/user_cancelled/.test(c)) return 'Cancelaste el inicio de sesión.';
+  if(/popup_window_error|empty_window/.test(c)) return 'El navegador bloqueó la ventana de Microsoft: permite las ventanas emergentes de esta página.';
+  if(/interaction_required|login_required|consent_required|no_account/.test(c)) return 'Falta iniciar sesión en Microsoft.';
+  if(/AADSTS65001|AADSTS90094|AADSTS650057|invalid_client|AADSTS700016/.test((e&&e.errorMessage)||c)) return 'La aplicación aún no tiene la aprobación o el registro correcto en Microsoft Entra (pide a TI que revise permisos y el ID de aplicación).';
+  if(e&&e.status===401) return 'Microsoft rechazó la sesión: vuelve a conectar.';
+  if(e&&e.status===403) return 'Tu cuenta no tiene permiso sobre el archivo: pide que te lo compartan.';
+  if(e&&(e.status===404||/graph_404/.test(c))) return 'No encontré el archivo en esa dirección de SharePoint.';
+  return 'No se pudo leer SharePoint ('+(c||'error desconocido')+').';
+}
+async function sincronizarSharePoint(interactivo){
+  if(spOcupado) return;
+  if(!await spIniciar()){spEstado('SharePoint: falta el ID de la aplicación (ver instrucciones)','warn');avisarPadre({tipo:'horas-sincronizadas',ok:false,msg:'SharePoint sin configurar'});return;}
+  spOcupado=true;spEstado('SharePoint: conectando…','');
+  try{
+    var token=await spToken(interactivo),mods=[];
+    for(var i=0;i<SP_ARCHIVOS.length;i++){
+      var a=SP_ARCHIVOS[i];
+      spEstado('SharePoint: descargando '+(a.nombre||a.url.split('/').pop())+'…','');
+      var d=await spDescargar(a.url,token);
+      procesarLibro(d.buf,a.nombre||d.name);
+      mods.push(d.mod?fmtFechaHora(new Date(d.mod).getTime()):'');
+    }
+    var ahora=fmtFechaHora(Date.now());
+    spEstado('SharePoint: ✔ sincronizado '+ahora+(mods[0]?' · archivo modificado '+mods[0]:'')+(spCuenta&&spCuenta.username?' · '+spCuenta.username:''),'ok');
+    var b=document.getElementById('btnSPActualizar');if(b)b.style.display='inline-block';
+    avisarPadre({tipo:'horas-sincronizadas',ok:true,msg:''});
+  }catch(e){
+    var m=spMensaje(e);
+    spEstado('SharePoint: '+m,'bad');
+    avisarPadre({tipo:'horas-sincronizadas',ok:false,msg:m});
+  }finally{spOcupado=false;}
+}
+async function conectarSharePoint(){await sincronizarSharePoint(true);}
+async function iniciarSharePoint(){
+  var det=document.getElementById('spAyuda');
+  if(!MS_CLIENT_ID){spEstado('SharePoint: falta el ID de la aplicación (ver instrucciones)','warn');if(det)det.open=true;return;}
+  if(typeof msal==='undefined'){spEstado('SharePoint: no se pudo cargar la librería de Microsoft (revisa tu conexión)','bad');return;}
+  await spIniciar();
+  if(spCuenta){await sincronizarSharePoint(false);}
+  else spEstado('SharePoint: sin conectar — pulsa "Conectar con SharePoint" para iniciar sesión con tu cuenta de Microsoft','warn');
+  setInterval(function(){if(spCuenta)sincronizarSharePoint(false);},SP_INTERVALO_MIN*60000);
+}
+
 async function cargarHorasDesdeUrl(){
   if(!HORAS_CSV_URL) return;
   try{
@@ -1093,9 +1260,21 @@ function onParam(){
 }
 
 /* ===== Cálculo y filtros ===== */
+/* Resumen de horas reales por día para el tablero en vivo (index.html lo lee del mismo navegador).
+   Son las horas ya combinadas (sin duplicar entre formatos) y solo de despacho (código de labor 99). */
+function guardarResumenDias(){
+  try{
+    if(!RES.length){localStorage.removeItem('horasDiaV1');return;}
+    var d={};
+    RES.forEach(function(r){var k=isoDate(r.fecha),x=d[k]||(d[k]={m:0,p:{}});x.m+=r.min;x.p[r.persona]=1;});
+    var o={};Object.keys(d).forEach(function(k){o[k]={m:Math.round(d[k].m),p:Object.keys(d[k].p).length,i:DIAS_INC[k]?1:0};});
+    localStorage.setItem('horasDiaV1',JSON.stringify({ts:Date.now(),dias:o}));
+  }catch(e){}
+}
 function recalcular(){
   combinarFuentes();
   RES=liquidar(TURNOS);
+  guardarResumenDias();
   construirFiltros();
   renderFuentes();
   render();
@@ -1708,12 +1887,36 @@ async function iniciar(){
   if(HORAS_CSV_URL){ document.getElementById('btnRecargar').style.display='inline-block'; await cargarHorasDesdeUrl(); }
   else if(!cargarLocal()){
     document.getElementById('srcMsg').innerHTML='<div class="how"><b>Cómo cargar las horas:</b><ol>'+
+    '<li><b>En línea:</b> conecta SharePoint con el botón verde de arriba (se configura una sola vez) y las horas se leen solas, sin adjuntar nada.</li>'+
     '<li><b>Sin configurar nada:</b> descarga el Excel de control de horas desde SharePoint (con sus fórmulas, se leen los valores ya calculados) o el reporte consolidado del mes, y súbelo con el botón verde. Puedes cargar los dos: se combinan sin duplicar horas. Se leen en tu navegador y quedan recordados en este equipo.</li>'+
     '<li><b>Automático:</b> copia las horas a una hoja de Google Sheets (una fila por persona y día: Fecha, Nombre, Entrada, Salida), publícala como CSV y pega el link en <code>HORAS_CSV_URL</code> al inicio del script.</li></ol></div>';
   }
   render();
+  sincronizarGitHub(false);
+  setInterval(function(){sincronizarGitHub(false);},GH_INTERVALO_MIN*60000);
+  iniciarSharePoint();
 }
-if(sessionStorage.getItem('costosUnlocked')==='1') unlock();
+(function(){
+  var r=document.getElementById('spRedir');if(r)r.textContent=location.origin+location.pathname;
+  // La ventana emergente de Microsoft vuelve a esta misma página: no debe arrancar la aplicación completa
+  var esPopupMs=!!window.opener&&/[#?&](code|error)=/.test(location.hash+location.search);
+  if(esPopupMs) return;
+  if(MODO_SYNC){
+    // Modo oculto: solo trae las horas de SharePoint y avisa al tablero en vivo. No muestra nada.
+    document.getElementById('lockScreen').style.display='none';
+    (async function(){
+      try{
+        cargarLocal();                                  // conserva lo que ya estaba cargado (p. ej. un archivo subido a mano)
+        var gh=await sincronizarGitHub(true);           // 1) lo que publica la macro de Excel en GitHub (no requiere sesión)
+        if(gh>0){avisarPadre({tipo:'horas-sincronizadas',ok:true,msg:''});return;}
+        if(!MS_CLIENT_ID||!await spIniciar()||!spCuenta){avisarPadre({tipo:'horas-sincronizadas',ok:false,msg:'Aún no hay horas publicadas por la macro (carpeta datos/)'});return;}
+        await sincronizarSharePoint(false);          // 2) respaldo: SharePoint con sesión de Microsoft
+      }catch(e){avisarPadre({tipo:'horas-sincronizadas',ok:false,msg:spMensaje(e)});}
+    })();
+    return;
+  }
+  if(sessionStorage.getItem('costosUnlocked')==='1') unlock();
+})();
 </script>
 </body>
 </html>
