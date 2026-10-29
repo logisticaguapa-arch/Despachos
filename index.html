@@ -226,7 +226,7 @@ tbody tr:hover{background:#f8fafc}
     </div>
     <div class="card" id="cardRend" style="padding:12px;grid-column:1/-1">
       <div class="card-title" style="margin-bottom:4px;font-size:0.72rem">🕐 Ingreso de las cuadrillas <span style="font-weight:500;color:#64748b;text-transform:none">— base del Ton/Hora real</span></div>
-      <div style="overflow-x:auto;max-width:640px">
+      <div style="overflow-x:auto;max-width:860px">
       <table style="width:100%;font-size:0.72rem;border-collapse:collapse">
         <thead><tr id="rendHead"></tr></thead>
         <tbody id="rendBody"></tbody>
@@ -496,7 +496,7 @@ function renderRangos(r){
    Aquí cada cuadrilla cuenta solo desde SU ingreso hasta SU último fin de cargue (menos almuerzo y cena). Las horas de
    todas se promedian entre el número de cuadrillas: "horas equivalentes" de la operación completa.
         Ton/Hora real = kg cargados ÷ horas equivalentes,   horas equivalentes = Σ horas activas de cada cuadrilla ÷ nº de cuadrillas
-   Si todas ingresan juntas, da exactamente el Ton/Hora clásico. */
+   El desayuno (30 min) solo se descuenta a la cuadrilla que ingresa antes de las 8:00. */
 function getIngresos(){try{return JSON.parse(localStorage.getItem('ingresoCuadrillasV1')||'{}');}catch(e){return {};}}
 function setIngreso(el){
   var id=el.getAttribute('data-id'),v=el.value,o=getIngresos();
@@ -504,11 +504,17 @@ function setIngreso(el){
   try{localStorage.setItem('ingresoCuadrillasV1',JSON.stringify(o));}catch(e){}
   renderOps();
 }
-function pausasMin(ini,fin){
-  var alm=(ini<=780&&fin>=720)?Math.min(fin,780)-Math.max(ini,720):0;
+/* Pausas de una cuadrilla: desayuno de 30 min (08:00–08:30) SOLO si la cuadrilla ingresa antes de las 8:00 (la de las 06:30);
+   almuerzo de 1 h (12:00–13:00, la parte que cubra) y cena de 30 min si pasa de las 6 p. m. */
+function pausasDetalle(ini,fin){
+  var des=(ini<=480&&fin>480)?Math.min(fin,510)-480:0;
+  var alm=(ini<=780&&fin>=720)?Math.max(0,Math.min(fin,780)-Math.max(ini,720)):0;
   var cena=fin>1080?30:0;
-  return Math.min(Math.max(0,alm)+cena,Math.max(0,fin-ini));
+  var tot=Math.max(0,fin-ini),suma=des+alm+cena;
+  if(suma>tot){var f=tot/suma;des*=f;alm*=f;cena*=f;}
+  return {des:des,alm:alm,cena:cena,total:des+alm+cena};
 }
+function pausasMin(ini,fin){return pausasDetalle(ini,fin).total;}
 function hhmm(m){if(m===null||m===undefined)return'—';m=((m%1440)+1440)%1440;var h=Math.floor(m/60),mi=Math.round(m%60);return(h<10?'0'+h:h)+':'+(mi<10?'0'+mi:mi);}
 function horasHM(m){if(!m||m<=0)return'0:00';var h=Math.floor(m/60),mi=Math.round(m%60);return h+':'+(mi<10?'0'+mi:mi);}
 function calcRendimiento(rows){
@@ -526,10 +532,10 @@ function calcRendimiento(rows){
     var g=grupos[k],primero=Math.min.apply(null,g.ini),ultimo=Math.max.apply(null,g.fin);
     var cfg=ing[g.cu],ent=cfg?timeToMin(cfg):null;
     var inicio=(ent!==null&&ent<=primero)?ent:primero;     // si cargó antes del ingreso escrito, cuenta desde su primer cargue
-    var ef=Math.max(0,(ultimo-inicio)-pausasMin(inicio,ultimo));
+    var pd=pausasDetalle(inicio,ultimo),ef=Math.max(0,(ultimo-inicio)-pd.total);
     (porDia[g.dia]=porDia[g.dia]||[]).push(ef);
-    var c=porCu[g.cu]||(porCu[g.cu]={cu:g.cu,ef:0,primero:null,fin:null,inicio:null});
-    c.ef+=ef;c.primero=(c.primero===null||primero<c.primero)?primero:c.primero;c.fin=(c.fin===null||ultimo>c.fin)?ultimo:c.fin;c.inicio=(c.inicio===null||inicio<c.inicio)?inicio:c.inicio;
+    var c=porCu[g.cu]||(porCu[g.cu]={cu:g.cu,ef:0,primero:null,fin:null,inicio:null,des:0,alm:0,cena:0});
+    c.ef+=ef;c.des+=pd.des;c.alm+=pd.alm;c.cena+=pd.cena;c.primero=(c.primero===null||primero<c.primero)?primero:c.primero;c.fin=(c.fin===null||ultimo>c.fin)?ultimo:c.fin;c.inicio=(c.inicio===null||inicio<c.inicio)?inicio:c.inicio;
     kg+=g.kg;
   });
   var hEq=0,cuentas={};
@@ -543,12 +549,12 @@ function renderIngresosCuadrillas(R){
   if(!cus.length){card.style.display='none';return;}
   card.style.display='';
   var th='padding:4px 8px;background:#1e293b;color:#94a3b8;font-size:0.62rem;text-transform:uppercase;';
-  document.getElementById('rendHead').innerHTML=['Cuadrilla|left','Ingreso (editable)|right','Primer cargue|right','Último fin de cargue|right','Horas activas|right'].map(function(h){var q=h.split('|');return'<th style="'+th+'text-align:'+q[1]+'">'+q[0]+'</th>';}).join('');
+  document.getElementById('rendHead').innerHTML=['Cuadrilla|left','Ingreso (editable)|right','Primer cargue|right','Último fin de cargue|right','Pausas descontadas|right','Horas activas|right'].map(function(h){var q=h.split('|');return'<th style="'+th+'text-align:'+q[1]+'">'+q[0]+'</th>';}).join('');
   document.getElementById('rendBody').innerHTML=cus.map(function(k){
     var c=R.porCu[k],td='padding:4px 8px;text-align:right;border-bottom:1px solid #f1f5f9;';
     return'<tr><td style="padding:4px 8px;font-weight:700;border-bottom:1px solid #f1f5f9">'+k+'</td>'
      +'<td style="'+td+'"><input type="time" data-id="'+k.replace(/"/g,'&quot;')+'" value="'+(R.ing[k]||'')+'" onchange="setIngreso(this)" style="font-size:.72rem;padding:1px 3px;border:1px solid #cbd5e1;border-radius:4px;'+(R.ing[k]?'':'color:#94a3b8')+'" title="Hora a la que ingresa la cuadrilla. Vacío = hora de su primer cargue"></td>'
-     +'<td style="'+td+'">'+hhmm(c.primero)+'</td><td style="'+td+'">'+hhmm(c.fin)+'</td><td style="'+td+'font-weight:700">'+horasHM(c.ef)+'</td></tr>';
+     +'<td style="'+td+'">'+hhmm(c.primero)+'</td><td style="'+td+'">'+hhmm(c.fin)+'</td><td style="'+td+'color:#64748b">'+([c.des>0?'desayuno '+horasHM(c.des):'',c.alm>0?'almuerzo '+horasHM(c.alm):'',c.cena>0?'cena '+horasHM(c.cena):''].filter(Boolean).join(' + ')||'—')+'</td><td style="'+td+'font-weight:700">'+horasHM(c.ef)+'</td></tr>';
   }).join('');
 }
 function renderOps(){
@@ -578,7 +584,7 @@ function renderOps(){
   document.getElementById('opsTiemposBody').innerHTML=[{label:'Hora Inicio',val:minToStr(hIni)},{label:'Hora Fin',val:minToStr(hFin)},{label:'Total Horas',val:minToHM(totalMin)},{label:'Tiempo no efectivo<div style="font-size:.62rem;font-weight:500;color:#94a3b8">'+notaPausas+'</div>',val:minToHM(noEf)},{label:'Tiempo efectivo',val:minToHM(efectivo)},{label:'Horas equivalentes<div style="font-size:.62rem;font-weight:500;color:#94a3b8">cada cuadrilla desde su ingreso</div>',val:R.hEq>0?minToHM(Math.round(R.hEq)):'—'},{label:'Ton / Hora real<div style="font-size:.62rem;font-weight:500;color:#94a3b8">kg cargados ÷ horas equivalentes</div>',val:tonReal,bold:true,color:'#2563eb'},{label:'Ton / Hora ventana completa<div style="font-size:.62rem;font-weight:500;color:#94a3b8">como si todas entraran al primer camión</div>',val:tonHora,color:'#94a3b8'}].map(function(t){return'<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:4px 8px;color:#374151;font-weight:600">'+t.label+'</td><td style="padding:4px 8px;text-align:right;font-weight:'+(t.bold?'800':'600')+';color:'+(t.color||'#1a1a2e')+'">'+t.val+'</td></tr>';}).join('');
   renderRangos(r);
   renderIngresosCuadrillas(R);
-  document.getElementById('rendNota').innerHTML='<b>Ton/Hora real</b> = kg cargados ÷ <b>horas equivalentes</b>. Cada cuadrilla cuenta solo desde su <b>ingreso</b> (el que escribas aquí; vacío = su primer cargue) hasta su <b>último fin de cargue</b>, menos almuerzo (12:00–13:00) y cena de 30 min si pasa de las 6 p. m.; las horas de todas se promedian entre el número de cuadrillas ('+(R.n||'—')+' hoy). Si todas ingresan juntas, da igual que el Ton/Hora de ventana completa.';
+  document.getElementById('rendNota').innerHTML='<b>Ton/Hora real</b> = kg cargados ÷ <b>horas equivalentes</b>. Cada cuadrilla cuenta solo desde su <b>ingreso</b> (el que escribas aquí; vacío = su primer cargue) hasta su <b>último fin de cargue</b>, menos las pausas: desayuno de 30 min solo la cuadrilla que ingresa antes de las 8:00, almuerzo (12:00–13:00) y cena de 30 min si pasa de las 6 p. m.; las horas de todas se promedian entre el número de cuadrillas ('+(R.n||'—')+' hoy).';
 }
 
 function renderCharts(){
