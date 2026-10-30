@@ -1,146 +1,80 @@
-#!/usr/bin/env python3
-"""
-Convierte los libros de Excel de horas (control de horas y reporte consolidado) en archivos de datos que leen costos.html e
-index.html: datos/horas_control.json y datos/horas_consolidado.json.
+# =====================================================================================================
+#  ACTUALIZAR HORAS  (copiar a  .github/workflows/actualizar-horas.yml  en el repositorio Despachos)
+#
+#  Lo dispara la macro "PublicarHoras" del Excel (boton "Publicar horas") al cerrar la operacion.
+#  1) Descarga los libros de Excel desde OneDrive con sus enlaces ("Cualquier persona con el enlace").
+#  2) convertir_horas.py los convierte a  datos/horas_control.json  y  datos/horas_consolidado.json
+#  3) Guarda los cambios en el repositorio. costos.html e index.html leen esos archivos.
+#
+#  SECRETOS necesarios (Settings > Secrets and variables > Actions > New repository secret):
+#     ENLACE_CONTROL_HORAS   enlace de OneDrive del libro CONTROL DE HORAS DESPACHOS
+#     ENLACE_CONSOLIDADO     enlace de OneDrive del reporte consolidado (opcional)
+#  Se guardan como secretos porque el repositorio es publico y el enlace da acceso al archivo.
+# =====================================================================================================
+name: Actualizar horas
 
-Se ejecuta dentro de la accion de GitHub (actualizar-horas.yml) despues de descargar los libros desde OneDrive.
+on:
+  workflow_dispatch:
 
-Uso:  python convertir_horas.py --control control.xlsx --consolidado consolidado.xlsx --salida datos
+permissions:
+  contents: write
 
-Privacidad: el repositorio es publico, por eso por defecto el nombre se publica como un codigo y la cedula/telefono se dejan
-vacios (ANONIMIZAR=si). Con ANONIMIZAR=no se publican los nombres.
-"""
-import argparse, datetime as dt, json, os, sys
-from openpyxl import load_workbook
-from openpyxl.utils.datetime import to_excel
+concurrency:
+  group: actualizar-horas
+  cancel-in-progress: false
 
-ANONIMIZAR = os.environ.get("ANONIMIZAR", "si").strip().lower() not in ("no", "false", "0")
-# nombre mal escrito -> nombre correcto (sin tildes; la Ñ se trata como N). Se agrega aqui cualquier otro caso.
-ALIAS = {"JUAN CAMIILO MOSQUERA ZUNIGA": "JUAN CAMILO MOSQUERA ZUNIGA"}
-COLUMNAS_VACIAS = ("CEDULA", "CC", "DOCUMENTO", "TELEFONO")
-VACIAS_SEGUIDAS = 300       # algunas hojas declaran 1.000.000 de filas: se corta tras tantas filas vacias seguidas
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-def normalizar(s):
-    s = str(s).strip().upper()
-    for a, b in (("Á", "A"), ("É", "E"), ("Í", "I"), ("Ó", "O"), ("Ú", "U"), ("Ü", "U"), ("Ñ", "N")):
-        s = s.replace(a, b)
-    s = s.replace("\n", " ").replace("\r", " ").replace("\xa0", " ")
-    while "  " in s:
-        s = s.replace("  ", " ")
-    return s.strip()
+      - name: Instalar openpyxl
+        run: pip install openpyxl
 
+      - name: Descargar los libros desde OneDrive
+        env:
+          ENLACE_CONTROL: ${{ secrets.ENLACE_CONTROL_HORAS }}
+          ENLACE_CONSOLIDADO: ${{ secrets.ENLACE_CONSOLIDADO }}
+        run: |
+          set -e
+          descargar () {
+            enlace="$1"; archivo="$2"
+            if [ -z "$enlace" ]; then echo "Sin enlace para $archivo: se omite"; return 0; fi
+            case "$enlace" in
+              *download=1*) url="$enlace" ;;
+              *\?*)         url="$enlace&download=1" ;;
+              *)            url="$enlace?download=1" ;;
+            esac
+            curl -L --fail --silent --show-error -o "$archivo" "$url"
+            # un Excel real empieza por "PK"; si llega una pagina de inicio de sesion, el enlace no es publico
+            if ! head -c 2 "$archivo" | grep -q "PK"; then
+              echo "::error::El enlace de $archivo no devolvio un Excel. Revisa que sea 'Cualquier persona con el enlace puede ver'."
+              exit 1
+            fi
+            echo "Descargado $archivo ($(stat -c%s "$archivo") bytes)"
+          }
+          descargar "$ENLACE_CONTROL" control.xlsx
+          descargar "$ENLACE_CONSOLIDADO" consolidado.xlsx
 
-def codigo(nombre):
-    """Mismo nombre = mismo codigo en cualquier libro (igual que la macro PublicarGitHub.bas)."""
-    s = normalizar(nombre)
-    s = ALIAS.get(s, s)
-    h1, h2 = 7, 11
-    for ch in s:
-        c = ord(ch)
-        h1 = (h1 * 31 + c) % 1000003
-        h2 = (h2 * 37 + c) % 999983
-    return "C%07d%06d" % (h1, h2)
+      - name: Convertir a datos
+        run: |
+          args=""
+          [ -s control.xlsx ] && args="$args --control control.xlsx"
+          [ -s consolidado.xlsx ] && args="$args --consolidado consolidado.xlsx"
+          python convertir_horas.py $args --salida datos
 
-
-def valor(v):
-    """Como lo ve el tablero: numeros (fechas y horas como numeros de Excel) y textos."""
-    if v is None:
-        return ""
-    if isinstance(v, bool):
-        return v
-    if isinstance(v, dt.datetime):
-        return float(to_excel(v))
-    if isinstance(v, dt.date):
-        return float(to_excel(dt.datetime(v.year, v.month, v.day)))
-    if isinstance(v, dt.time):
-        return (v.hour * 3600 + v.minute * 60 + v.second + v.microsecond / 1e6) / 86400
-    if isinstance(v, dt.timedelta):
-        return v.total_seconds() / 86400
-    if isinstance(v, (int, float)):
-        f = float(v)
-        return int(f) if f.is_integer() else float(format(f, ".15g"))
-    return str(v)
-
-
-def leer_filas(ws):
-    filas, vacias, hubo = [], 0, False
-    for fila in ws.iter_rows(values_only=True):
-        if all(c in (None, "") for c in fila):
-            vacias += 1
-            if hubo and vacias >= VACIAS_SEGUIDAS:
-                break
-            filas.append(list(fila))
-            continue
-        hubo, vacias = True, 0
-        filas.append(list(fila))
-    while filas and all(c in (None, "") for c in filas[-1]):     # recorta el final vacio
-        filas.pop()
-    return filas
-
-
-def hoja_a_json(ws):
-    filas = leer_filas(ws)
-    if not filas:
-        return None
-    n_col = max((j for r in filas for j, c in enumerate(r, 1) if c not in (None, "")), default=0)
-    datos = [[valor(c) for c in (r + [None] * n_col)[:n_col]] for r in filas]
-    hdr = col_nombre = 0
-    for r in range(min(15, len(datos))):                           # fila de encabezados: la primera donde una celda empieza por NOMBRE
-        for c in range(n_col):
-            if isinstance(datos[r][c], str) and normalizar(datos[r][c]).startswith("NOMBRE") and not col_nombre:
-                col_nombre, hdr = c + 1, r + 1
-        if hdr:
-            break
-    vaciar = set()
-    if hdr:
-        for c in range(n_col):
-            t = normalizar(datos[hdr - 1][c]) if isinstance(datos[hdr - 1][c], str) else ""
-            if t in COLUMNAS_VACIAS or t.startswith("TELEFONO"):
-                vaciar.add(c + 1)
-    if hdr:
-        for r in range(hdr, len(datos)):
-            for c in range(n_col):
-                if (c + 1) in vaciar:
-                    datos[r][c] = ""
-                elif ANONIMIZAR and (c + 1) == col_nombre and isinstance(datos[r][c], str):
-                    datos[r][c] = "" if not datos[r][c].strip() else codigo(datos[r][c])
-    return {"nombre": ws.title, "rows": datos}
-
-
-def convertir(ruta, destino):
-    wb = load_workbook(ruta, data_only=True, read_only=True)
-    hojas = []
-    for ws in wb.worksheets:
-        if ws.sheet_state != "visible":
-            continue
-        h = hoja_a_json(ws)
-        if h:
-            hojas.append(h)
-    salida = {"version": 1, "archivo": os.path.basename(ruta), "generado": dt.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"), "hojas": hojas}
-    os.makedirs(os.path.dirname(destino) or ".", exist_ok=True)
-    with open(destino, "w", encoding="ascii") as f:
-        json.dump(salida, f, ensure_ascii=True, separators=(",", ":"))
-    filas = sum(len(h["rows"]) for h in hojas)
-    print("%s -> %s: %d hoja(s), %d filas, %d KB" % (os.path.basename(ruta), destino, len(hojas), filas, os.path.getsize(destino) // 1024))
-
-
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--control")
-    ap.add_argument("--consolidado")
-    ap.add_argument("--salida", default="datos")
-    a = ap.parse_args()
-    hecho = False
-    for ruta, nombre in ((a.control, "horas_control.json"), (a.consolidado, "horas_consolidado.json")):
-        if ruta and os.path.exists(ruta) and os.path.getsize(ruta) > 0:
-            convertir(ruta, os.path.join(a.salida, nombre))
-            hecho = True
-    if not hecho:
-        print("No se encontro ningun libro para convertir", file=sys.stderr)
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
+      - name: Guardar en el repositorio
+        run: |
+          git config user.name "actions-user"
+          git config user.email "actions@github.com"
+          git add datos/*.json
+          if git diff --staged --quiet; then echo "Sin cambios en las horas"; exit 0; fi
+          git commit -m "Horas actualizadas $(date -u +'%Y-%m-%d %H:%M')"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push
 
