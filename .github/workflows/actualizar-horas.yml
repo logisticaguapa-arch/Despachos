@@ -77,4 +77,3 @@ jobs:
           git commit -m "Horas actualizadas $(date -u +'%Y-%m-%d %H:%M')"
           git pull --rebase origin "${GITHUB_REF_NAME}"
           git push
-
