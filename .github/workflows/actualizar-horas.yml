@@ -42,33 +42,44 @@ jobs:
           ENLACE_CONSOLIDADO: ${{ secrets.ENLACE_CONSOLIDADO }}
         run: |
           set -e
+          es_excel () { head -c 2 "$1" | grep -q "PK"; }
+          intentar () {
+            # $1 = direccion, $2 = archivo de destino, $3 = descripcion del intento
+            info=$(curl -L -sS -o "$2" -c cookies.txt -b cookies.txt -w "%{http_code}|%{content_type}|%{url_effective}" "$1" || true)
+            codigo=$(echo "$info" | cut -d'|' -f1)
+            tipo=$(echo "$info" | cut -d'|' -f2)
+            host=$(echo "$info" | cut -d'|' -f3 | awk -F/ '{print $3}')
+            echo "Intento ($3): HTTP $codigo | tipo $tipo | servidor final $host | $(stat -c%s "$2") bytes"
+            es_excel "$2"
+          }
           descargar () {
             enlace="$1"; archivo="$2"
             if [ -z "$enlace" ]; then echo "Sin enlace para $archivo: se omite"; return 0; fi
+            # forma del enlace (sin datos sensibles): :x:/g/personal = enlace compartido; :x:/r/ = enlace con ruta; personal/... = ruta directa
+            echo "Forma del enlace de $archivo: /$(echo "$enlace" | cut -d/ -f4-6)"
             case "$enlace" in
               *download=1*) url="$enlace" ;;
               *\?*)         url="$enlace&download=1" ;;
               *)            url="$enlace?download=1" ;;
             esac
-            # -c/-b: conserva las cookies durante las redirecciones (los enlaces anonimos de SharePoint las necesitan)
-            info=$(curl -L -sS -o "$archivo" -c cookies.txt -b cookies.txt -w "%{http_code}|%{content_type}|%{url_effective}" "$url" || true)
-            codigo=$(echo "$info" | cut -d'|' -f1)
-            tipo=$(echo "$info" | cut -d'|' -f2)
-            host=$(echo "$info" | cut -d'|' -f3 | awk -F/ '{print $3}')
-            echo "Respuesta para $archivo: HTTP $codigo | tipo $tipo | servidor final $host | $(stat -c%s "$archivo") bytes"
-            # un Excel real empieza por "PK"; si llega otra cosa, se muestra que es
-            if ! head -c 2 "$archivo" | grep -q "PK"; then
-              titulo=$(grep -o -i '<title>[^<]*' "$archivo" | head -1 | sed 's/<[Tt][Ii][Tt][Ll][Ee]>//')
-              echo "Titulo de la pagina recibida: ${titulo:-ninguno}"
-              case "$host" in
-                *login.microsoftonline*|*login.live*|*login.windows*)
-                  echo "::error::El enlace de $archivo pide iniciar sesion en Microsoft: no es un enlace publico. Crea uno con Compartir > Cualquier persona con el enlace > Puede ver." ;;
-                *)
-                  echo "::error::El enlace de $archivo no devolvio un Excel (HTTP $codigo, $tipo). Revisa que sea un enlace de Compartir de tipo Cualquier persona con el enlace." ;;
-              esac
-              exit 1
+            if intentar "$url" "$archivo" "enlace con download=1"; then echo "Descargado $archivo correctamente"; return 0; fi
+            # Plan B: ruta de descarga directa de SharePoint para enlaces compartidos (/g/personal/... o /s/sitio/...)
+            alt=$(echo "$enlace" | sed -n -E 's#^(https?)://([^/]+)/:[a-z]:/g/personal/([^/]+)/([^/?]+).*#\1://\2/personal/\3/_layouts/15/download.aspx?share=\4#p')
+            [ -z "$alt" ] && alt=$(echo "$enlace" | sed -n -E 's#^(https?)://([^/]+)/:[a-z]:/s/([^/]+)/([^/?]+).*#\1://\2/sites/\3/_layouts/15/download.aspx?share=\4#p')
+            if [ -n "$alt" ]; then
+              if intentar "$alt" "$archivo" "descarga directa download.aspx"; then echo "Descargado $archivo correctamente"; return 0; fi
+            else
+              echo "No se pudo armar la ruta de descarga directa: el enlace no es del tipo compartido (/:x:/g/ o /:x:/s/)."
             fi
-            echo "Descargado $archivo correctamente"
+            titulo=$(grep -o -i '<title>[^<]*' "$archivo" | head -1 | sed 's/<[Tt][Ii][Tt][Ll][Ee]>//')
+            echo "Titulo de la pagina recibida: ${titulo:-ninguno}"
+            case "$host" in
+              *login.microsoftonline*|*login.live*|*login.windows*)
+                echo "::error::El enlace de $archivo pide iniciar sesion en Microsoft: no es publico. Usa Compartir > Cualquier persona con el vinculo > Puede ver." ;;
+              *)
+                echo "::error::SharePoint devolvio la pagina del visor y no el archivo. En Compartir > configuracion del vinculo elige 'Cualquier persona con el vinculo', 'Puede ver' y DESACTIVA 'Bloquear descarga'. Si no se puede, TI debe permitir la descarga en vinculos anonimos." ;;
+            esac
+            exit 1
           }
           descargar "$ENLACE_CONTROL" control.xlsx
           descargar "$ENLACE_CONSOLIDADO" consolidado.xlsx
