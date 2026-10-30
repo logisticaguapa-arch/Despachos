@@ -50,13 +50,25 @@ jobs:
               *\?*)         url="$enlace&download=1" ;;
               *)            url="$enlace?download=1" ;;
             esac
-            curl -L --fail --silent --show-error -o "$archivo" "$url"
-            # un Excel real empieza por "PK"; si llega una pagina de inicio de sesion, el enlace no es publico
+            # -c/-b: conserva las cookies durante las redirecciones (los enlaces anonimos de SharePoint las necesitan)
+            info=$(curl -L -sS -o "$archivo" -c cookies.txt -b cookies.txt -w "%{http_code}|%{content_type}|%{url_effective}" "$url" || true)
+            codigo=$(echo "$info" | cut -d'|' -f1)
+            tipo=$(echo "$info" | cut -d'|' -f2)
+            host=$(echo "$info" | cut -d'|' -f3 | awk -F/ '{print $3}')
+            echo "Respuesta para $archivo: HTTP $codigo | tipo $tipo | servidor final $host | $(stat -c%s "$archivo") bytes"
+            # un Excel real empieza por "PK"; si llega otra cosa, se muestra que es
             if ! head -c 2 "$archivo" | grep -q "PK"; then
-              echo "::error::El enlace de $archivo no devolvio un Excel. Revisa que sea 'Cualquier persona con el enlace puede ver'."
+              titulo=$(grep -o -i '<title>[^<]*' "$archivo" | head -1 | sed 's/<[Tt][Ii][Tt][Ll][Ee]>//')
+              echo "Titulo de la pagina recibida: ${titulo:-ninguno}"
+              case "$host" in
+                *login.microsoftonline*|*login.live*|*login.windows*)
+                  echo "::error::El enlace de $archivo pide iniciar sesion en Microsoft: no es un enlace publico. Crea uno con Compartir > Cualquier persona con el enlace > Puede ver." ;;
+                *)
+                  echo "::error::El enlace de $archivo no devolvio un Excel (HTTP $codigo, $tipo). Revisa que sea un enlace de Compartir de tipo Cualquier persona con el enlace." ;;
+              esac
               exit 1
             fi
-            echo "Descargado $archivo ($(stat -c%s "$archivo") bytes)"
+            echo "Descargado $archivo correctamente"
           }
           descargar "$ENLACE_CONTROL" control.xlsx
           descargar "$ENLACE_CONSOLIDADO" consolidado.xlsx
