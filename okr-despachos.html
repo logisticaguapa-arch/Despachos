@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OKR Despachos — Agrícola Guapa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<style>
+/* Mismo diseño del OKR de Cosecha: cabecera navy con pestañas, objetivo arriba con anillo, resultados clave en fila, análisis en tarjetas debajo */
+:root{
+  --bg:#F5F2EC; --panel:#FFFFFF; --ink:#0E2841; --muted:#5B6575; --line:#E3DCD1; --soft:#EFE8DD;
+  --navy:#0E2841; --orange:#C95B0A; --gold:#B88300; --brown:#7C411E; --sand:#E1D5C6;
+  --ok:#2E7D4F; --ok-bg:#E3F1E8; --warn:#A86A00; --warn-bg:#FBF0D9; --bad:#B3261E; --bad-bg:#FBE4E2;
+  --head-bg:#0E2841; --head-fg:#F5F2EC; --head-muted:#B9C2CF;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Barlow","Segoe UI",Arial,sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0B1522; --panel:#121F30; --ink:#E9EEF4; --muted:#9AA6B6; --line:#24344A; --soft:#1A2A3F;
+  --navy:#8FB3E0; --orange:#EE8A42; --gold:#E6B53C; --brown:#C98B62; --sand:#3A3022;
+  --ok:#5CC48A; --ok-bg:#163527; --warn:#E8B04B; --warn-bg:#3A2C10; --bad:#F2786F; --bad-bg:#3E1A18;
+  --head-bg:#07101B; --head-fg:#E9EEF4; --head-muted:#8C99AA; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--head-bg)}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{background:var(--head-bg);color:var(--head-fg)}
+header.top .wrap{padding-block:18px 0;display:flex;flex-direction:column;gap:14px}
+.brandrow{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-family:var(--f-display);letter-spacing:.14em;text-transform:uppercase;font-size:13px;color:var(--head-muted);font-weight:600}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,4vw,40px);line-height:1;margin:4px 0 0;letter-spacing:.01em}
+.right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.sync{font-size:13px;color:var(--head-muted);display:flex;align-items:center;gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--head-muted);display:inline-block}
+.dot.on{background:#5CC48A}
+.nav{display:flex;gap:8px;flex-wrap:wrap}
+.nav a{font-size:12.5px;font-weight:600;color:var(--head-fg);text-decoration:none;border:1px solid rgba(255,255,255,.22);padding:5px 12px;border-radius:99px;white-space:nowrap}
+.nav a:hover{background:rgba(255,255,255,.1)}
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tab{font-family:var(--f-display);font-size:16px;font-weight:600;letter-spacing:.03em;padding:10px 16px;border-radius:8px 8px 0 0;border:0;background:transparent;color:var(--head-muted);cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{background:var(--bg);color:var(--ink)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+main .wrap{padding-block:18px 48px;display:flex;flex-direction:column;gap:18px}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.filters label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600;display:flex;flex-direction:column;gap:3px}
+select,input[type=number],input[type=password]{font:inherit;font-size:14px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:0}
+.btn{font:inherit;font-weight:600;font-size:14px;border-radius:8px;padding:9px 16px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--orange);border-color:var(--orange);color:#fff}
+.btn.primary:hover{filter:brightness(1.07)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0}
+.card h2,.card h3{font-family:var(--f-display);font-weight:600;letter-spacing:.02em;margin:0;font-size:20px}
+.card .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.objective{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;border-left:6px solid var(--orange)}
+.objective .o-label{font-family:var(--f-display);font-size:13px;letter-spacing:.14em;color:var(--orange);font-weight:700;text-transform:uppercase}
+.objective h2{font-size:clamp(22px,2.6vw,28px);line-height:1.15;margin-top:4px;text-wrap:balance}
+.takeaway{margin-top:8px;color:var(--ink);max-width:72ch}
+.ometa{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:var(--muted)}
+.ring{width:118px;height:118px;position:relative;flex:none}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .val b{font-family:var(--f-display);font-size:28px;font-weight:700;line-height:1}
+.ring .val span{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;white-space:nowrap}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.na{background:var(--soft);color:var(--muted)}
+.krs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.kr{display:flex;flex-direction:column;gap:10px;position:relative}
+.kr .krhead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.kr .kmeta{margin-top:6px;display:inline-block;font-size:13.5px;color:var(--ink);background:var(--soft);border-left:3px solid var(--orange);padding:4px 10px;border-radius:4px;line-height:1.35}
+.kr .kmeta b{color:var(--orange)}
+.kr .krid{font-family:var(--f-display);font-weight:700;font-size:13px;letter-spacing:.12em;color:var(--muted)}
+.kr h3{font-size:18px;line-height:1.2;margin-top:2px}
+.kr .big{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.kr .big b{font-family:var(--f-display);font-size:46px;font-weight:700;line-height:1}
+.kr .big .unit{color:var(--muted);font-size:15px}
+.kr .delta{font-size:13px;font-weight:600}
+.delta.good{color:var(--ok)} .delta.badd{color:var(--bad)} .delta.flat{color:var(--muted)}
+.prog{position:relative;height:10px;border-radius:99px;background:var(--soft);overflow:visible}
+.prog .fill{position:absolute;inset:0 auto 0 0;border-radius:99px;background:var(--orange)}
+.prog .mk{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);right:0}
+.gap{font-size:13px;font-weight:600}
+.progl{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.kr .foot{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px;flex-wrap:wrap}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px}
+.sechead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:6px}
+.sechead h2{font-family:var(--f-display);font-size:22px;margin:0;font-weight:700;letter-spacing:.02em}
+.sechead p{margin:0;color:var(--muted);font-size:13px}
+.chartbox{position:relative;height:230px;margin-top:10px}
+.tbl{overflow-x:auto;margin-top:10px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);text-align:left;font-weight:600;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n,th.n{text-align:right}
+tr.nofn td{color:var(--muted)}
+.empty{color:var(--muted);font-size:14px;padding:22px 0;text-align:center}
+details.card summary{cursor:pointer;font-family:var(--f-display);font-size:19px;font-weight:600;letter-spacing:.02em;list-style:none;display:flex;justify-content:space-between;align-items:center}
+details.card summary::-webkit-details-marker{display:none}
+details.card summary::after{content:"+";font-size:22px;color:var(--muted)}
+details[open].card summary::after{content:"–"}
+.ficha{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;margin-top:14px}
+.ficha dt{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--orange);font-weight:700}
+.ficha dd{margin:4px 0 0}
+.ficha ul{margin:4px 0 0;padding-left:18px}
+.metas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px;margin-top:14px}
+.metas label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.note{font-size:12.5px;color:var(--muted)}
+.msg{padding:10px 12px;border-radius:8px;font-size:13.5px}
+.msg.bad{background:var(--bad-bg);color:var(--bad)} .msg.warn{background:var(--warn-bg);color:var(--warn)}
+#lockScreen{position:fixed;inset:0;background:var(--head-bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+.lock-card{background:var(--panel);color:var(--ink);border-radius:14px;padding:28px 30px;max-width:380px;width:100%;text-align:center}
+.lock-card h2{font-family:var(--f-display);font-size:26px;margin:0 0 6px}
+.lock-card p{color:var(--muted);font-size:14px;margin:0 0 14px}
+.lock-card input{width:100%;margin-bottom:10px}
+#passError{display:none;color:var(--bad);font-size:13px;margin-top:8px}
+@media (max-width:560px){.objective{grid-template-columns:1fr}.ring{justify-self:start}}
+@media (prefers-reduced-motion:no-preference){.prog .fill{transition:width .6s ease}}
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <div class="lock-card">
+    <div style="font-size:2rem">🔒</div>
+    <h2>OKR Despachos</h2>
+    <p>Acceso restringido. Ingresa la contraseña para continuar.</p>
+    <input type="password" id="passInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkPass()">
+    <button class="btn primary" style="width:100%" onclick="checkPass()">Ingresar</button>
+    <div id="passError">Contraseña incorrecta, intenta de nuevo.</div>
+  </div>
+</div>
+
+<div id="mainContent" hidden>
+<header class="top">
+  <div class="wrap">
+    <div class="brandrow">
+      <div>
+        <div class="eyebrow">Agrícola Guapa · Despachos</div>
+        <h1>OKR Despachos</h1>
+      </div>
+      <div class="right">
+        <div class="sync"><span class="dot" id="syncDot"></span><span id="syncTxt">Conectando…</span></div>
+        <nav class="nav">
+          <a href="resultados.html">📊 Resultados</a>
+          <a href="kpi-cumplimiento-entrega.html">📦 Entregas</a>
+          <a href="costos.html">💰 Costos</a>
+          <a href="index.html">← Tablero en vivo</a>
+        </nav>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="OKR de despachos">
+      <button class="tab" role="tab" aria-selected="true">1 · Despachos eficientes, puntuales y de bajo costo</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+
+  <div class="toolbar">
+    <div class="filters">
+      <label for="selModo">Vista<select id="selModo"><option value="w">Semana</option><option value="m">Mes</option></select></label>
+      <label for="selPeriodo" id="lblPeriodo">Semana evaluada<select id="selPeriodo"><option>—</option></select></label>
+    </div>
+    <span class="note" id="fuenteTxt">—</span>
+  </div>
+
+  <div id="avisos"></div>
+
+  <div class="card objective">
+    <div>
+      <div class="o-label">Objetivo · Despachos 2026</div>
+      <h2>Despachar a tiempo, completo y a bajo costo: más kilos por hora de trabajo y un costo por kg por debajo del tope</h2>
+      <p class="note" style="margin:2px 0 8px" id="objDesc">—</p>
+      <p class="takeaway" id="takeaway">Cargando…</p>
+      <div class="ometa"><span id="oPeriodo">Período —</span></div>
+    </div>
+    <div class="ring" aria-label="Cumplimiento del objetivo">
+      <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="var(--soft)" stroke-width="12"/><circle id="ringArc" cx="60" cy="60" r="50" fill="none" stroke="var(--orange)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 400"/></svg>
+      <div class="val"><b id="ringVal">—</b><span>cumplimiento</span></div>
+    </div>
+  </div>
+
+  <div class="krs" id="krs"></div>
+
+  <div class="sechead"><h2>Tendencia</h2><p id="tendSub">—</p></div>
+  <div class="grid3">
+    <div class="card"><h3>KR1 · Kg por hora por hombre</h3><div class="chartbox"><canvas id="chKR1"></canvas></div></div>
+    <div class="card"><h3>KR2 · OTIF</h3><div class="chartbox"><canvas id="chKR2"></canvas></div></div>
+    <div class="card"><h3>KR3 · Costo por kg (días ordinarios)</h3><div class="chartbox"><canvas id="chKR3"></canvas></div></div>
+  </div>
+
+  <div class="card">
+    <h3>Detalle del período, día por día</h3>
+    <div class="sub" id="detSub">—</div>
+    <div class="tbl"><table id="tbDet"><thead><tr>
+      <th>Día</th><th class="n">Vehículos</th><th class="n">Kg cargados</th><th class="n">KR1 · Kg/h/hombre</th><th class="n">KR2 · OTIF</th><th class="n">Pedidos</th><th class="n">KR3 · Costo/kg</th><th>Costo/kg se cuenta?</th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+
+  <details class="card">
+    <summary>Metas del OKR</summary>
+    <div class="metas">
+      <label>KR1 · Kg por hora por hombre (mínimo)<input type="number" id="mKr1" min="1" step="1"></label>
+      <label>KR2 · OTIF % (mínimo)<input type="number" id="mKr2" min="1" max="100" step="0.5"></label>
+      <label>KR3 · Costo por kg $ (máximo)<input type="number" id="mKr3" min="1" step="0.5"></label>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn primary" type="button" onclick="guardarMetas()">Guardar metas</button><span class="note" id="metasMsg">Se guardan en este navegador.</span></div>
+  </details>
+
+  <details class="card">
+    <summary>Ficha del OKR · resultados clave, reglas y fuentes</summary>
+    <dl class="ficha">
+      <div><dt>Resultados clave</dt><dd><ul>
+        <li><b>KR1</b> Kg por hora por hombre: kg cargados ÷ (horas de cargue neto) ÷ personas de la cuadrilla, promedio por vehículo cargado. Meta: <b>mínimo 700</b>.</li>
+        <li><b>KR2</b> OTIF: pedidos entregados <b>a tiempo y completos</b> ÷ pedidos evaluados. «Completo» = kg cargados ≥ 99 % de los kg de la OC. Meta: <b>mínimo 95 %</b>.</li>
+        <li><b>KR3</b> Costo de mano de obra por kg: costo del día ÷ kg despachados, en <b>días ordinarios</b> (sin domingos ni festivos). En un período se divide el costo total entre los kg totales de esos días. Meta: <b>máximo $ 25 por kg</b>.</li>
+      </ul></dd></div>
+      <div><dt>Reglas</dt><dd><ul>
+        <li>Cumplimiento de cada KR: kg/h/hombre y OTIF = valor ÷ meta (tope 100 %); costo por kg = 100 % si está dentro de la meta y meta ÷ valor si la supera.</li>
+        <li>Cumplimiento del objetivo: promedio del cumplimiento de los resultados clave con datos.</li>
+        <li>El costo por kg no se calcula en domingos, festivos ni en días con horas incompletas o sin registro.</li>
+        <li>Seguimiento semanal; revisión mensual.</li>
+      </ul></dd></div>
+      <div><dt>Fuentes</dt><dd><ul>
+        <li>KR1 y KR2: hoja SYOP de despachos (columnas de kilos cargados, cargue, personas y entrega a tiempo), las mismas de los tableros de Resultados y de Entregas.</li>
+        <li>KR3: horas reales del control de horas (solo código de labor de despacho), valoradas en <b>Costos</b>, entre los kg despachados del SYOP.</li>
+      </ul></dd></div>
+      <div><dt>Responsables</dt><dd><ul><li>Por definir.</li></ul></dd></div>
+    </dl>
+  </details>
+
+</div>
+</main>
+</div>
+
+<script>
+Chart.register(ChartDataLabels);
+/* ===== CONTRASEÑA ===== */
+var CLAVE_ACCESO='GuapaSYOP2026';
+function checkPass(){
+  if(document.getElementById('passInput').value===CLAVE_ACCESO){sessionStorage.setItem('okrUnlocked','1');unlock();}
+  else document.getElementById('passError').style.display='block';
+}
+function unlock(){
+  document.getElementById('lockScreen').style.display='none';
+  document.getElementById('mainContent').hidden=false;
+  iniciar();
+}
+
+/* ===== DATOS: mismo CSV y columnas que los demás tableros ===== */
+var CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRvNCexnvVrxlmbEX7KfW_WU8ffv6rflw-VjIzUgN3PHINWvDwIwdm9TYhaUkCMgp0lNG6OHDLgxDAC/pub?output=csv';
+var C={FECHA:0,OC:1,REMISION:2,DESTINO:3,KG_OC:4,CANT:5,PCT:6,CLIENTE:7,PLACAS:8,H_OC:9,H_CITA:10,H_LLE:11,H_SALIDA:12,H_INI:13,H_FIN:14,STATUS:15,OBS:16,HS:17,MIN:18,KGMIN:19,EMP:20,MUE:21,CUA:22,PER:23,ENTREGA_TIEMPO:33};
+var OKR_INICIO='2026-01-01';          // el OKR cuenta desde esta fecha
+var OTIF_COMPLETO_MIN=99;             // "completo": kg cargados >= 99 % de los kg de la OC
+var MIN_MINUTOS_VALIDOS=1;
+var METAS={kr1:700,kr2:95,kr3:25};
+try{var gm=JSON.parse(localStorage.getItem('okrDespachosMetasV1')||'null');if(gm){METAS.kr1=+gm.kr1||METAS.kr1;METAS.kr2=+gm.kr2||METAS.kr2;METAS.kr3=+gm.kr3||METAS.kr3;}}catch(e){}
+
+var allData=[], DIAS={}, HORAS=null, modo='w', selK=null, charts={}, reintentos=0, ultimaCarga=null;
+
+function pad(n){return n<10?'0'+n:''+n;}
+function toNum(v){if(!v)return 0;var s=v.toString().replace(/"/g,'').replace('%','').trim();s=s.replace(/\./g,'').replace(',','.');var n=parseFloat(s);return isNaN(n)?0:n;}
+function timeToMin(t){if(!t)return null;var s=(t+'').trim();var m12=s.match(/(\d+):(\d+)(?::\d+)?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i);if(m12){var h=parseInt(m12[1]),mi=parseInt(m12[2]),ap=m12[3].toLowerCase().charAt(0);if(ap==='p'&&h<12)h+=12;if(ap==='a'&&h===12)h=0;return h*60+mi;}var p=s.split(':');if(p.length>=2){var hh=parseInt(p[0]),mm=parseInt(p[1]);if(!isNaN(hh)&&!isNaN(mm))return hh*60+mm;}return null;}
+function parseFecha(s){var p=(s||'').split('/');if(p.length===3){var d=parseInt(p[0]),m=parseInt(p[1]),y=parseInt(p[2]);if(y<100)y+=2000;if(d&&m&&y)return new Date(y,m-1,d);}return null;}
+function isoOf(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function isoWeekKey(d){var t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));var dn=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-dn);var y=t.getUTCFullYear();var w=Math.ceil((((t-new Date(Date.UTC(y,0,1)))/86400000)+1)/7);return y+'-W'+pad(w);}
+function weekStartUTC(key){var y=+key.slice(0,4),w=+key.slice(6);var j4=new Date(Date.UTC(y,0,4));var dn=j4.getUTCDay()||7;var mon=new Date(j4);mon.setUTCDate(j4.getUTCDate()-dn+1+(w-1)*7);return mon;}
+function fmtDM(d){return pad(d.getUTCDate())+'/'+pad(d.getUTCMonth()+1);}
+var MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+var DIAS_ES=['dom','lun','mar','mié','jue','vie','sáb'];
+function perLabel(k){
+  if(modo==='m')return MESES[+k.slice(5,7)-1]+' '+k.slice(0,4);
+  var s=weekStartUTC(k),e=new Date(s);e.setUTCDate(s.getUTCDate()+6);return 'Semana '+(+k.slice(6))+' ('+fmtDM(s)+' – '+fmtDM(e)+')';
+}
+function perShort(k){return modo==='m'?MESES[+k.slice(5,7)-1].slice(0,3):'S'+(+k.slice(6));}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function avg(a){a=a.filter(function(x){return x!==null&&x!==undefined&&!isNaN(x);});return a.length?a.reduce(function(x,y){return x+y;},0)/a.length:null;}
+
+function parseCSV(txt){
+  var lines=txt.trim().split('\n');if(lines.length<2)return[];
+  return lines.slice(1).map(function(line){
+    var cols=[],cur='',inQ=false;
+    for(var i=0;i<line.length;i++){var ch=line[i];if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){cols.push(cur.trim());cur='';}else{cur+=ch;}}
+    cols.push(cur.trim());return cols;
+  }).filter(function(r){
+    var oc=(r[C.OC]||'').replace(/"/g,'').trim();if(!oc)return false;
+    var lo=oc.toLowerCase();
+    return lo!=='oc'&&lo.indexOf('cargue')<0&&lo.indexOf('minutos')<0&&lo.indexOf('empaque')<0&&lo.indexOf('fecha')<0;
+  });
+}
+function isCargado(s){return (s||'').toLowerCase().trim()==='cargado';}
+
+/* KR1: kg por hora por hombre de un vehículo cargado (misma fórmula del tablero de Resultados) */
+function klHoraHombre(r){
+  var kg=toNum(r[C.CANT]),personas=toNum(r[C.PER]);
+  var ini=timeToMin(r[C.H_INI]),fin=timeToMin(r[C.H_FIN]),minRaw=toNum(r[C.MIN]);
+  var minutos=minRaw>0?minRaw:((ini!==null&&fin!==null&&fin>ini)?(fin-ini):null);
+  if(minutos===null||minutos<MIN_MINUTOS_VALIDOS||!(personas>0)) return null;
+  return (kg/(minutos/60))/personas;
+}
+/* KR2: OTIF (misma definición del tablero de Entregas) */
+function esATiempo(r){var v=(r[C.ENTREGA_TIEMPO]||'').trim().toUpperCase();return v==='SI'?true:(v==='NO'?false:null);}
+function esCompleto(r){var oc=toNum(r[C.KG_OC]);if(oc<=0)return null;return (toNum(r[C.CANT])/oc*100)>=OTIF_COMPLETO_MIN;}
+
+function armarDias(){
+  DIAS={};
+  allData.forEach(function(r){
+    var d=parseFecha(r[C.FECHA]);if(!d)return;
+    var iso=isoOf(d);if(iso<OKR_INICIO)return;
+    var x=DIAS[iso]||(DIAS[iso]={iso:iso,wk:isoWeekKey(d),mk:iso.slice(0,7),veh:0,kg:0,khs:[],oN:0,oOk:0});
+    x.veh++;
+    if(isCargado(r[C.STATUS])){x.kg+=toNum(r[C.CANT]);var k=klHoraHombre(r);if(k!==null)x.khs.push(k);}
+    var t=esATiempo(r),c=esCompleto(r);
+    if(t!==null&&c!==null){x.oN++;if(t&&c)x.oOk++;}
+  });
+}
+
+/* KR3: ¿el día cuenta para el costo por kg? Solo días ordinarios con horas completas */
+function costoDia(iso){
+  var d=DIAS[iso],h=HORAS&&HORAS.dias?HORAS.dias[iso]:null,dow=new Date(iso+'T00:00:00').getDay();
+  if(dow===0)return {ok:false,motivo:'Domingo'};
+  if(!HORAS)return {ok:false,motivo:'Horas sin cargar'};
+  if(!h)return {ok:false,motivo:'Sin horas'};
+  if(h.f)return {ok:false,motivo:'Festivo'};
+  if(h.c===undefined)return {ok:false,motivo:'Falta actualizar Costos'};
+  if(h.i)return {ok:false,motivo:'Horas incompletas'};
+  if(!(h.c>0)||!(d.kg>0))return {ok:false,motivo:'Sin kg o sin costo'};
+  return {ok:true,c:h.c,kg:d.kg,v:h.c/d.kg};
+}
+function agg(isos){
+  var khs=[],oN=0,oOk=0,veh=0,kg=0,cS=0,kS=0,dEl=0;
+  isos.forEach(function(iso){
+    var d=DIAS[iso];veh+=d.veh;kg+=d.kg;d.khs.forEach(function(v){khs.push(v);});oN+=d.oN;oOk+=d.oOk;
+    var e=costoDia(iso);if(e.ok){cS+=e.c;kS+=e.kg;dEl++;}
+  });
+  return {kr1:khs.length?avg(khs):null,kr2:oN?oOk/oN*100:null,kr3:kS>0?cS/kS:null,veh:veh,kg:kg,oN:oN,dEl:dEl,nTrucks:khs.length};
+}
+function periodos(){
+  var m={};Object.keys(DIAS).forEach(function(iso){var k=modo==='w'?DIAS[iso].wk:DIAS[iso].mk;(m[k]=m[k]||[]).push(iso);});
+  return Object.keys(m).sort().map(function(k){return {k:k,isos:m[k].sort()};});
+}
+
+/* ===== Cumplimiento y estado (mismas reglas del OKR de Cosecha) ===== */
+function cumpl(v,meta,higher){if(v===null||v===undefined)return null;if(higher)return Math.max(0,Math.min(1,meta?v/meta:1));if(v<=meta)return 1;return Math.max(0,meta/v);}
+function status(v,meta,higher){if(v===null||v===undefined)return 'na';return (higher?v>=meta:v<=meta)?'ok':'bad';}
+var ST_TXT={ok:'Cumple',bad:'No cumple',na:'Sin datos'};
+function fInt(v){return v===null?'—':Math.round(v).toLocaleString('es-CO');}
+function f1(v){return v===null?'—':v.toLocaleString('es-CO',{minimumFractionDigits:1,maximumFractionDigits:1});}
+function krDefs(cur){
+  return [
+    {id:'KR1',key:'kr1',title:'Kg por hora por hombre',unit:'kg/h por hombre',higher:true,meta:METAS.kr1,fmt:fInt,eps:5,metaTxt:'mínimo '+fInt(METAS.kr1)+' kg/h por hombre',extra:cur.nTrucks+' vehículos con dato',short:'Kg/h por hombre'},
+    {id:'KR2',key:'kr2',title:'OTIF: a tiempo y completo',unit:'%',higher:true,meta:METAS.kr2,fmt:f1,eps:0.5,metaTxt:'mínimo '+f1(METAS.kr2).replace(/,0$/,'')+'%',extra:cur.oN+' pedidos evaluados',short:'OTIF'},
+    {id:'KR3',key:'kr3',title:'Costo de mano de obra por kg',unit:'$ por kg',higher:false,meta:METAS.kr3,fmt:f1,eps:0.2,metaTxt:'máximo $ '+f1(METAS.kr3).replace(/,0$/,'')+' por kg',sfx:'· días ordinarios (sin domingos ni festivos)',extra:cur.dEl+' días ordinarios con costo',short:'Costo por kg'}
+  ];
+}
+
+function krCard(k,cur,prev,a4,curLbl,prevLbl){
+  var v=cur[k.key],pv=prev?prev[k.key]:null;
+  var st=status(v,k.meta,k.higher),c=cumpl(v,k.meta,k.higher);
+  var dTxt='Sin período anterior',dCls='flat';
+  if(v!==null&&pv!==null){var d=v-pv;var good=k.higher?d>0:d<0;dCls=Math.abs(d)<k.eps?'flat':(good?'good':'badd');dTxt=(d>0?'+':(d<0?'−':'±'))+k.fmt(Math.abs(d))+' '+k.unit+' vs '+prevLbl;}
+  var gap='';
+  if(v!==null){var g=k.higher?k.meta-v:v-k.meta;
+    gap=st==='ok'?'<span class="gap" style="color:var(--ok)">Dentro de la meta'+(g<0?' por '+k.fmt(-g)+' '+k.unit:'')+'</span>':'<span class="gap" style="color:var(--bad)">'+(k.higher?'Faltan ':'Sobran ')+k.fmt(g)+' '+k.unit+' para cumplir</span>';}
+  var col=st==='ok'?'var(--ok)':(st==='bad'?'var(--bad)':'var(--muted)');
+  var el=document.createElement('article');el.className='card kr';el.id='okr-'+k.key;
+  el.innerHTML='<div class="krhead"><div><div class="krid">'+k.id+'</div><h3>'+esc(k.title)+'</h3><div class="kmeta">Meta: <b>'+esc(k.metaTxt)+'</b> '+esc(k.sfx||'')+'</div></div><span class="pill '+st+'">'+ST_TXT[st]+'</span></div>'
+   +'<div class="big"><b style="color:'+col+'">'+k.fmt(v)+'</b><span class="unit">'+esc(k.unit)+' · '+esc(curLbl)+'</span></div>'
+   +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">'+gap+'<span class="delta '+dCls+'">'+esc(dTxt)+'</span></div>'
+   +'<div><div class="prog" role="img" aria-label="Cumplimiento '+(c===null?'sin datos':Math.round(c*100)+'%')+'"><div class="fill" style="width:'+(c===null?0:c*100)+'%;background:'+col+'"></div><div class="mk" title="Meta"></div></div>'
+   +'<div class="progl" style="margin-top:4px"><span><b>'+(c===null?'—':Math.round(c*100)+'%')+'</b> de cumplimiento</span></div></div>'
+   +'<div class="foot"><span>Promedio últimos '+a4.n+' '+(modo==='m'?'meses':'semanas')+': <b>'+k.fmt(a4[k.key])+' '+esc(k.unit)+'</b></span><span>'+esc(k.extra)+'</span></div>';
+  return el;
+}
+
+function render(){
+  armarDias();
+  var P=periodos();
+  var box=document.getElementById('krs');
+  if(!P.length){box.innerHTML='<div class="card empty" style="grid-column:1/-1">Todavía no hay despachos desde '+OKR_INICIO+'.</div>';return;}
+  if(!selK||!P.some(function(p){return p.k===selK;}))selK=P[P.length-1].k;
+  var sel=document.getElementById('selPeriodo'),hoy=new Date(),kHoy=modo==='w'?isoWeekKey(hoy):isoOf(hoy).slice(0,7);
+  sel.innerHTML=P.slice().reverse().map(function(p){return '<option value="'+p.k+'">'+esc(perLabel(p.k))+(p.k===kHoy?' (en curso)':'')+'</option>';}).join('');
+  sel.value=selK;
+  document.getElementById('lblPeriodo').firstChild.textContent=modo==='w'?'Semana evaluada':'Mes evaluado';
+
+  var i=P.findIndex(function(p){return p.k===selK;});
+  var cur=agg(P[i].isos),prev=i>0?agg(P[i-1].isos):null;
+  var ult=P.slice(Math.max(0,i-3),i+1).map(function(p){return agg(p.isos);});
+  var a4={n:ult.length,kr1:avg(ult.map(function(x){return x.kr1;})),kr2:avg(ult.map(function(x){return x.kr2;})),kr3:avg(ult.map(function(x){return x.kr3;}))};
+  var curLbl=perLabel(selK),prevLbl=i>0?perLabel(P[i-1].k).replace(/ \(.*\)/,''):'';
+  var defs=krDefs(cur);
+
+  box.innerHTML='';defs.forEach(function(k){box.appendChild(krCard(k,cur,prev,a4,curLbl.replace(/ \(.*\)/,''),prevLbl));});
+
+  // objetivo: anillo = promedio del cumplimiento de los KR con datos
+  var cs=defs.map(function(k){return cumpl(cur[k.key],k.meta,k.higher);}).filter(function(x){return x!==null;});
+  var pct=cs.length?Math.round(avg(cs)*100):null;
+  document.getElementById('ringVal').textContent=pct===null?'—':pct+'%';
+  document.getElementById('ringArc').setAttribute('stroke-dasharray',(pct===null?0:pct/100*314.16)+' 400');
+  var ev=defs.filter(function(k){return cur[k.key]!==null;}),ok=ev.filter(function(k){return status(cur[k.key],k.meta,k.higher)==='ok';});
+  var faltan=ev.filter(function(k){return status(cur[k.key],k.meta,k.higher)!=='ok';}).map(function(k){return k.id+' ('+k.fmt(cur[k.key])+' vs '+(k.higher?'mín. ':'máx. ')+k.fmt(k.meta).replace(/,0$/,'')+')';});
+  var t=curLbl+': ';
+  t+=ev.length?(ok.length+' de '+ev.length+' resultados clave cumplen la meta.'+(faltan.length?' Por mejorar: '+faltan.join('; ')+'.':' ¡Todos en meta!')):'sin datos suficientes todavía.';
+  var sinKR3=cur.kr3===null?' El costo por kg no tiene días ordinarios con horas completas en este período.':'';
+  document.getElementById('takeaway').textContent=t+sinKR3;
+  document.getElementById('oPeriodo').textContent='Período 2026 · '+curLbl;
+  document.getElementById('objDesc').textContent='Alcanzar al menos '+fInt(METAS.kr1)+' kg por hora por hombre, un OTIF de '+f1(METAS.kr2).replace(/,0$/,'')+'% y un costo de mano de obra menor a $ '+f1(METAS.kr3).replace(/,0$/,'')+' por kg en días ordinarios (sin domingos ni festivos).';
+
+  renderTendencia(P,i,defs);
+  renderDetalle(P[i],defs);
+  renderAvisos();
+  document.getElementById('mKr1').value=METAS.kr1;document.getElementById('mKr2').value=METAS.kr2;document.getElementById('mKr3').value=METAS.kr3;
+}
+
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+function renderTendencia(P,i,defs){
+  var from=Math.max(0,i-7),sub=P.slice(from,i+1);
+  document.getElementById('tendSub').textContent='Últimos '+sub.length+' '+(modo==='m'?'meses':'semanas')+' hasta '+perLabel(selK).replace(/ \(.*\)/,'')+' · línea punteada = meta';
+  var labels=sub.map(function(p){return perShort(p.k);}),ink=cssVar('--ink')||'#0E2841',mut=cssVar('--muted')||'#5B6575',line=cssVar('--line')||'#E3DCD1';
+  Chart.defaults.font.family='Barlow, Segoe UI, Arial, sans-serif';
+  var data=sub.map(function(p){return agg(p.isos);});
+  defs.forEach(function(k){
+    var id='ch'+k.id,vals=data.map(function(x){var v=x[k.key];return v===null?null:(k.key==='kr1'?Math.round(v):Math.round(v*10)/10);});
+    if(charts[id]){charts[id].destroy();delete charts[id];}
+    var cols=vals.map(function(v){return status(v,k.meta,k.higher)==='ok'?(cssVar('--ok')||'#2E7D4F'):(cssVar('--bad')||'#B3261E');});
+    var all=vals.filter(function(v){return v!==null;}).concat([k.meta]),mn=Math.min.apply(null,all),mx=Math.max.apply(null,all),pad=(mx-mn)*0.25||1;
+    charts[id]=new Chart(document.getElementById(id),{
+      type:'line',
+      data:{labels:labels,datasets:[
+        {label:k.short,data:vals,borderColor:cssVar('--orange')||'#C95B0A',backgroundColor:cssVar('--orange')||'#C95B0A',pointBackgroundColor:cols,pointBorderColor:cols,pointRadius:5,borderWidth:2.5,tension:0.25,spanGaps:true,
+          datalabels:{align:'top',anchor:'end',offset:4,color:ink,font:{weight:'bold',size:12},formatter:function(v){return v===null?'':(k.key==='kr1'?fInt(v):f1(v));}}},
+        {label:'Meta',data:labels.map(function(){return k.meta;}),borderColor:mut,borderDash:[6,5],pointRadius:0,borderWidth:1.5,datalabels:{display:false}}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:22,right:8}},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.raw===null?'—':(k.key==='kr1'?fInt(c.raw):f1(c.raw))+' '+k.unit);}}}},
+        scales:{x:{ticks:{color:mut},grid:{display:false}},y:{min:Math.floor(Math.max(0,mn-pad)),max:Math.ceil(mx+pad),ticks:{color:mut,precision:0},grid:{color:line}}}}
+    });
+  });
+}
+
+function renderDetalle(per,defs){
+  var tb=document.querySelector('#tbDet tbody');
+  document.getElementById('detSub').textContent=perLabel(per.k)+' · cada día con su valor de cada resultado clave. En KR3 se indica por qué un día no cuenta.';
+  var m1=defs[0].meta,m2=defs[1].meta,m3=defs[2].meta;
+  tb.innerHTML=per.isos.map(function(iso){
+    var d=DIAS[iso],dt=new Date(iso+'T00:00:00'),k1=d.khs.length?avg(d.khs):null,k2=d.oN?d.oOk/d.oN*100:null,e=costoDia(iso);
+    var pill=function(v,meta,higher,txt){var s=status(v,meta,higher);return '<span class="pill '+(s==='na'?'na':s)+'">'+txt+'</span>';};
+    var tag=dt.getDay()===0?' · domingo':((HORAS&&HORAS.dias&&HORAS.dias[iso]&&HORAS.dias[iso].f)?' · festivo':'');
+    return '<tr'+(e.ok?'':' class="nofn"')+'><td><b>'+DIAS_ES[dt.getDay()]+' '+pad(dt.getDate())+'/'+pad(dt.getMonth()+1)+'</b>'+tag+'</td>'
+      +'<td class="n">'+d.veh+'</td><td class="n">'+(d.kg/1000).toLocaleString('es-CO',{minimumFractionDigits:1,maximumFractionDigits:1})+' T</td>'
+      +'<td class="n">'+pill(k1,m1,true,fInt(k1))+'</td>'
+      +'<td class="n">'+pill(k2,m2,true,k2===null?'—':f1(k2)+'%')+'</td><td class="n">'+d.oN+'</td>'
+      +'<td class="n">'+(e.ok?pill(e.v,m3,false,'$ '+f1(e.v)):'<span class="pill na">—</span>')+'</td>'
+      +'<td>'+(e.ok?'Sí':esc(e.motivo))+'</td></tr>';
+  }).join('')||'<tr><td colspan="8" class="empty">Sin días</td></tr>';
+}
+
+function renderAvisos(){
+  var a='';
+  if(!HORAS)a+='<div class="msg warn">KR3 sin datos: aún no hay horas cargadas en este navegador. Abre <a href="costos.html" target="_blank">Costos</a> una vez, o espera la sincronización automática.'+(horasSync.msg?' ('+esc(horasSync.msg)+')':'')+'</div>';
+  else if(HORAS.hayCosto===false)a+='<div class="msg warn">Las horas guardadas no traen el costo del día. Sube la versión nueva de <b>costos.html</b> y ábrela una vez.</div>';
+  document.getElementById('avisos').innerHTML=a;
+  var f=document.getElementById('fuenteTxt');
+  f.textContent='SYOP '+(ultimaCarga?'actualizado '+ultimaCarga.toLocaleTimeString('es-CO'):'—')+' · horas '+(HORAS&&HORAS.ts?'del '+fmtTs(HORAS.ts):'sin cargar');
+}
+function fmtTs(ts){var d=new Date(ts);return pad(d.getDate())+'/'+pad(d.getMonth()+1)+' '+pad(d.getHours())+':'+pad(d.getMinutes());}
+
+/* ===== Metas ===== */
+function guardarMetas(){
+  var a=+document.getElementById('mKr1').value,b=+document.getElementById('mKr2').value,c=+document.getElementById('mKr3').value;
+  if(!(a>0&&b>0&&c>0)){document.getElementById('metasMsg').textContent='Revisa los valores: deben ser números mayores que cero.';return;}
+  METAS={kr1:a,kr2:b,kr3:c};
+  try{localStorage.setItem('okrDespachosMetasV1',JSON.stringify(METAS));}catch(e){}
+  document.getElementById('metasMsg').textContent='Metas guardadas en este navegador.';
+  render();
+}
+
+/* ===== Horas y costo diario: las publica costos.html (se lee en modo oculto, sin pedir nada) ===== */
+var horasSync={ok:null,msg:''};
+function leerHoras(){
+  try{var o=JSON.parse(localStorage.getItem('horasDiaV1')||'null');
+    if(o&&o.dias){var any=Object.keys(o.dias).some(function(k){return o.dias[k].c!==undefined;});o.hayCosto=any;return o;}}catch(e){}
+  return null;
+}
+function sincronizarHoras(){
+  var v=document.getElementById('ifrHoras');if(v&&v.parentNode)v.parentNode.removeChild(v);
+  var f=document.createElement('iframe');f.id='ifrHoras';f.style.display='none';f.setAttribute('aria-hidden','true');
+  f.src='costos.html?sync=1&t='+Date.now();document.body.appendChild(f);
+}
+window.addEventListener('message',function(e){
+  if(e.origin!==location.origin||!e.data||e.data.tipo!=='horas-sincronizadas')return;
+  horasSync={ok:!!e.data.ok,msg:e.data.msg||''};
+  var f=document.getElementById('ifrHoras');if(f&&f.parentNode)f.parentNode.removeChild(f);
+  HORAS=leerHoras();if(allData.length)render();
+});
+
+async function cargar(){
+  try{
+    var res=await fetch(CSV_URL+'&t='+Date.now());
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    var txt=await res.text();if(!txt||!txt.trim())throw new Error('Respuesta vacía');
+    allData=parseCSV(txt);reintentos=0;ultimaCarga=new Date();
+    document.getElementById('syncDot').classList.add('on');document.getElementById('syncTxt').textContent='Datos al día · '+ultimaCarga.toLocaleTimeString('es-CO');
+    HORAS=leerHoras();render();
+  }catch(e){
+    reintentos++;
+    document.getElementById('syncTxt').textContent=reintentos<=3?'Reintentando ('+reintentos+'/3)…':'Sin conexión con el SYOP';
+    if(reintentos<=3)setTimeout(cargar,1800*reintentos);
+  }
+}
+function iniciar(){
+  document.getElementById('selModo').addEventListener('change',function(){modo=this.value;selK=null;render();});
+  document.getElementById('selPeriodo').addEventListener('change',function(){selK=this.value;render();});
+  cargar();
+  setTimeout(sincronizarHoras,2500);
+  setInterval(sincronizarHoras,10*60*1000);
+  setInterval(cargar,5*60*1000);
+}
+if(sessionStorage.getItem('okrUnlocked')==='1')unlock();
+</script>
+</body>
+</html>
