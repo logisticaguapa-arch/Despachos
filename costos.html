@@ -1098,26 +1098,58 @@ var HORAS_JSON=[
 var GH_INTERVALO_MIN=5;
 var GH_ULTIMO={};
 function ghEstado(txt,cls){var e=document.getElementById('ghEstado');if(!e)return;e.className='src-chip'+(cls?' '+cls:'');e.innerHTML=txt;}
+/* Descripción del archivo publicado, para ver en pantalla qué llegó y cómo se interpretó */
+function describirJson(j){
+  var out='<div class="note" style="margin-top:6px"><b>Diagnóstico del archivo publicado</b> ('+(j.archivo||'sin nombre')+', generado '+(j.generado||'?')+')</div>';
+  (j.hojas||[]).forEach(function(h){
+    var rows=Array.isArray(h.rows)?h.rows:[], noVacias=0, cols=0, hdr=-1, mapa=null;
+    rows.forEach(function(r,i){
+      if(!Array.isArray(r)) return;
+      if(r.length>cols) cols=r.length;
+      if(!filaVacia(r)) noVacias++;
+      if(hdr<0){var m=mapearEncabezado(r);if((m.fecha!==undefined||m.fhEnt!==undefined)&&(m.nombre!==undefined||m.cedula!==undefined)){hdr=i;mapa=m;}}
+    });
+    var prim=null;for(var k=0;k<rows.length&&prim===null;k++){if(Array.isArray(rows[k])&&!filaVacia(rows[k]))prim=rows[k];}
+    out+='<div class="note">Hoja <b>'+h.nombre+'</b>: '+rows.length+' filas ('+noVacias+' con datos), hasta '+cols+' columnas. '+
+      (hdr>=0?'Encabezados reconocidos en la fila '+(hdr+1)+': '+Object.keys(mapa).filter(function(x){return x!=='cat';}).join(', ')+'.':'<b>No encontré la fila de encabezados</b> (busco Fecha, Nombre y Entrada/Salida). ')+
+      (prim?' Primera fila con datos: <i>'+prim.slice(0,10).map(function(c){return String(c).slice(0,22);}).join(' | ')+'</i>':'')+'</div>';
+  });
+  return out;
+}
 async function sincronizarGitHub(forzar){
-  var hallados=0,nuevos=0,gens=[],err=null;
+  var hallados=0,aplicados=0,gens=[],errores=[],diag='';
   for(var i=0;i<HORAS_JSON.length;i++){
-    var f=HORAS_JSON[i];
+    var f=HORAS_JSON[i],j=null;
     try{
       var r=await fetch(f.url+'?t='+Date.now(),{cache:'no-store'});
       if(!r.ok) continue;                                  // todavía no se ha publicado ese archivo
-      var j=await r.json();
-      if(!j||!j.hojas||!j.hojas.length) continue;
-      hallados++;gens.push(j.generado||'');
-      if(!forzar&&GH_ULTIMO[f.url]&&GH_ULTIMO[f.url]===j.generado) continue;   // sin cambios desde la última lectura
-      GH_ULTIMO[f.url]=j.generado;nuevos++;
+      j=await r.json();
+    }catch(e){errores.push(f.nombre+': no se pudo leer el archivo ('+(e&&e.message?e.message:e)+')');continue;}
+    if(!j||!j.hojas||!j.hojas.length) continue;
+    hallados++;gens.push(j.generado||'');
+    if(!forzar&&GH_ULTIMO[f.url]&&GH_ULTIMO[f.url]===j.generado&&FUENTES&&Object.keys(FUENTES).length){aplicados++;continue;}   // sin cambios desde la última lectura
+    try{
       aplicarHojas(j.hojas.map(function(h){return {nombre:h.nombre,oculta:false,rows:h.rows};}),(j.archivo||f.nombre));
-    }catch(e){err=e;}
+      GH_ULTIMO[f.url]=j.generado;
+      if(!Object.keys(FUENTES).length) throw new Error('el archivo se leyó pero no produjo ningún turno');
+      aplicados++;
+    }catch(e){
+      errores.push(f.nombre+': '+(e&&e.message?e.message:e));
+      diag+=describirJson(j);
+    }
   }
-  if(hallados){
+  if(errores.length){
+    ghEstado('Macro de Excel → GitHub: ✘ el archivo llegó pero no se pudo procesar — '+errores[0],'bad');
+    var msg=document.getElementById('srcMsg');
+    if(msg) msg.innerHTML='<div class="alert-box"><b>No se pudo procesar el archivo publicado.</b><br>'+errores.join('<br>')+'</div>'+diag;
+  } else if(aplicados){
     var g=gens.filter(Boolean).sort().pop();
-    ghEstado('Macro de Excel → GitHub: ✔ '+hallados+' archivo(s) · última publicación '+(g?g.replace('T',' ').slice(0,16):'—')+' · revisado '+fmtFechaHora(Date.now()),'ok');
-  } else ghEstado(err?'Macro de Excel → GitHub: no se pudo leer ('+err.message+')':'Macro de Excel → GitHub: aún no hay archivos publicados en <code>datos/</code>','warn');
-  return hallados;
+    ghEstado('Macro de Excel → GitHub: ✔ '+aplicados+' archivo(s) · '+TURNOS.length+' turnos · última publicación '+(g?g.replace('T',' ').slice(0,16):'—')+' · revisado '+fmtFechaHora(Date.now()),'ok');
+  } else if(hallados){
+    ghEstado('Macro de Excel → GitHub: el archivo llegó pero no trae hojas con datos','warn');
+    var m2=document.getElementById('srcMsg');if(m2)m2.innerHTML='<div class="alert-box">El archivo publicado no trae filas con datos.</div>';
+  } else ghEstado('Macro de Excel → GitHub: aún no hay archivos publicados en <code>datos/</code>','warn');
+  return aplicados;
 }
 
 /* =====================================================================
@@ -1266,8 +1298,9 @@ function guardarResumenDias(){
   try{
     if(!RES.length){localStorage.removeItem('horasDiaV1');return;}
     var d={};
-    RES.forEach(function(r){var k=isoDate(r.fecha),x=d[k]||(d[k]={m:0,p:{}});x.m+=r.min;x.p[r.persona]=1;});
-    var o={};Object.keys(d).forEach(function(k){o[k]={m:Math.round(d[k].m),p:Object.keys(d[k].p).length,i:DIAS_INC[k]?1:0};});
+    RES.forEach(function(r){var k=isoDate(r.fecha),x=d[k]||(d[k]={m:0,p:{},c:0,f:esDominical(r.fecha)?1:0});x.m+=r.min;x.c+=r.total;x.p[r.persona]=1;});
+    // m = minutos trabajados, p = personas, i = día con horas incompletas, c = costo del día ($), f = domingo o festivo
+    var o={};Object.keys(d).forEach(function(k){o[k]={m:Math.round(d[k].m),p:Object.keys(d[k].p).length,i:DIAS_INC[k]?1:0,c:Math.round(d[k].c),f:d[k].f};});
     localStorage.setItem('horasDiaV1',JSON.stringify({ts:Date.now(),dias:o}));
   }catch(e){}
 }
