@@ -62,6 +62,10 @@ select,input[type=number],input[type=password]{font:inherit;font-size:14px;color
 .objective h2{font-size:clamp(22px,2.6vw,28px);line-height:1.15;margin-top:4px;text-wrap:balance}
 .takeaway{margin-top:8px;color:var(--ink);max-width:72ch}
 .ometa{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:var(--muted)}
+.owner{display:inline-flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:12px;padding:8px 14px;background:var(--soft);border-left:4px solid var(--orange);border-radius:6px}
+.owner-lbl{font-family:var(--f-display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--orange);font-weight:700}
+.owner-name{font-family:var(--f-display);font-size:24px;font-weight:700;color:var(--ink);line-height:1.1}
+.owner-rol{font-size:15px;font-weight:600;color:var(--muted)}
 .ring{width:118px;height:118px;position:relative;flex:none}
 .ring svg{width:100%;height:100%;transform:rotate(-90deg)}
 .ring .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
@@ -178,7 +182,8 @@ details[open].card summary::after{content:"–"}
       <h2>Despachar a tiempo, completo y a bajo costo: más kilos por hora de trabajo y un costo por kg por debajo del tope</h2>
       <p class="note" style="margin:2px 0 8px" id="objDesc">—</p>
       <p class="takeaway" id="takeaway">Cargando…</p>
-      <div class="ometa"><span id="oPeriodo">Período —</span><span>Responsable: <b>Yeison Ortiz</b> · Líder Logístico</span></div>
+      <div class="ometa"><span id="oPeriodo">Período —</span></div>
+      <div class="owner"><span class="owner-lbl">Responsable</span><span class="owner-name">Yeison Ortiz</span><span class="owner-rol">Líder Logístico</span></div>
     </div>
     <div class="ring" aria-label="Cumplimiento del objetivo">
       <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="var(--soft)" stroke-width="12"/><circle id="ringArc" cx="60" cy="60" r="50" fill="none" stroke="var(--orange)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 400"/></svg>
@@ -231,7 +236,7 @@ details[open].card summary::after{content:"–"}
         <li>KR1 y KR2: hoja SYOP de despachos (columnas de kilos cargados, cargue, personas y entrega a tiempo), las mismas de los tableros de Resultados y de Entregas.</li>
         <li>KR3: horas reales del control de horas (solo código de labor de despacho), valoradas en <b>Costos</b>, entre los kg despachados del SYOP.</li>
       </ul></dd></div>
-      <div><dt>Responsables</dt><dd><ul><li><b>Yeison Ortiz</b> · Líder Logístico</li></ul></dd></div>
+      <div><dt>Responsables</dt><dd><ul><li><b style="font-size:17px">Yeison Ortiz</b> · <b>Líder Logístico</b></li></ul></dd></div>
     </dl>
   </details>
 
